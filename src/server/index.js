@@ -168,6 +168,10 @@ function decrypt(text, key) {
   const crypto = require('crypto');
   const algorithm = 'aes-256-cbc';
   const parts = text.split(':');
+  if (parts.length < 2) {
+    console.warn('Encrypted text does not have proper format, returning as is');
+    return text;
+  }
   const iv = Buffer.from(parts.shift(), 'hex');
   const encrypted = parts.join(':');
   const keyBuffer = crypto.createHash('sha256').update(key).digest();
@@ -586,16 +590,29 @@ app.delete('/api/characters/:id', (req, res) => {
 app.post('/api/llm/chat', async (req, res) => {
   try {
     const { provider, messages, options = {} } = req.body;
+    console.log('LLM Chat request:', { provider, messagesCount: messages?.length, options });
     
     // 获取API密钥
     const settings = query('SELECT * FROM settings WHERE key = ?', [`${provider}_api_key`]);
     if (settings.length === 0) {
-      return res.status(400).json({ error: 'API key not configured' });
+      console.error(`API key not configured for provider: ${provider}`);
+      return res.status(400).json({ 
+        error: 'API key not configured', 
+        provider,
+        message: `请在设置中配置 ${provider === 'openai' ? 'OpenAI' : 'DeepSeek'} API 密钥` 
+      });
     }
     
     const crypto = require('crypto');
     const machineId = crypto.createHash('sha256').update(os.hostname() + os.platform()).digest('hex').substring(0, 32);
     const apiKey = decrypt(settings[0].value, machineId);
+    
+    if (!apiKey || apiKey.length < 10) {
+      console.error(`Invalid API key for ${provider}: ${apiKey ? apiKey.length : 'empty'}`);
+      return res.status(400).json({ error: 'Invalid API key configuration', provider });
+    }
+    
+    console.log(`API key loaded for ${provider}, length: ${apiKey.length}`);
     
     let apiUrl, modelName;
     if (provider === 'openai') {
@@ -603,28 +620,40 @@ app.post('/api/llm/chat', async (req, res) => {
       modelName = options.model || 'gpt-3.5-turbo';
     } else if (provider === 'deepseek') {
       apiUrl = 'https://api.deepseek.com/v1/chat/completions';
-      modelName = options.model || 'deepseek-chat';
+      modelName = options.model || 'deepseek-reasoner';
     } else {
-      return res.status(400).json({ error: 'Invalid provider' });
+      console.error(`Invalid provider: ${provider}`);
+      return res.status(400).json({ error: 'Invalid provider', provider });
     }
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: messages,
-        stream: true,
-        ...options
-      })
-    });
+    console.log(`Calling LLM API: ${apiUrl} with model: ${modelName}`);
+    
+    let response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: messages,
+          stream: true,
+          temperature: options.temperature,
+          top_p: options.topP,
+          max_tokens: options.maxTokens
+        })
+      });
+    } catch (fetchError) {
+      console.error('Fetch error:', fetchError);
+      return res.status(500).json({ error: fetchError.message });
+    }
     
     if (!response.ok) {
-      const error = await response.text();
-      return res.status(response.status).json({ error });
+      const errorText = await response.text();
+      console.error(`LLM API error (${response.status}):`, errorText);
+      return res.status(response.status).json({ error: errorText });
     }
     
     // 设置SSE响应
