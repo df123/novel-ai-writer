@@ -2,13 +2,14 @@ import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { app } from 'electron';
-import * as os from 'os';
-
-const DB_PATH = path.join(app.getPath('userData'), 'novel-ai.db');
-const DB_BACKUP_PATH = path.join(app.getPath('userData'), 'novel-ai.db-wal');
 
 let db: Database | null = null;
 let SQL: SqlJsStatic | null = null;
+
+function getDBPath(): string {
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'novel-ai.db');
+}
 
 export async function getDatabase(): Promise<Database> {
   if (!db) {
@@ -20,10 +21,11 @@ export async function getDatabase(): Promise<Database> {
 async function initializeDatabase(): Promise<void> {
   try {
     SQL = await initSqlJs({
-      locateFile: (file) => `https://sql.js.org/dist/${file}`,
+      locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
     });
 
     let dbData: Uint8Array | null = null;
+    const DB_PATH = getDBPath();
 
     try {
       const data = await fs.readFile(DB_PATH);
@@ -33,7 +35,6 @@ async function initializeDatabase(): Promise<void> {
     }
 
     db = new SQL.Database(dbData);
-    db.pragma('journal_mode = WAL');
 
     await createTables();
   } catch (error) {
@@ -119,6 +120,7 @@ async function createTables(): Promise<void> {
 export async function closeDatabase(): Promise<void> {
   if (db) {
     const data = db.export();
+    const DB_PATH = getDBPath();
     await fs.writeFile(DB_PATH, Buffer.from(data));
     db.close();
     db = null;
@@ -128,6 +130,7 @@ export async function closeDatabase(): Promise<void> {
 export async function saveDatabase(): Promise<void> {
   if (db) {
     const data = db.export();
+    const DB_PATH = getDBPath();
     await fs.writeFile(DB_PATH, Buffer.from(data));
   }
 }

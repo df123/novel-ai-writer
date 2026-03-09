@@ -9,6 +9,8 @@ lerna-debug.log*
 
 # Dependencies
 node_modules
+.pnpm-debug.log*
+.pnpm-store
 dist
 dist-electron
 build

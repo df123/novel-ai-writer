@@ -1,5 +1,5 @@
 import { BaseLLMProvider } from './base';
-import { ChatOptions, ModelInfo, Message } from '../../shared/types';
+import { ChatOptions, ModelInfo, Message, StreamResponse } from '@shared/types';
 
 export class DeepSeekProvider extends BaseLLMProvider {
   name = 'DeepSeek';
@@ -8,7 +8,7 @@ export class DeepSeekProvider extends BaseLLMProvider {
   async chat(
     messages: Omit<Message, 'id' | 'chatId' | 'timestamp' | 'orderIndex' | 'deleted' | 'deletedAt'>[],
     options: ChatOptions
-  ): Promise<AsyncGenerator<string>> {
+  ): Promise<StreamResponse> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -48,7 +48,7 @@ export class DeepSeekProvider extends BaseLLMProvider {
       throw new Error(`Failed to fetch models: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { data: any[] };
     
     const models = data.data.map((m: any) => ({
       id: m.id,

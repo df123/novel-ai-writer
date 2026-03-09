@@ -8,14 +8,10 @@
     "strict": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "outDir": "dist/main",
-    "types": ["node"],
-    "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["src/shared/*"]
-    }
+    "outDir": "dist/preload",
+    "rootDir": "src/preload",
+    "types": ["electron"]
   },
-  "include": ["src/main/**/*"],
+  "include": ["src/preload/**/*"],
   "exclude": ["node_modules"]
 }

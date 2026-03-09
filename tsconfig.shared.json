@@ -8,14 +8,13 @@
     "strict": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "outDir": "dist/main",
+    "outDir": "dist/main/shared",
+    "rootDir": "src/shared",
     "types": ["node"],
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["src/shared/*"]
-    }
+    "declaration": true,
+    "declarationMap": true
   },
-  "include": ["src/main/**/*"],
+  "include": ["src/shared/**/*"],
   "exclude": ["node_modules"]
 }

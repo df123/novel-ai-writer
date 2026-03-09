@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Character } from '../../shared/types';
-import { ipcClient } from '../utils/ipc';
+import { characterApi } from '../utils/api';
+import { useProjectStore } from './projectStore';
 
 interface CharacterState {
   characters: Character[];
@@ -10,7 +11,7 @@ interface CharacterState {
   loadCharacters: (projectId: string) => Promise<void>;
   createCharacter: (character: Omit<Character, 'id' | 'projectId' | 'createdAt'>) => Promise<Character>;
   updateCharacter: (id: string, updates: Partial<Character>) => Promise<void>;
-  deleteCharacter: (id: string) => Promise<void>;
+  deleteCharacter: (id: string) => void;
   toggleCharacterSelection: (id: string) => void;
   clearCharacterSelection: () => void;
 }
@@ -23,7 +24,8 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
   loadCharacters: async (projectId: string) => {
     set({ isLoading: true });
     try {
-      const characters = await ipcClient.character.getAll(projectId);
+      const response = await characterApi.list(projectId);
+      const characters = response.data;
       set({ characters, isLoading: false });
     } catch (error) {
       console.error('Failed to load characters:', error);
@@ -35,20 +37,22 @@ export const useCharacterStore = create<CharacterState>((set, get) => ({
     const { currentProject } = useProjectStore.getState();
     if (!currentProject) throw new Error('No project selected');
 
-    const newCharacter = await ipcClient.character.create(currentProject.id, character);
+    const response = await characterApi.create(currentProject.id, character);
+    const newCharacter = response.data;
     set(state => ({ characters: [...state.characters, newCharacter] }));
     return newCharacter;
   },
 
   updateCharacter: async (id: string, updates: Partial<Character>) => {
-    await ipcClient.character.update(id, updates);
+    const response = await characterApi.update(id, updates);
+    const updated = response.data;
     set(state => ({
-      characters: state.characters.map(c => (c.id === id ? { ...c, ...updates } : c)),
+      characters: state.characters.map(c => (c.id === id ? updated : c)),
     }));
   },
 
-  deleteCharacter: (id: string) => {
-    ipcClient.character.delete(id);
+  deleteCharacter: async (id: string) => {
+    await characterApi.delete(id);
     set(state => ({
       characters: state.characters.filter(c => c.id !== id),
       selectedCharacters: new Set([...state.selectedCharacters].filter(sid => sid !== id)),

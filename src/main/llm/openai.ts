@@ -1,5 +1,5 @@
 import { BaseLLMProvider } from './base';
-import { ChatOptions, ModelInfo, Message } from '../../shared/types';
+import { ChatOptions, ModelInfo, Message, StreamResponse } from '@shared/types';
 
 export class OpenAIProvider extends BaseLLMProvider {
   name = 'OpenAI';
@@ -8,7 +8,7 @@ export class OpenAIProvider extends BaseLLMProvider {
   async chat(
     messages: Omit<Message, 'id' | 'chatId' | 'timestamp' | 'orderIndex' | 'deleted' | 'deletedAt'>[],
     options: ChatOptions
-  ): Promise<AsyncGenerator<string>> {
+  ): Promise<StreamResponse> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -48,7 +48,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       throw new Error(`Failed to fetch models: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { data: any[] };
     
     const chatModels = data.data
       .filter((m: any) => m.id.includes('gpt'))

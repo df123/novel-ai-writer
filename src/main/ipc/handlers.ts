@@ -1,10 +1,10 @@
 import { ipcMain } from 'electron';
-import { IPC_CHANNELS } from '../../shared/constants';
+import { IPC_CHANNELS } from '@shared/constants';
 import { getDatabase } from '../database';
-import { generateId } from '../../shared/utils';
-import { Project, Chat, TimelineNode, Character, Message } from '../../shared/types';
+import { generateId } from '@shared/utils';
+import { Project, Chat, TimelineNode, Character, Message } from '@shared/types';
 import { llmService } from '../llm';
-import { templateEngine } from '../../shared/templateEngine';
+import { templateEngine } from '@shared/templateEngine';
 
 export function registerIPCHandlers(): void {
   registerProjectHandlers();
@@ -73,7 +73,7 @@ function registerProjectHandlers(): void {
       UPDATE projects 
       SET title = ?, description = ?, updated_at = ?
       WHERE id = ?
-    `, [updates.title, updates.description || '', now, id]);
+    `, [updates.title || '', updates.description || '', now, id]);
 
     return getProjectById(db, id);
   });
@@ -313,7 +313,7 @@ function registerTimelineHandlers(): void {
       UPDATE timeline_nodes 
       SET title = ?, date = ?, description = ?, order_index = ?
       WHERE id = '${id}'
-    `, [updates.title, updates.date, updates.description || '', updates.orderIndex]);
+    `, [updates.title || '', updates.date || '', updates.description || '', updates.orderIndex ?? 0]);
   });
 
   ipcMain.handle(IPC_CHANNELS.TIMELINE.DELETE, async (_, id: string) => {
@@ -374,7 +374,7 @@ function registerCharacterHandlers(): void {
       SET name = ?, avatar = ?, personality = ?, background = ?, relationships = ?
       WHERE id = '${id}'
     `, [
-      updates.name,
+      updates.name || '',
       updates.avatar || '',
       updates.personality || '',
       updates.background || '',

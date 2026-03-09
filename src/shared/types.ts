@@ -78,12 +78,13 @@ export interface ModelInfo {
   contextLength: number;
 }
 
-export interface StreamResponse {
-  [Symbol.asyncIterator](): AsyncIterator<string>;
+export interface StreamResponse extends AsyncIterable<string> {
+  [Symbol.asyncIterator](): AsyncIterator<string, any, undefined>;
 }
 
 export interface LLMProvider {
   name: string;
+  setApiKey(apiKey: string): void;
   chat(messages: Omit<Message, 'id' | 'chatId' | 'timestamp' | 'orderIndex' | 'deleted' | 'deletedAt'>[], options: ChatOptions): Promise<StreamResponse>;
   getModels(): Promise<ModelInfo[]>;
   validateApiKey(apiKey: string): Promise<boolean>;

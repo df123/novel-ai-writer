@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { TimelineNode } from '../../shared/types';
-import { ipcClient } from '../utils/ipc';
+import { timelineApi } from '../utils/api';
+import { useProjectStore } from './projectStore';
 
 interface TimelineState {
   nodes: TimelineNode[];
@@ -8,9 +9,9 @@ interface TimelineState {
   isLoading: boolean;
   
   loadNodes: (projectId: string) => Promise<void>;
-  createNode: (title: string, date: string, description?: string) => Promise<TimelineNode>;
+  createNode: (title: string, content?: string) => Promise<TimelineNode>;
   updateNode: (id: string, updates: Partial<TimelineNode>) => Promise<void>;
-  deleteNode: (id: string) => Promise<void>;
+  deleteNode: (id: string) => void;
   selectNode: (id: string | null) => void;
 }
 
@@ -22,7 +23,8 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   loadNodes: async (projectId: string) => {
     set({ isLoading: true });
     try {
-      const nodes = await ipcClient.timeline.getAll(projectId);
+      const response = await timelineApi.list(projectId);
+      const nodes = response.data;
       set({ nodes, isLoading: false });
     } catch (error) {
       console.error('Failed to load timeline nodes:', error);
@@ -30,15 +32,17 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     }
   },
 
-  createNode: async (title: string, date: string, description?: string) => {
+  createNode: async (title: string, content?: string) => {
     const { currentProject } = useProjectStore.getState();
     if (!currentProject) throw new Error('No project selected');
 
-    const node = await ipcClient.timeline.create(currentProject.id, {
+    const orderIndex = get().nodes.length;
+    const response = await timelineApi.create(currentProject.id, {
       title,
-      date,
-      description: description || '',
+      content: content || '',
+      orderIndex,
     });
+    const node = response.data;
     
     set(state => ({
       nodes: [...state.nodes, node],
@@ -49,15 +53,23 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   },
 
   updateNode: async (id: string, updates: Partial<TimelineNode>) => {
-    await ipcClient.timeline.update(id, updates);
+    const node = get().nodes.find(n => n.id === id);
+    if (!node) return;
+
+    const response = await timelineApi.update(id, {
+      title: updates.title || node.title,
+      content: updates.content || node.content,
+      orderIndex: updates.orderIndex || node.orderIndex,
+    });
+    
     set(state => ({
-      nodes: state.nodes.map(n => (n.id === id ? { ...n, ...updates } : n)),
-      selectedNode: state.selectedNode?.id === id ? { ...state.selectedNode, ...updates } : state.selectedNode,
+      nodes: state.nodes.map(n => (n.id === id ? response.data : n)),
+      selectedNode: state.selectedNode?.id === id ? response.data : state.selectedNode,
     }));
   },
 
-  deleteNode: (id: string) => {
-    ipcClient.timeline.delete(id);
+  deleteNode: async (id: string) => {
+    await timelineApi.delete(id);
     set(state => ({
       nodes: state.nodes.filter(n => n.id !== id),
       selectedNode: state.selectedNode?.id === id ? null : state.selectedNode,

@@ -12,8 +12,7 @@ import {
   Typography,
   Alert,
 } from '@mui/material';
-import { ipcClient } from '../utils/ipc';
-import { useProjectStore } from '../store/projectStore';
+import { useSettingsStore } from '../store/settingsStore';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -39,28 +38,22 @@ export default function LLMSettingsDialog({ open, onClose }: LLMSettingsDialogPr
   const [openaiKey, setOpenaiKey] = useState('');
   const [deepseekKey, setDeepseekKey] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const { loadProjects } = useProjectStore();
+  const { openaiApiKey, deepseekApiKey, loadSettings, updateSettings } = useSettingsStore();
 
   useEffect(() => {
     if (open) {
-      loadKeys();
+      loadSettings();
     }
-  }, [open]);
+  }, [open, loadSettings]);
 
-  const loadKeys = async () => {
-    try {
-      const openaiStored = await ipcClient.settings.get('apiKey.openai');
-      const deepseekStored = await ipcClient.settings.get('apiKey.deepseek');
-      setOpenaiKey(openaiStored || '');
-      setDeepseekKey(deepseekStored || '');
-    } catch (error) {
-      console.error('Failed to load API keys:', error);
-    }
-  };
+  useEffect(() => {
+    setOpenaiKey(openaiApiKey);
+    setDeepseekKey(deepseekApiKey);
+  }, [openaiApiKey, deepseekApiKey]);
 
   const handleSaveOpenAI = async () => {
     try {
-      await ipcClient.settings.set('apiKey.openai', openaiKey);
+      await updateSettings({ openaiApiKey: openaiKey });
       setMessage({ type: 'success', text: 'OpenAI API密钥已保存' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
@@ -70,7 +63,7 @@ export default function LLMSettingsDialog({ open, onClose }: LLMSettingsDialogPr
 
   const handleSaveDeepSeek = async () => {
     try {
-      await ipcClient.settings.set('apiKey.deepseek', deepseekKey);
+      await updateSettings({ deepseekApiKey: deepseekKey });
       setMessage({ type: 'success', text: 'DeepSeek API密钥已保存' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {

@@ -16,35 +16,41 @@
 - **前端框架**：Electron + React + TypeScript
 - **UI库**：Material-UI (MUI)
 - **状态管理**：Zustand
-- **数据库**：SQLite (better-sqlite3)
+- **数据库**：SQLite (sql.js)
 - **构建工具**：Vite
+- **包管理器**：pnpm
 
 ## 安装
 
+推荐使用 [pnpm](https://pnpm.io/) 作为包管理器：
+
 ```bash
-# 安装依赖
-npm install
+# 全局安装 pnpm（如果还没有）
+npm install -g pnpm
+
+# 安装项目依赖
+pnpm install
 ```
 
 ## 开发
 
 ```bash
 # 启动开发模式
-npm run dev
+pnpm dev
 
 # 启动Electron应用（需要先构建）
-npm run build
-npm run electron
+pnpm build
+pnpm electron
 ```
 
 ## 构建
 
 ```bash
 # 构建项目
-npm run build
+pnpm build
 
 # 打包应用
-npm run dist
+pnpm dist
 ```
 
 ## 使用说明
@@ -72,8 +78,16 @@ novel-ai/
 │   ├── preload/           # Preload脚本
 │   └── shared/            # 共享代码
 ├── package.json
+├── pnpm-lock.yaml
 └── tsconfig.json
 ```
+
+## 为什么要用pnpm
+
+- **节省磁盘空间**：pnpm使用硬链接，不重复下载相同版本的包
+- **更快的安装速度**：比npm和yarn更快
+- **严格的依赖管理**：避免幽灵依赖问题
+- **支持Monorepo**：便于管理多包项目
 
 ## 注意事项
 

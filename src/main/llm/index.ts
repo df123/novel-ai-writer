@@ -1,6 +1,6 @@
 import { OpenAIProvider } from './openai';
 import { DeepSeekProvider } from './deepseek';
-import { LLMProvider, ChatOptions, Message } from '../../shared/types';
+import { LLMProvider, ChatOptions, Message, StreamResponse } from '@shared/types';
 import { getDatabase } from '../database';
 import * as crypto from 'crypto-js';
 import * as os from 'os';
@@ -22,27 +22,29 @@ class LLMService {
     this.providers.set('deepseek', new DeepSeekProvider());
   }
 
-  private loadApiKey(providerName: string): string | null {
-    const db = getDatabase();
-    const result = db.prepare('SELECT value FROM settings WHERE key = ?').get(`apiKey.${providerName}`) as { value: string } | undefined;
+  private async loadApiKey(providerName: string): Promise<string | null> {
+    const db = await getDatabase();
+    const result = db.exec(`SELECT value FROM settings WHERE key = 'apiKey.${providerName}'`);
     
-    if (!result) return null;
+    if (result.length === 0 || result[0].values.length === 0) return null;
+
+    const value = result[0].values[0][0] as string;
 
     try {
-      const decrypted = crypto.AES.decrypt(result.value, this.secretKey);
+      const decrypted = crypto.AES.decrypt(value, this.secretKey);
       return decrypted.toString(crypto.enc.Utf8);
     } catch {
       return null;
     }
   }
 
-  private saveApiKey(providerName: string, apiKey: string): void {
-    const db = getDatabase();
+  private async saveApiKey(providerName: string, apiKey: string): Promise<void> {
+    const db = await getDatabase();
     const encrypted = crypto.AES.encrypt(apiKey, this.secretKey).toString();
-    db.prepare(`
+    db.run(`
       INSERT OR REPLACE INTO settings (key, value)
       VALUES (?, ?)
-    `).run(`apiKey.${providerName}`, encrypted);
+    `, [`apiKey.${providerName}`, encrypted]);
   }
 
   async setApiKey(providerName: string, apiKey: string): Promise<void> {
@@ -57,14 +59,14 @@ class LLMService {
     }
 
     provider.setApiKey(apiKey);
-    this.saveApiKey(providerName, apiKey);
+    await this.saveApiKey(providerName, apiKey);
   }
 
-  getProvider(providerName: string): LLMProvider | null {
+  async getProvider(providerName: string): Promise<LLMProvider | null> {
     const provider = this.providers.get(providerName);
     if (!provider) return null;
 
-    const apiKey = this.loadApiKey(providerName);
+    const apiKey = await this.loadApiKey(providerName);
     if (!apiKey) return null;
 
     provider.setApiKey(apiKey);
@@ -75,8 +77,8 @@ class LLMService {
     providerName: string,
     messages: Omit<Message, 'id' | 'chatId' | 'timestamp' | 'orderIndex' | 'deleted' | 'deletedAt'>[],
     options: ChatOptions
-  ): Promise<AsyncGenerator<string>> {
-    const provider = this.getProvider(providerName);
+  ): Promise<StreamResponse> {
+    const provider = await this.getProvider(providerName);
     if (!provider) {
       throw new Error(`Provider ${providerName} not configured`);
     }
@@ -85,7 +87,7 @@ class LLMService {
   }
 
   async getModels(providerName: string): Promise<any[]> {
-    const provider = this.getProvider(providerName);
+    const provider = await this.getProvider(providerName);
     if (!provider) {
       throw new Error(`Provider ${providerName} not configured`);
     }

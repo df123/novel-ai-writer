@@ -1,4 +1,4 @@
-import { LLMProvider, Message, ChatOptions, StreamResponse, ModelInfo } from '../../shared/types';
+import { LLMProvider, Message, ChatOptions, StreamResponse, ModelInfo } from '@shared/types';
 
 export abstract class BaseLLMProvider implements LLMProvider {
   abstract name: string;
