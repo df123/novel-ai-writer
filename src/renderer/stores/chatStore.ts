@@ -74,8 +74,9 @@ export const useChatStore = defineStore('chat', () => {
     currentStreamContent.value = '';
     currentStreamReasoning.value = '';
 
+    const userMessageId = generateId();
     const userMessage: Message = {
-      id: generateId(),
+      id: userMessageId,
       chatId: currentChat.value.id,
       role: 'user',
       content,
@@ -84,6 +85,22 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     messages.value.push(userMessage);
+    
+    await messageApi.create(currentChat.value.id, {
+      role: 'user',
+      content,
+    });
+
+    const assistantMessageId = generateId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      chatId: currentChat.value.id,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      orderIndex: messages.value.length + 1,
+    };
+    messages.value.push(assistantMessage);
 
     let systemPrompt = options.systemPrompt || '';
     
@@ -107,10 +124,14 @@ export const useChatStore = defineStore('chat', () => {
       messagesForLLM.push({ role: 'system', content: systemPrompt });
     }
     
-    messagesForLLM.push(...messages.value.map(m => ({
-      role: m.role,
-      content: m.content,
-    })));
+    const validMessages = messages.value
+      .filter(m => m.id !== assistantMessageId && m.content && m.content.trim())
+      .map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+    
+    messagesForLLM.push(...validMessages);
 
     try {
       const response = await llmApi.chat(
@@ -147,10 +168,12 @@ export const useChatStore = defineStore('chat', () => {
               if (content) {
                 fullContent += content;
                 currentStreamContent.value = fullContent;
+                console.log('Stream content updated:', fullContent.length, 'chars');
               }
               if (reasoning_content) {
                 fullReasoning += reasoning_content;
                 currentStreamReasoning.value = fullReasoning;
+                console.log('Stream reasoning updated:', fullReasoning.length, 'chars');
               }
             } catch (e) {
             }
@@ -158,15 +181,14 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      const assistantMessage: Message = {
-        id: generateId(),
-        chatId: currentChat.value.id,
-        role: 'assistant',
-        content: fullContent,
-        reasoning_content: fullReasoning || undefined,
-        timestamp: Date.now(),
-        orderIndex: messages.value.length + 1,
-      };
+      const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+      if (lastMessageIndex !== -1) {
+        messages.value[lastMessageIndex] = {
+          ...messages.value[lastMessageIndex],
+          content: fullContent,
+          reasoning_content: fullReasoning || undefined,
+        };
+      }
 
       await messageApi.create(currentChat.value.id, {
         role: 'assistant',
@@ -174,12 +196,6 @@ export const useChatStore = defineStore('chat', () => {
         reasoning_content: fullReasoning || undefined,
       });
 
-      await messageApi.create(currentChat.value.id, {
-        role: 'user',
-        content,
-      });
-
-      messages.value.push(assistantMessage);
       isLoading.value = false;
       isStreaming.value = false;
       currentStreamContent.value = '';

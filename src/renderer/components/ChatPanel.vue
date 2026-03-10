@@ -9,8 +9,8 @@
     <el-main style="flex: 1; overflow: auto; padding: 16px">
       <div style="display: flex; flex-direction: column; gap: 16px">
         <div
-          v-for="message in messages"
-          :key="message.id"
+          v-for="(message, index) in messages"
+          :key="message.id + index"
           style="width: 100%"
         >
           <div style="display: flex; align-items: center; width: 100%; margin-bottom: 8px">
@@ -50,8 +50,19 @@
                 </el-collapse-item>
               </el-collapse>
             </div>
-            <div style="white-space: pre-wrap">{{ displayContent(message) }}</div>
+            <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1 && currentStreamContent" style="white-space: pre-wrap">
+              {{ currentStreamContent }}
+            </div>
+            <div v-else style="white-space: pre-wrap">{{ message.content }}</div>
           </el-card>
+        </div>
+        <div v-if="isStreaming" style="padding: 12px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px">
+          <div style="font-weight: bold; margin-bottom: 8px">流式传输调试信息:</div>
+          <div>Content: {{ currentStreamContent.length }} chars</div>
+          <div>Reasoning: {{ currentStreamReasoning.length }} chars</div>
+          <div v-if="currentStreamContent" style="margin-top: 8px; max-height: 100px; overflow: auto; font-size: 12px">
+            {{ currentStreamContent }}
+          </div>
         </div>
         <div ref="messagesEndRef"></div>
       </div>
@@ -104,88 +115,13 @@ const { createChat, selectChat, sendMessage, deleteMessage } = chatStore;
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
-const contentInterval = ref<number | null>(null);
-const reasoningInterval = ref<number | null>(null);
-const displayedStreamContent = ref('');
-const displayedStreamReasoning = ref('');
 
-watch(currentStreamContent, (newContent, oldContent) => {
-  if (contentInterval.value) {
-    clearInterval(contentInterval.value);
-  }
-  
-  displayedStreamContent.value = newContent;
-  
-  if (!isStreaming.value || !newContent) {
-    return;
-  }
-  
-  let targetLength = newContent.length;
-  if (oldContent && newContent.startsWith(oldContent)) {
-    displayedStreamContent.value = oldContent;
-    targetLength = newContent.length;
-  } else {
-    displayedStreamContent.value = '';
-    targetLength = newContent.length;
-  }
-  
-  contentInterval.value = window.setInterval(() => {
-    if (displayedStreamContent.value.length < targetLength) {
-      displayedStreamContent.value = currentStreamContent.value.slice(0, displayedStreamContent.value.length + 1);
-    } else {
-      if (contentInterval.value) {
-        clearInterval(contentInterval.value);
-        contentInterval.value = null;
-      }
-    }
-  }, 5);
-});
-
-watch(currentStreamReasoning, (newReasoning, oldReasoning) => {
-  if (reasoningInterval.value) {
-    clearInterval(reasoningInterval.value);
-  }
-  
-  displayedStreamReasoning.value = newReasoning;
-  
-  if (!isStreaming.value || !newReasoning) {
-    return;
-  }
-  
-  let targetLength = newReasoning.length;
-  if (oldReasoning && newReasoning.startsWith(oldReasoning)) {
-    displayedStreamReasoning.value = oldReasoning;
-    targetLength = newReasoning.length;
-  } else {
-    displayedStreamReasoning.value = '';
-    targetLength = newReasoning.length;
-  }
-  
-  reasoningInterval.value = window.setInterval(() => {
-    if (displayedStreamReasoning.value.length < targetLength) {
-      displayedStreamReasoning.value = currentStreamReasoning.value.slice(0, displayedStreamReasoning.value.length + 1);
-    } else {
-      if (reasoningInterval.value) {
-        clearInterval(reasoningInterval.value);
-        reasoningInterval.value = null;
-      }
-    }
-  }, 5);
-});
-
-watch(isStreaming, (newValue) => {
-  if (!newValue) {
-    if (contentInterval.value) {
-      clearInterval(contentInterval.value);
-      contentInterval.value = null;
-    }
-    if (reasoningInterval.value) {
-      clearInterval(reasoningInterval.value);
-      reasoningInterval.value = null;
-    }
-    displayedStreamContent.value = currentStreamContent.value;
-    displayedStreamReasoning.value = currentStreamReasoning.value;
-  }
+watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning]) => {
+  console.log('Stream content changed:', newContent?.length || 0, 'chars');
+  console.log('Stream reasoning changed:', newReasoning?.length || 0, 'chars');
+  nextTick(() => {
+    messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
+  });
 });
 
 onMounted(async () => {
@@ -194,7 +130,7 @@ onMounted(async () => {
   }
 });
 
-watch([messages, displayedStreamContent, displayedStreamReasoning], async () => {
+watch(messages, async () => {
   await nextTick();
   messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
 });
@@ -209,15 +145,25 @@ watch(
 );
 
 const displayContent = (message: Message) => {
-  if (isStreaming.value && message.role === 'assistant' && messages.value.length > 0 && messages.value[messages.value.length - 1].id === message.id) {
-    return displayedStreamContent.value;
+  const isLastAssistantMessage = isStreaming.value && 
+    message.role === 'assistant' && 
+    messages.value.length > 0 && 
+    messages.value[messages.value.length - 1].id === message.id;
+  
+  if (isLastAssistantMessage) {
+    return currentStreamContent.value;
   }
   return message.content;
 };
 
 const displayReasoning = (message: Message) => {
-  if (isStreaming.value && message.role === 'assistant' && messages.value.length > 0 && messages.value[messages.value.length - 1].id === message.id) {
-    return displayedStreamReasoning.value;
+  const isLastAssistantMessage = isStreaming.value && 
+    message.role === 'assistant' && 
+    messages.value.length > 0 && 
+    messages.value[messages.value.length - 1].id === message.id;
+  
+  if (isLastAssistantMessage) {
+    return currentStreamReasoning.value;
   }
   return message.reasoning_content;
 };
