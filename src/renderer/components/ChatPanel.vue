@@ -1,15 +1,13 @@
 <template>
-  <el-container v-if="currentProject" style="flex: 1; min-width: 400px">
-    <el-header style="border-bottom: 1px solid #e0e0e0; padding: 0">
-      <div style="padding: 12px 16px; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: space-between">
-        <span>写作区</span>
-        <el-tag size="small" type="info">
-          {{ totalTokens }} tokens
-        </el-tag>
-      </div>
+  <el-main v-if="currentProject" style="flex: 1; min-width: 400px; display: flex; flex-direction: column; overflow: hidden; padding: 0">
+    <el-header style="border-bottom: 1px solid #e0e0e0; padding: 0; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px">
+      <span style="font-size: 16px; font-weight: 500">写作区</span>
+      <el-tag size="small" type="info">
+        {{ totalTokens }} tokens
+      </el-tag>
     </el-header>
 
-    <el-main style="flex: 1; overflow: auto; padding: 16px">
+    <div style="flex: 1; overflow: auto; padding: 16px">
       <div style="display: flex; flex-direction: column; gap: 16px">
         <div
           v-for="(message, index) in messages"
@@ -72,9 +70,9 @@
         </div>
         <div ref="messagesEndRef"></div>
       </div>
-    </el-main>
+    </div>
 
-    <el-footer style="border-top: 1px solid #e0e0e0; padding: 12px">
+    <el-footer style="border-top: 1px solid #e0e0e0; padding: 12px; height: auto; flex-shrink: 0">
       <el-input
         v-model="inputText"
         type="textarea"
@@ -92,7 +90,7 @@
         </template>
       </el-input>
     </el-footer>
-  </el-container>
+  </el-main>
   <el-empty v-else description="请先选择或创建一个项目" style="flex: 1" />
 </template>
 

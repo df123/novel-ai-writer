@@ -1,6 +1,6 @@
 <template>
-  <el-container style="height: 100vh">
-    <el-header style="background-color: #1976d2; color: white; padding: 0 16px">
+  <el-container style="height: 100vh; display: flex; flex-direction: column">
+    <el-header style="background-color: #1976d2; color: white; padding: 0 16px; flex-shrink: 0; height: 60px">
       <el-row align="middle" style="height: 100%">
         <el-icon :size="24" style="margin-right: 12px">
           <HomeFilled />
@@ -25,7 +25,7 @@
       </el-row>
     </el-header>
 
-    <el-container style="flex: 1; overflow: hidden">
+    <el-container style="flex: 1; overflow: hidden; display: flex; flex-direction: row">
       <TimelinePanel />
       <ChatPanel />
       <CharacterPanel />
