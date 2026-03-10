@@ -6,6 +6,7 @@ import { generateId } from '../../shared/utils';
 import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
+import { useSettingsStore } from './settingsStore';
 
 export const useChatStore = defineStore('chat', () => {
   const chats = ref<Chat[]>([]);
@@ -64,6 +65,7 @@ export const useChatStore = defineStore('chat', () => {
     const projectStore = useProjectStore();
     const timelineStore = useTimelineStore();
     const characterStore = useCharacterStore();
+    const settingsStore = useSettingsStore();
     
     if (!currentChat.value || !projectStore.currentProject) {
       throw new Error('No chat or project selected');
@@ -137,7 +139,10 @@ export const useChatStore = defineStore('chat', () => {
       const response = await llmApi.chat(
         options.providerName || 'openai',
         messagesForLLM,
-        { model: options.modelName }
+        { 
+          model: options.modelName,
+          temperature: settingsStore.temperature
+        }
       );
 
       if (!response.body) {

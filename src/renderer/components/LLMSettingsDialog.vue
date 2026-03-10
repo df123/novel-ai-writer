@@ -32,6 +32,33 @@
           />
         </div>
       </el-tab-pane>
+      <el-tab-pane label="模型参数" name="params">
+        <div style="padding: 16px 0">
+          <div style="margin-bottom: 24px">
+            <label style="display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px">
+              Temperature
+            </label>
+            <p style="font-size: 12px; color: #666; margin-bottom: 12px">
+              控制模型输出的随机性。值越高输出越随机，值越低输出越确定。建议范围：0.0 - 1.0
+            </p>
+            <el-slider
+              v-model="tempValue"
+              :min="0"
+              :max="2"
+              :step="0.1"
+              :marks="{ 0: '0.0', 0.7: '0.7', 1.0: '1.0', 2.0: '2.0' }"
+              show-stops
+              style="margin-bottom: 12px"
+            />
+            <div style="text-align: center; font-size: 14px; font-weight: bold; color: #409eff">
+              {{ tempValue }}
+            </div>
+          </div>
+          <el-button type="primary" @click="handleSaveParams">
+            保存参数设置
+          </el-button>
+        </div>
+      </el-tab-pane>
     </el-tabs>
 
     <el-alert
@@ -73,13 +100,14 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const settingsStore = useSettingsStore();
-const { openaiApiKey, deepseekApiKey } = storeToRefs(settingsStore);
+const { openaiApiKey, deepseekApiKey, temperature } = storeToRefs(settingsStore);
 const { loadSettings, updateSettings } = settingsStore;
 
 const visible = ref(props.modelValue);
 const activeTab = ref('deepseek');
 const openaiKey = ref('');
 const deepseekKey = ref('');
+const tempValue = ref(0.7);
 const message = ref<{ type: 'success' | 'error'; text: string } | null>(null);
 
 watch(
@@ -88,6 +116,7 @@ watch(
     visible.value = val;
     if (val) {
       await loadSettings();
+      tempValue.value = temperature.value;
     }
   }
 );
@@ -131,9 +160,19 @@ const handleSaveDeepSeek = async () => {
   }
 };
 
+const handleSaveParams = async () => {
+  try {
+    await updateSettings({ temperature: tempValue.value });
+    ElMessage.success('参数设置已保存');
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error as Error).message);
+  }
+};
+
 const handleClose = () => {
   openaiKey.value = '';
   deepseekKey.value = '';
+  tempValue.value = temperature.value;
   message.value = null;
   visible.value = false;
 };
