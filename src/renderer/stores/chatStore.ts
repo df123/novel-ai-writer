@@ -14,6 +14,7 @@ export const useChatStore = defineStore('chat', () => {
   const isLoading = ref(false);
   const isStreaming = ref(false);
   const currentStreamContent = ref('');
+  const currentStreamReasoning = ref('');
 
   const loadChats = async (projectId: string) => {
     const response = await chatApi.list(projectId);
@@ -71,6 +72,7 @@ export const useChatStore = defineStore('chat', () => {
     isLoading.value = true;
     isStreaming.value = true;
     currentStreamContent.value = '';
+    currentStreamReasoning.value = '';
 
     const userMessage: Message = {
       id: generateId(),
@@ -87,7 +89,7 @@ export const useChatStore = defineStore('chat', () => {
     
     if (timelineStore.nodes.length > 0) {
       const timelineSummary = timelineStore.nodes
-        .map((node, i) => `${i + 1}. ${node.title}: ${node.content || '无内容'}`)
+        .map((node, i) => `${i + 1}. ${node.title}: ${node.description || '无内容'}`)
         .join('\n');
       systemPrompt += `\n\n当前时间线：\n${timelineSummary}`;
     }
@@ -124,6 +126,7 @@ export const useChatStore = defineStore('chat', () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
+      let fullReasoning = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -140,9 +143,14 @@ export const useChatStore = defineStore('chat', () => {
             try {
               const parsed = JSON.parse(data);
               const content = parsed.content;
+              const reasoning_content = parsed.reasoning_content;
               if (content) {
                 fullContent += content;
                 currentStreamContent.value = fullContent;
+              }
+              if (reasoning_content) {
+                fullReasoning += reasoning_content;
+                currentStreamReasoning.value = fullReasoning;
               }
             } catch (e) {
             }
@@ -155,6 +163,7 @@ export const useChatStore = defineStore('chat', () => {
         chatId: currentChat.value.id,
         role: 'assistant',
         content: fullContent,
+        reasoning_content: fullReasoning || undefined,
         timestamp: Date.now(),
         orderIndex: messages.value.length + 1,
       };
@@ -162,6 +171,7 @@ export const useChatStore = defineStore('chat', () => {
       await messageApi.create(currentChat.value.id, {
         role: 'assistant',
         content: fullContent,
+        reasoning_content: fullReasoning || undefined,
       });
 
       await messageApi.create(currentChat.value.id, {
@@ -173,11 +183,13 @@ export const useChatStore = defineStore('chat', () => {
       isLoading.value = false;
       isStreaming.value = false;
       currentStreamContent.value = '';
+      currentStreamReasoning.value = '';
     } catch (error) {
       console.error('Send message error:', error);
       isLoading.value = false;
       isStreaming.value = false;
       currentStreamContent.value = '';
+      currentStreamReasoning.value = '';
       throw error;
     }
   };
@@ -204,6 +216,7 @@ export const useChatStore = defineStore('chat', () => {
     isLoading,
     isStreaming,
     currentStreamContent,
+    currentStreamReasoning,
     loadChats,
     loadMessages,
     createChat,

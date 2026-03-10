@@ -3,6 +3,7 @@ export interface Message {
   chatId: string;
   role: 'system' | 'user' | 'assistant';
   content: string;
+  reasoning_content?: string;
   timestamp: number;
   deleted?: boolean;
   deletedAt?: number;
@@ -31,6 +32,7 @@ export interface Character {
   id: string;
   projectId: string;
   name: string;
+  description?: string;
   avatar?: string;
   personality?: string;
   background?: string;

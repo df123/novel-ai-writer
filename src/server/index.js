@@ -58,6 +58,7 @@ const initDB = async () => {
         chat_id TEXT NOT NULL,
         role TEXT NOT NULL,
         content TEXT NOT NULL,
+        reasoning_content TEXT,
         timestamp INTEGER NOT NULL,
         FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
       );
@@ -399,12 +400,12 @@ app.get('/api/chats/:chatId/messages', (req, res) => {
 
 app.post('/api/chats/:chatId/messages', (req, res) => {
   try {
-    const { role, content } = req.body;
+    const { role, content, reasoning_content } = req.body;
     const id = generateId();
     const timestamp = now();
     
-    run('INSERT INTO messages (id, chat_id, role, content, timestamp) VALUES (?, ?, ?, ?, ?)',
-      [id, req.params.chatId, role, content, timestamp]);
+    run('INSERT INTO messages (id, chat_id, role, content, reasoning_content, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, req.params.chatId, role, content, reasoning_content || null, timestamp]);
     
     run('UPDATE chats SET updated_at = ? WHERE id = ?', [timestamp, req.params.chatId]);
     
@@ -682,8 +683,12 @@ app.post('/api/llm/chat', async (req, res) => {
           try {
             const parsed = JSON.parse(data);
             const content = parsed.choices?.[0]?.delta?.content;
+            const reasoning_content = parsed.choices?.[0]?.delta?.reasoning_content;
             if (content) {
               res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            }
+            if (reasoning_content) {
+              res.write(`data: ${JSON.stringify({ reasoning_content })}\n\n`);
             }
           } catch (e) {
             // 忽略解析错误

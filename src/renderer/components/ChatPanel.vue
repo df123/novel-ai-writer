@@ -43,7 +43,14 @@
             }"
             shadow="never"
           >
-            <div style="white-space: pre-wrap">{{ message.content }}</div>
+            <div v-if="message.role === 'assistant' && displayReasoning(message)">
+              <el-collapse>
+                <el-collapse-item title="思考过程" name="reasoning">
+                  <div style="white-space: pre-wrap; color: #666; font-size: 13px">{{ displayReasoning(message) }}</div>
+                </el-collapse-item>
+              </el-collapse>
+            </div>
+            <div style="white-space: pre-wrap">{{ displayContent(message) }}</div>
           </el-card>
         </div>
         <div ref="messagesEndRef"></div>
@@ -73,7 +80,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue';
+import { ref, watch, nextTick, onMounted, computed } from 'vue';
+import type { Message } from '../../shared/types';
 import { storeToRefs } from 'pinia';
 import { Promotion, MoreFilled } from '@element-plus/icons-vue';
 import { useChatStore } from '../stores/chatStore';
@@ -87,7 +95,7 @@ const projectStore = useProjectStore();
 const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
 
-const { chats, currentChat, messages, isLoading } = storeToRefs(chatStore);
+const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning } = storeToRefs(chatStore);
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters, selectedCharacters } = storeToRefs(characterStore);
@@ -96,6 +104,89 @@ const { createChat, selectChat, sendMessage, deleteMessage } = chatStore;
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
+const contentInterval = ref<number | null>(null);
+const reasoningInterval = ref<number | null>(null);
+const displayedStreamContent = ref('');
+const displayedStreamReasoning = ref('');
+
+watch(currentStreamContent, (newContent, oldContent) => {
+  if (contentInterval.value) {
+    clearInterval(contentInterval.value);
+  }
+  
+  displayedStreamContent.value = newContent;
+  
+  if (!isStreaming.value || !newContent) {
+    return;
+  }
+  
+  let targetLength = newContent.length;
+  if (oldContent && newContent.startsWith(oldContent)) {
+    displayedStreamContent.value = oldContent;
+    targetLength = newContent.length;
+  } else {
+    displayedStreamContent.value = '';
+    targetLength = newContent.length;
+  }
+  
+  contentInterval.value = window.setInterval(() => {
+    if (displayedStreamContent.value.length < targetLength) {
+      displayedStreamContent.value = currentStreamContent.value.slice(0, displayedStreamContent.value.length + 1);
+    } else {
+      if (contentInterval.value) {
+        clearInterval(contentInterval.value);
+        contentInterval.value = null;
+      }
+    }
+  }, 5);
+});
+
+watch(currentStreamReasoning, (newReasoning, oldReasoning) => {
+  if (reasoningInterval.value) {
+    clearInterval(reasoningInterval.value);
+  }
+  
+  displayedStreamReasoning.value = newReasoning;
+  
+  if (!isStreaming.value || !newReasoning) {
+    return;
+  }
+  
+  let targetLength = newReasoning.length;
+  if (oldReasoning && newReasoning.startsWith(oldReasoning)) {
+    displayedStreamReasoning.value = oldReasoning;
+    targetLength = newReasoning.length;
+  } else {
+    displayedStreamReasoning.value = '';
+    targetLength = newReasoning.length;
+  }
+  
+  reasoningInterval.value = window.setInterval(() => {
+    if (displayedStreamReasoning.value.length < targetLength) {
+      displayedStreamReasoning.value = currentStreamReasoning.value.slice(0, displayedStreamReasoning.value.length + 1);
+    } else {
+      if (reasoningInterval.value) {
+        clearInterval(reasoningInterval.value);
+        reasoningInterval.value = null;
+      }
+    }
+  }, 5);
+});
+
+watch(isStreaming, (newValue) => {
+  if (!newValue) {
+    if (contentInterval.value) {
+      clearInterval(contentInterval.value);
+      contentInterval.value = null;
+    }
+    if (reasoningInterval.value) {
+      clearInterval(reasoningInterval.value);
+      reasoningInterval.value = null;
+    }
+    displayedStreamContent.value = currentStreamContent.value;
+    displayedStreamReasoning.value = currentStreamReasoning.value;
+  }
+});
 
 onMounted(async () => {
   if (currentProject.value && chats.value.length === 0) {
@@ -103,7 +194,7 @@ onMounted(async () => {
   }
 });
 
-watch(messages, async () => {
+watch([messages, displayedStreamContent, displayedStreamReasoning], async () => {
   await nextTick();
   messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
 });
@@ -116,6 +207,20 @@ watch(
     }
   }
 );
+
+const displayContent = (message: Message) => {
+  if (isStreaming.value && message.role === 'assistant' && messages.value.length > 0 && messages.value[messages.value.length - 1].id === message.id) {
+    return displayedStreamContent.value;
+  }
+  return message.content;
+};
+
+const displayReasoning = (message: Message) => {
+  if (isStreaming.value && message.role === 'assistant' && messages.value.length > 0 && messages.value[messages.value.length - 1].id === message.id) {
+    return displayedStreamReasoning.value;
+  }
+  return message.reasoning_content;
+};
 
 const handleSend = async () => {
   if (!inputText.value.trim()) return;
