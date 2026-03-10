@@ -73,7 +73,8 @@ watch(
       await timelineStore.loadNodes(currentProject.id);
       await characterStore.loadCharacters(currentProject.id);
     }
-  }
+  },
+  { immediate: true }
 );
 
 const handleMenuCommand = (command: string) => {

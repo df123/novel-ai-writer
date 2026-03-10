@@ -7,7 +7,14 @@
       </el-tag>
     </el-header>
 
-    <div style="flex: 1; overflow: auto; padding: 16px">
+    <div v-if="!currentChat" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px">
+      <div style="text-align: center; color: #999">
+        <p style="margin-bottom: 12px">暂无对话记录</p>
+        <el-button type="primary" @click="handleCreateChat">创建新对话</el-button>
+      </div>
+    </div>
+
+    <div v-else style="flex: 1; overflow: auto; padding: 16px">
       <div style="display: flex; flex-direction: column; gap: 16px">
         <div
           v-for="(message, index) in messages"
@@ -78,14 +85,14 @@
         type="textarea"
         :rows="3"
         placeholder="输入您的问题或写作需求..."
-        :disabled="isLoading"
+        :disabled="isLoading || !currentChat"
         @keydown.enter.prevent="handleSend"
       >
         <template #append>
           <el-button
             :icon="Promotion"
             @click="handleSend"
-            :disabled="!inputText.trim() || isLoading"
+            :disabled="!inputText.trim() || isLoading || !currentChat"
           />
         </template>
       </el-input>
@@ -115,7 +122,7 @@ const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters, selectedCharacters } = storeToRefs(characterStore);
 
-const { createChat, selectChat, sendMessage, deleteMessage } = chatStore;
+const { createChat, sendMessage, deleteMessage } = chatStore;
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
@@ -128,25 +135,10 @@ watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning
   });
 });
 
-onMounted(async () => {
-  if (currentProject.value && chats.value.length === 0) {
-    await createChat('默认对话');
-  }
-});
-
 watch(messages, async () => {
   await nextTick();
   messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
 });
-
-watch(
-  () => [currentProject.value, chats.value.length],
-  async ([project, chatsLength]) => {
-    if (project && chatsLength === 0) {
-      await createChat('默认对话');
-    }
-  }
-);
 
 const displayContent = (message: Message) => {
   const isLastAssistantMessage = isStreaming.value && 
@@ -176,6 +168,9 @@ const handleSend = async () => {
   if (!inputText.value.trim()) return;
 
   try {
+    if (!currentChat.value) {
+      await createChat('默认对话');
+    }
     await sendMessage(inputText.value, {
       systemPrompt: '你是一个专业的小说写作助手。',
       providerName: 'deepseek',
@@ -186,6 +181,14 @@ const handleSend = async () => {
     inputText.value = '';
   } catch (error) {
     console.error('Failed to send message:', error);
+  }
+};
+
+const handleCreateChat = async () => {
+  try {
+    await createChat('默认对话');
+  } catch (error) {
+    console.error('Failed to create chat:', error);
   }
 };
 

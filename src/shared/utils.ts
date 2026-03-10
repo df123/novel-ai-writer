@@ -3,7 +3,9 @@ export function generateId(): string {
 }
 
 export function formatTimestamp(timestamp: number): string {
-  return new Date(timestamp).toLocaleString('zh-CN');
+  const isSeconds = timestamp < 10000000000;
+  const milliseconds = isSeconds ? timestamp * 1000 : timestamp;
+  return new Date(milliseconds).toLocaleString('zh-CN');
 }
 
 export function formatDate(dateStr: string): string {

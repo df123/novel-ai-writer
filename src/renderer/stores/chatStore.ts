@@ -22,8 +22,21 @@ export const useChatStore = defineStore('chat', () => {
     const response = await chatApi.list(projectId);
     chats.value = response.data;
     
-    if (chats.value.length > 0 && !currentChat.value) {
-      selectChat(chats.value[0].id);
+    if (chats.value.length > 0) {
+      if (!currentChat.value) {
+        await selectChat(chats.value[0].id);
+      } else {
+        const exists = chats.value.some(c => c.id === currentChat.value!.id);
+        if (!exists) {
+          await selectChat(chats.value[0].id);
+        } else {
+          await loadMessages(currentChat.value!.id);
+        }
+      }
+    } else {
+      currentChat.value = null;
+      messages.value = [];
+      totalTokens.value = 0;
     }
   };
 
@@ -58,7 +71,7 @@ export const useChatStore = defineStore('chat', () => {
     return chat;
   };
 
-  const selectChat = (chatId: string | null) => {
+  const selectChat = async (chatId: string | null) => {
     if (!chatId) {
       currentChat.value = null;
       messages.value = [];
@@ -69,7 +82,7 @@ export const useChatStore = defineStore('chat', () => {
     const chat = chats.value.find(c => c.id === chatId);
     if (chat) {
       currentChat.value = chat;
-      loadMessages(chatId);
+      await loadMessages(chatId);
     }
   };
 
