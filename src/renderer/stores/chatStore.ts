@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Message, Chat } from '../../shared/types';
 import { chatApi, messageApi, llmApi } from '../utils/api';
-import { generateId } from '../../shared/utils';
+import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
@@ -16,6 +16,7 @@ export const useChatStore = defineStore('chat', () => {
   const isStreaming = ref(false);
   const currentStreamContent = ref('');
   const currentStreamReasoning = ref('');
+  const totalTokens = ref(0);
 
   const loadChats = async (projectId: string) => {
     const response = await chatApi.list(projectId);
@@ -32,6 +33,15 @@ export const useChatStore = defineStore('chat', () => {
       ...m,
       orderIndex: i + 1,
     }));
+    updateTokenCount();
+  };
+
+  const updateTokenCount = () => {
+    const messagesForTokens = messages.value.map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+    totalTokens.value = estimateConversationTokens(messagesForTokens);
   };
 
   const createChat = async (title: string) => {
@@ -43,6 +53,7 @@ export const useChatStore = defineStore('chat', () => {
     chats.value.unshift(chat);
     currentChat.value = chat;
     messages.value = [];
+    totalTokens.value = 0;
     
     return chat;
   };
@@ -51,6 +62,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!chatId) {
       currentChat.value = null;
       messages.value = [];
+      totalTokens.value = 0;
       return;
     }
 
@@ -87,6 +99,7 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     messages.value.push(userMessage);
+    updateTokenCount();
     
     await messageApi.create(currentChat.value.id, {
       role: 'user',
@@ -201,6 +214,8 @@ export const useChatStore = defineStore('chat', () => {
         reasoning_content: fullReasoning || undefined,
       });
 
+      updateTokenCount();
+
       isLoading.value = false;
       isStreaming.value = false;
       currentStreamContent.value = '';
@@ -218,6 +233,7 @@ export const useChatStore = defineStore('chat', () => {
   const deleteMessage = async (messageId: string) => {
     await messageApi.delete(messageId);
     messages.value = messages.value.filter(m => m.id !== messageId);
+    updateTokenCount();
   };
 
   const clearHistory = () => {
@@ -228,6 +244,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     
     messages.value = [];
+    totalTokens.value = 0;
   };
 
   return {
@@ -238,6 +255,7 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     currentStreamContent,
     currentStreamReasoning,
+    totalTokens,
     loadChats,
     loadMessages,
     createChat,

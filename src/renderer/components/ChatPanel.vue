@@ -1,8 +1,11 @@
 <template>
   <el-container v-if="currentProject" style="flex: 1; min-width: 400px">
     <el-header style="border-bottom: 1px solid #e0e0e0; padding: 0">
-      <div style="padding: 12px 16px; font-size: 16px; font-weight: 500">
-        写作区
+      <div style="padding: 12px 16px; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: space-between">
+        <span>写作区</span>
+        <el-tag size="small" type="info">
+          {{ totalTokens }} tokens
+        </el-tag>
       </div>
     </el-header>
 
@@ -22,6 +25,9 @@
             </el-tag>
             <span style="margin-left: 8px; font-size: 12px; color: #666">
               {{ formatTimestamp(message.timestamp) }}
+            </span>
+            <span style="margin-left: 8px; font-size: 12px; color: #999">
+              ~{{ estimateMessageTokens(message) }} tokens
             </span>
             <el-dropdown
               trigger="click"
@@ -99,14 +105,14 @@ import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
-import { formatTimestamp } from '../../shared/utils';
+import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
 
 const chatStore = useChatStore();
 const projectStore = useProjectStore();
 const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
 
-const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning } = storeToRefs(chatStore);
+const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning, totalTokens } = storeToRefs(chatStore);
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters, selectedCharacters } = storeToRefs(characterStore);
