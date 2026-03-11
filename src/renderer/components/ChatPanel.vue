@@ -2,9 +2,16 @@
   <el-main v-if="currentProject" style="flex: 1; min-width: 400px; display: flex; flex-direction: column; overflow: hidden; padding: 0">
     <el-header style="border-bottom: 1px solid #e0e0e0; padding: 0; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px">
       <span style="font-size: 16px; font-weight: 500">写作区</span>
-      <el-tag size="small" type="info">
-        {{ totalTokens }} tokens
-      </el-tag>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <el-select v-model="selectedProvider" size="small" style="width: 120px">
+          <el-option label="DeepSeek" value="deepseek" />
+          <el-option label="OpenAI" value="openai" />
+          <el-option label="OpenRouter" value="openrouter" />
+        </el-select>
+        <el-tag size="small" type="info">
+          {{ totalTokens }} tokens
+        </el-tag>
+      </div>
     </el-header>
 
     <div v-if="!currentChat" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px">
@@ -108,6 +115,7 @@ import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
 import { marked } from 'marked';
 
@@ -120,13 +128,23 @@ const chatStore = useChatStore();
 const projectStore = useProjectStore();
 const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
+const settingsStore = useSettingsStore();
 
 const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning, totalTokens } = storeToRefs(chatStore);
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters, selectedCharacters } = storeToRefs(characterStore);
+const { selectedProvider } = storeToRefs(settingsStore);
 
 const { createChat, sendMessage, deleteMessage } = chatStore;
+
+const providerModels = {
+  deepseek: 'deepseek-reasoner',
+  openai: 'gpt-3.5-turbo',
+  openrouter: 'openai/gpt-3.5-turbo',
+};
+
+const currentModel = computed(() => providerModels[selectedProvider.value] || 'deepseek-reasoner');
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
@@ -179,15 +197,15 @@ const renderMarkdown = (content: string) => {
 
 const handleSend = async () => {
   if (!inputText.value.trim()) return;
-
+  
   try {
     if (!currentChat.value) {
       await createChat('默认对话');
     }
     await sendMessage(inputText.value, {
       systemPrompt: '你是一个专业的小说写作助手。',
-      providerName: 'deepseek',
-      modelName: 'deepseek-reasoner',
+      providerName: selectedProvider.value,
+      modelName: currentModel.value,
       timelineId: selectedNode.value?.id,
       characterIds: Array.from(selectedCharacters.value),
     });

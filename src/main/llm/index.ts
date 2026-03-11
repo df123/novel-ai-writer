@@ -1,5 +1,6 @@
 import { OpenAIProvider } from './openai';
 import { DeepSeekProvider } from './deepseek';
+import { OpenRouterProvider } from './openrouter';
 import { LLMProvider, ChatOptions, Message, StreamResponse } from '@shared/types';
 import { getDatabase } from '../database';
 import * as crypto from 'crypto-js';
@@ -20,6 +21,7 @@ class LLMService {
   private initializeProviders(): void {
     this.providers.set('openai', new OpenAIProvider());
     this.providers.set('deepseek', new DeepSeekProvider());
+    this.providers.set('openrouter', new OpenRouterProvider());
   }
 
   private async loadApiKey(providerName: string): Promise<string | null> {

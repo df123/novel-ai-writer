@@ -32,6 +32,22 @@
           />
         </div>
       </el-tab-pane>
+      <el-tab-pane label="OpenRouter" name="openrouter">
+        <div style="padding: 16px 0">
+          <p style="font-size: 14px; color: #666; margin-bottom: 16px">
+            输入您的OpenRouter API密钥。密钥将加密存储在本地。OpenRouter提供统一访问多个AI模型的接口。
+          </p>
+          <p style="font-size: 12px; color: #999; margin-bottom: 12px">
+            <a href="https://openrouter.ai/keys" target="_blank" style="color: #409eff">获取API密钥</a>
+          </p>
+          <el-input
+            v-model="openrouterKey"
+            type="password"
+            placeholder="sk-or-..."
+            show-password
+          />
+        </div>
+      </el-tab-pane>
       <el-tab-pane label="模型参数" name="params">
         <div style="padding: 16px 0">
           <div style="margin-bottom: 24px">
@@ -77,6 +93,9 @@
       <el-button v-if="activeTab === 'deepseek'" type="primary" @click="handleSaveDeepSeek">
         保存DeepSeek密钥
       </el-button>
+      <el-button v-if="activeTab === 'openrouter'" type="primary" @click="handleSaveOpenRouter">
+        保存OpenRouter密钥
+      </el-button>
     </template>
   </el-dialog>
 </template>
@@ -100,13 +119,14 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const settingsStore = useSettingsStore();
-const { openaiApiKey, deepseekApiKey, temperature } = storeToRefs(settingsStore);
+const { openaiApiKey, deepseekApiKey, openrouterApiKey, temperature } = storeToRefs(settingsStore);
 const { loadSettings, updateSettings } = settingsStore;
 
 const visible = ref(props.modelValue);
 const activeTab = ref('deepseek');
 const openaiKey = ref('');
 const deepseekKey = ref('');
+const openrouterKey = ref('');
 const tempValue = ref(0.7);
 const message = ref<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -142,6 +162,13 @@ watch(
   }
 );
 
+watch(
+  () => openrouterApiKey.value,
+  (val) => {
+    openrouterKey.value = val;
+  }
+);
+
 const handleSaveOpenAI = async () => {
   try {
     await updateSettings({ openaiApiKey: openaiKey.value });
@@ -160,6 +187,15 @@ const handleSaveDeepSeek = async () => {
   }
 };
 
+const handleSaveOpenRouter = async () => {
+  try {
+    await updateSettings({ openrouterApiKey: openrouterKey.value });
+    ElMessage.success('OpenRouter API密钥已保存');
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error as Error).message);
+  }
+};
+
 const handleSaveParams = async () => {
   try {
     await updateSettings({ temperature: tempValue.value });
@@ -172,6 +208,7 @@ const handleSaveParams = async () => {
 const handleClose = () => {
   openaiKey.value = '';
   deepseekKey.value = '';
+  openrouterKey.value = '';
   tempValue.value = temperature.value;
   message.value = null;
   visible.value = false;

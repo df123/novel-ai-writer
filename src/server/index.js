@@ -618,10 +618,15 @@ app.post('/api/llm/chat', async (req, res) => {
     const settings = query('SELECT * FROM settings WHERE key = ?', [`${provider}_api_key`]);
     if (settings.length === 0) {
       console.error(`API key not configured for provider: ${provider}`);
+      const providerNames = {
+        openai: 'OpenAI',
+        deepseek: 'DeepSeek',
+        openrouter: 'OpenRouter'
+      };
       return res.status(400).json({ 
         error: 'API key not configured', 
         provider,
-        message: `请在设置中配置 ${provider === 'openai' ? 'OpenAI' : 'DeepSeek'} API 密钥` 
+        message: `请在设置中配置 ${providerNames[provider] || provider} API 密钥` 
       });
     }
     
@@ -643,6 +648,9 @@ app.post('/api/llm/chat', async (req, res) => {
     } else if (provider === 'deepseek') {
       apiUrl = 'https://api.deepseek.com/v1/chat/completions';
       modelName = options.model || 'deepseek-reasoner';
+    } else if (provider === 'openrouter') {
+      apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+      modelName = options.model || 'openai/gpt-3.5-turbo';
     } else {
       console.error(`Invalid provider: ${provider}`);
       return res.status(400).json({ error: 'Invalid provider', provider });
