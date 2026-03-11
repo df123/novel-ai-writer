@@ -1,11 +1,14 @@
 <template>
-  <el-aside style="width: 300px; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column">
-    <div style="padding: 12px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center">
-      <span style="font-size: 16px; font-weight: 500">时间线</span>
-      <el-button :icon="Plus" circle size="small" @click="handleOpenCreateDialog" />
+  <el-aside :style="{ width: isCollapsed ? '50px' : '300px', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }">
+    <div :style="{ padding: isCollapsed ? '12px 8px' : '12px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }">
+      <span v-if="!isCollapsed" style="font-size: 16px; font-weight: 500">时间线</span>
+      <div :style="{ display: 'flex', gap: '4px', margin: isCollapsed ? '0 auto' : '' }">
+        <el-button v-if="!isCollapsed" :icon="Plus" circle size="small" @click="handleOpenCreateDialog" />
+        <el-button :icon="isCollapsed ? ArrowLeft : ArrowRight" circle size="small" @click="toggleCollapse" />
+      </div>
     </div>
 
-    <el-scrollbar style="flex: 1">
+    <el-scrollbar v-if="!isCollapsed" style="flex: 1">
       <div style="padding: 8px">
         <div
           v-for="node in nodes"
@@ -74,7 +77,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, CircleCheck } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight } from '@element-plus/icons-vue';
 import { useTimelineStore } from '../stores/timelineStore';
 import { formatDate } from '../../shared/utils';
 
@@ -88,6 +91,11 @@ const editId = ref<string | null>(null);
 const title = ref('');
 const date = ref('');
 const description = ref('');
+const isCollapsed = ref(false);
+
+const toggleCollapse = () => {
+  isCollapsed.value = !isCollapsed.value;
+};
 
 const handleOpenCreateDialog = () => {
   editMode.value = false;
