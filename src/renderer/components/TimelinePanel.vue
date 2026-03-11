@@ -101,17 +101,8 @@ const handleOpenEditDialog = (node: any) => {
   editMode.value = true;
   editId.value = node.id;
   title.value = node.title;
-  date.value = node.date.split('T')[0];
-  
-  const content = node.content || '';
-  const match = content.match(/Date: (.*?)\nDescription: (.*)/s);
-  if (match) {
-    date.value = match[1];
-    description.value = match[2] || '';
-  } else {
-    description.value = content;
-  }
-  
+  date.value = node.date || '';
+  description.value = node.description || '';
   dialogOpen.value = true;
 };
 

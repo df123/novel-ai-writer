@@ -154,6 +154,19 @@ function now() {
   return Math.floor(Date.now() / 1000);
 }
 
+function parseTimelineContent(content) {
+  if (!content) {
+    return { date: '', description: '' };
+  }
+
+  const match = content.match(/Date: (.*?)\nDescription: (.*)/s);
+  if (match) {
+    return { date: match[1], description: match[2] || '' };
+  }
+
+  return { date: '', description: content };
+}
+
 function encrypt(text, key) {
   const crypto = require('crypto');
   const algorithm = 'aes-256-cbc';
@@ -439,13 +452,17 @@ app.get('/api/projects/:projectId/timeline', (req, res) => {
   try {
     const nodes = query('SELECT * FROM timeline_nodes WHERE project_id = ? ORDER BY order_index ASC', [req.params.projectId]);
     // Format for frontend compatibility
-    const formattedNodes = nodes.map(n => ({
-      ...n,
-      description: n.content,
-      projectId: n.project_id,
-      orderIndex: n.order_index,
-      createdAt: n.created_at
-    }));
+    const formattedNodes = nodes.map(n => {
+      const { date, description } = parseTimelineContent(n.content);
+      return {
+        ...n,
+        date,
+        description,
+        projectId: n.project_id,
+        orderIndex: n.order_index,
+        createdAt: n.created_at
+      };
+    });
     res.json(formattedNodes);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -463,11 +480,13 @@ app.post('/api/projects/:projectId/timeline', (req, res) => {
       [id, req.params.projectId, title, content || null, orderIndex || 0, createdAt, updatedAt]);
     
     saveDB();
-    
+
     const nodes = query('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
+    const { date, description } = parseTimelineContent(nodes[0].content);
     const node = {
       ...nodes[0],
-      description: nodes[0].content,
+      date,
+      description,
       projectId: nodes[0].project_id,
       orderIndex: nodes[0].order_index,
       createdAt: nodes[0].created_at
@@ -487,11 +506,13 @@ app.put('/api/timeline/:id', (req, res) => {
       [title, content || null, orderIndex || 0, updatedAt, req.params.id]);
     
     saveDB();
-    
+
     const nodes = query('SELECT * FROM timeline_nodes WHERE id = ?', [req.params.id]);
+    const { date, description } = parseTimelineContent(nodes[0].content);
     const node = {
       ...nodes[0],
-      description: nodes[0].content,
+      date,
+      description,
       projectId: nodes[0].project_id,
       orderIndex: nodes[0].order_index,
       createdAt: nodes[0].created_at

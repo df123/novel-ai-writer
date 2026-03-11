@@ -45,10 +45,10 @@ export const useTimelineStore = defineStore('timeline', () => {
 
     const response = await timelineApi.update(id, {
       title: updates.title || node.title,
-      content: updates.content || node.content,
+      content: (updates as any).content || (node as any).content,
       orderIndex: updates.orderIndex || node.orderIndex,
     });
-    
+
     nodes.value = nodes.value.map(n => (n.id === id ? response.data : n));
     if (selectedNode.value?.id === id) {
       selectedNode.value = response.data;
