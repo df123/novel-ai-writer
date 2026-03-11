@@ -57,14 +57,12 @@
             <div v-if="message.role === 'assistant' && displayReasoning(message)">
               <el-collapse>
                 <el-collapse-item title="思考过程" name="reasoning">
-                  <div style="white-space: pre-wrap; color: #666; font-size: 13px">{{ displayReasoning(message) }}</div>
+                  <div class="markdown-content" style="color: #666; font-size: 13px" v-html="renderMarkdown(displayReasoning(message))"></div>
                 </el-collapse-item>
               </el-collapse>
             </div>
-            <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1 && currentStreamContent" style="white-space: pre-wrap">
-              {{ currentStreamContent }}
-            </div>
-            <div v-else style="white-space: pre-wrap">{{ message.content }}</div>
+            <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1 && currentStreamContent" class="markdown-content" v-html="renderMarkdown(currentStreamContent)"></div>
+            <div v-else class="markdown-content" v-html="renderMarkdown(message.content)"></div>
           </el-card>
         </div>
         <div v-if="isStreaming" style="padding: 12px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px">
@@ -111,6 +109,12 @@ import { useProjectStore } from '../stores/projectStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
 import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
+import { marked } from 'marked';
+
+marked.setOptions({
+  breaks: true,
+  gfm: true
+});
 
 const chatStore = useChatStore();
 const projectStore = useProjectStore();
@@ -164,6 +168,15 @@ const displayReasoning = (message: Message) => {
   return message.reasoning_content;
 };
 
+const renderMarkdown = (content: string) => {
+  try {
+    return marked(content);
+  } catch (error) {
+    console.error('Markdown render error:', error);
+    return content;
+  }
+};
+
 const handleSend = async () => {
   if (!inputText.value.trim()) return;
 
@@ -198,3 +211,114 @@ const handleMessageCommand = async (command: string, messageId: string) => {
   }
 };
 </script>
+
+<style scoped>
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-content :deep(h1) {
+  font-size: 1.5em;
+}
+
+.markdown-content :deep(h2) {
+  font-size: 1.25em;
+}
+
+.markdown-content :deep(h3) {
+  font-size: 1.1em;
+}
+
+.markdown-content :deep(p) {
+  margin: 8px 0;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-content :deep(li) {
+  margin: 4px 0;
+}
+
+.markdown-content :deep(code) {
+  background-color: rgba(0, 0, 0, 0.06);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.markdown-content :deep(pre) {
+  background-color: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.markdown-content :deep(pre code) {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.markdown-content :deep(blockquote) {
+  border-left: 4px solid #d0d0d0;
+  padding-left: 12px;
+  margin: 12px 0;
+  color: #666;
+}
+
+.markdown-content :deep(a) {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.markdown-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.markdown-content :deep(table) {
+  border-collapse: collapse;
+  margin: 12px 0;
+  width: 100%;
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  border: 1px solid #e0e0e0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content :deep(th) {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+.markdown-content :deep(hr) {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 16px 0;
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+</style>
