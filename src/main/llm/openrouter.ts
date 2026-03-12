@@ -20,6 +20,9 @@ export class OpenRouterProvider extends BaseLLMProvider {
       body: JSON.stringify({
         model: options.model,
         messages: this.buildMessagesArray(messages),
+        reasoning: {
+          enabled: true
+        },
         temperature: options.temperature ?? 0.7,
         top_p: options.topP,
         max_tokens: options.maxTokens,

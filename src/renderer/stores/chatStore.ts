@@ -277,12 +277,10 @@ export const useChatStore = defineStore('chat', () => {
               if (content) {
                 fullContent += content;
                 currentStreamContent.value = fullContent;
-                console.log('Stream content updated:', fullContent.length, 'chars');
               }
               if (reasoning_content) {
                 fullReasoning += reasoning_content;
                 currentStreamReasoning.value = fullReasoning;
-                console.log('Stream reasoning updated:', fullReasoning.length, 'chars');
               }
             } catch (e) {
             }

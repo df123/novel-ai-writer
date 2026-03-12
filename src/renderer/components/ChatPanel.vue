@@ -77,14 +77,6 @@
             <div v-else class="markdown-content" v-html="renderMarkdown(message.content)"></div>
           </el-card>
         </div>
-        <div v-if="isStreaming" style="padding: 12px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px">
-          <div style="font-weight: bold; margin-bottom: 8px">流式传输调试信息:</div>
-          <div>Content: {{ currentStreamContent.length }} chars</div>
-          <div>Reasoning: {{ currentStreamReasoning.length }} chars</div>
-          <div v-if="currentStreamContent" style="margin-top: 8px; max-height: 100px; overflow: auto; font-size: 12px">
-            {{ currentStreamContent }}
-          </div>
-        </div>
         <div ref="messagesEndRef"></div>
       </div>
     </div>
@@ -150,8 +142,6 @@ const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
 
 watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning]) => {
-  console.log('Stream content changed:', newContent?.length || 0, 'chars');
-  console.log('Stream reasoning changed:', newReasoning?.length || 0, 'chars');
   nextTick(() => {
     messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
   });

@@ -707,17 +707,25 @@ app.post('/api/llm/chat', async (req, res) => {
     }));
 
     try {
+      const requestBody = {
+        model: modelName,
+        messages: messages,
+        stream: true,
+        temperature: options.temperature,
+        top_p: options.topP,
+        max_tokens: options.maxTokens
+      };
+
+      if (provider === 'openrouter') {
+        requestBody.reasoning = {
+          enabled: true
+        };
+      }
+
       response = await fetch(apiUrl, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({
-          model: modelName,
-          messages: messages,
-          stream: true,
-          temperature: options.temperature,
-          top_p: options.topP,
-          max_tokens: options.maxTokens
-        })
+        body: JSON.stringify(requestBody)
       });
       console.log('[DEBUG] LLM API response status:', response.status, response.statusText);
     } catch (fetchError) {
@@ -757,7 +765,7 @@ app.post('/api/llm/chat', async (req, res) => {
           try {
             const parsed = JSON.parse(data);
             const content = parsed.choices?.[0]?.delta?.content;
-            const reasoning_content = parsed.choices?.[0]?.delta?.reasoning_content;
+            const reasoning_content = parsed.choices?.[0]?.delta?.reasoning_content || parsed.choices?.[0]?.delta?.reasoning;
             if (content) {
               res.write(`data: ${JSON.stringify({ content })}\n\n`);
             }
