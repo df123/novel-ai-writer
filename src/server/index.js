@@ -734,35 +734,8 @@ app.post('/api/models/:provider', async (req, res) => {
     const { provider } = req.params;
     const { apiKey } = req.body;
     
-    if (!apiKey) {
-      return res.status(400).json({ error: 'API key is required' });
-    }
-    
-    let apiUrl;
-    if (provider === 'deepseek') {
-      apiUrl = 'https://api.deepseek.com/v1/models';
-    } else if (provider === 'openrouter') {
-      apiUrl = 'https://openrouter.ai/api/v1/models';
-    } else {
-      return res.status(400).json({ error: 'Invalid provider' });
-    }
-    
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Failed to fetch models for ${provider}:`, errorText);
-      return res.status(response.status).json({ error: errorText });
-    }
-    
-    const data = await response.json();
-    
     let models = [];
+    
     if (provider === 'deepseek') {
       models = [
         {
@@ -775,6 +748,24 @@ app.post('/api/models/:provider', async (req, res) => {
         }
       ];
     } else if (provider === 'openrouter') {
+      if (!apiKey) {
+        return res.status(400).json({ error: 'API key is required' });
+      }
+      
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to fetch models for ${provider}:`, errorText);
+        return res.status(response.status).json({ error: errorText });
+      }
+      
+      const data = await response.json();
       models = data.data
         .filter(m => 
           m.output_modalities && m.output_modalities.includes('text') &&
@@ -806,6 +797,8 @@ app.post('/api/models/:provider', async (req, res) => {
             }
           };
         });
+    } else {
+      return res.status(400).json({ error: 'Invalid provider' });
     }
     
     res.json({ models });

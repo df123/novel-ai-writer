@@ -61,15 +61,17 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoadingModels.value = true;
     try {
       const apiKey = provider === 'deepseek' ? deepseekApiKey.value : openrouterApiKey.value;
-      if (!apiKey) {
-        models.value = [];
+      
+      if (provider === 'openrouter' && !apiKey) {
+        models.value = [{ id: '', name: '请先配置 OpenRouter API 密钥' }];
+        selectedModel.value = '';
         return;
       }
       
       const response = await fetch('http://localhost:3002/api/models/' + provider, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey })
+        body: JSON.stringify({ apiKey: apiKey || 'dummy' })
       });
       
       if (!response.ok) {
@@ -84,7 +86,12 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     } catch (error) {
       console.error('Failed to load models:', error);
-      models.value = [];
+      if (provider === 'openrouter') {
+        models.value = [{ id: '', name: '加载模型失败，请检查 API 密钥' }];
+        selectedModel.value = '';
+      } else {
+        models.value = [];
+      }
     } finally {
       isLoadingModels.value = false;
     }
