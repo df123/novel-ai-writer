@@ -221,13 +221,31 @@ export const useChatStore = defineStore('chat', () => {
     
     messagesForLLM.push(...validMessages);
 
+    const apiKey = options.providerName === 'deepseek'
+      ? settingsStore.deepseekApiKey
+      : settingsStore.openrouterApiKey;
+
+    if (!apiKey) {
+      throw new Error(`请先配置 ${options.providerName === 'deepseek' ? 'DeepSeek' : 'OpenRouter'} API 密钥`);
+    }
+
+    console.log('[DEBUG] Sending chat request:', {
+      provider: options.providerName,
+      model: options.modelName,
+      apiKeyLength: apiKey?.length,
+      apiKeyPrefix: apiKey?.substring(0, 10) + '...',
+      temperature: settingsStore.temperature,
+      messagesCount: messagesForLLM.length
+    });
+
     try {
       const response = await llmApi.chat(
         options.providerName || 'deepseek',
         messagesForLLM,
-        { 
+        {
           model: options.modelName,
-          temperature: settingsStore.temperature
+          temperature: settingsStore.temperature,
+          apiKey
         }
       );
 

@@ -17,39 +17,72 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const response = await settingsApi.get();
       const settings = response.data;
+
+      console.log('[DEBUG] Loaded settings from backend:', {
+        hasDeepseekKey: !!settings.deepseek_api_key,
+        deepseekKeyLength: settings.deepseek_api_key?.length,
+        deepseekKeyPrefix: settings.deepseek_api_key?.substring(0, 10) + '...',
+        hasOpenrouterKey: !!settings.openrouter_api_key,
+        openrouterKeyLength: settings.openrouter_api_key?.length,
+        openrouterKeyPrefix: settings.openrouter_api_key?.substring(0, 10) + '...',
+        temperature: settings.temperature,
+        selectedProvider: settings.selected_provider,
+        selectedModel: settings.selected_model
+      });
+
       deepseekApiKey.value = settings.deepseek_api_key || '';
       openrouterApiKey.value = settings.openrouter_api_key || '';
       temperature.value = settings.temperature ? parseFloat(settings.temperature) : 0.7;
       selectedProvider.value = settings.selected_provider || 'deepseek';
       selectedModel.value = settings.selected_model || 'deepseek-reasoner';
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      console.error('[DEBUG] Failed to load settings:', error);
     } finally {
       isLoading.value = false;
     }
   };
 
   const updateSettings = async (settings: { deepseekApiKey?: string; openrouterApiKey?: string; temperature?: number; selectedProvider?: string; selectedModel?: string }) => {
-    const currentSettings: Record<string, string | number> = {
-      deepseek_api_key: settings.deepseekApiKey || deepseekApiKey.value,
-      openrouter_api_key: settings.openrouterApiKey || openrouterApiKey.value,
-    };
-    
+    const currentSettings: Record<string, string | number> = {};
+
+    if (settings.deepseekApiKey !== undefined) {
+      currentSettings.deepseek_api_key = settings.deepseekApiKey;
+    }
+
+    if (settings.openrouterApiKey !== undefined) {
+      currentSettings.openrouter_api_key = settings.openrouterApiKey;
+    }
+
     if (settings.temperature !== undefined) {
       currentSettings.temperature = settings.temperature;
     }
-    
+
     if (settings.selectedProvider !== undefined) {
       currentSettings.selected_provider = settings.selectedProvider;
     }
-    
+
     if (settings.selectedModel !== undefined) {
       currentSettings.selected_model = settings.selectedModel;
     }
-    
+
+    console.log('[DEBUG] Saving settings:', {
+      hasDeepseekKey: !!settings.deepseekApiKey,
+      deepseekKeyLength: settings.deepseekApiKey?.length,
+      hasOpenrouterKey: !!settings.openrouterApiKey,
+      openrouterKeyLength: settings.openrouterApiKey?.length,
+      keysToSave: Object.keys(currentSettings)
+    });
+
     const response = await settingsApi.update(currentSettings);
     const updated = response.data;
-    
+
+    console.log('[DEBUG] Saved settings response:', {
+      hasDeepseekKey: !!updated.deepseek_api_key,
+      deepseekKeyLength: updated.deepseek_api_key?.length,
+      hasOpenrouterKey: !!updated.openrouter_api_key,
+      openrouterKeyLength: updated.openrouter_api_key?.length
+    });
+
     deepseekApiKey.value = updated.deepseek_api_key || '';
     openrouterApiKey.value = updated.openrouter_api_key || '';
     temperature.value = updated.temperature ? parseFloat(updated.temperature) : 0.7;
