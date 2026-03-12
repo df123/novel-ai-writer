@@ -132,7 +132,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const response = await llmApi.chat(
-        options.providerName || 'openai',
+        options.providerName || 'deepseek',
         messagesForLLM,
         { model: options.modelName }
       );

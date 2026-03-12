@@ -19,19 +19,6 @@
           />
         </div>
       </el-tab-pane>
-      <el-tab-pane label="OpenAI" name="openai">
-        <div style="padding: 16px 0">
-          <p style="font-size: 14px; color: #666; margin-bottom: 16px">
-            输入您的OpenAI API密钥。密钥将加密存储在本地。
-          </p>
-          <el-input
-            v-model="openaiKey"
-            type="password"
-            placeholder="sk-..."
-            show-password
-          />
-        </div>
-      </el-tab-pane>
       <el-tab-pane label="OpenRouter" name="openrouter">
         <div style="padding: 16px 0">
           <p style="font-size: 14px; color: #666; margin-bottom: 16px">
@@ -87,9 +74,6 @@
 
     <template #footer>
       <el-button @click="handleClose">关闭</el-button>
-      <el-button v-if="activeTab === 'openai'" type="primary" @click="handleSaveOpenAI">
-        保存OpenAI密钥
-      </el-button>
       <el-button v-if="activeTab === 'deepseek'" type="primary" @click="handleSaveDeepSeek">
         保存DeepSeek密钥
       </el-button>
@@ -119,12 +103,11 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const settingsStore = useSettingsStore();
-const { openaiApiKey, deepseekApiKey, openrouterApiKey, temperature } = storeToRefs(settingsStore);
+const { deepseekApiKey, openrouterApiKey, temperature } = storeToRefs(settingsStore);
 const { loadSettings, updateSettings } = settingsStore;
 
 const visible = ref(props.modelValue);
 const activeTab = ref('deepseek');
-const openaiKey = ref('');
 const deepseekKey = ref('');
 const openrouterKey = ref('');
 const tempValue = ref(0.7);
@@ -149,13 +132,6 @@ watch(
 );
 
 watch(
-  () => openaiApiKey.value,
-  (val) => {
-    openaiKey.value = val;
-  }
-);
-
-watch(
   () => deepseekApiKey.value,
   (val) => {
     deepseekKey.value = val;
@@ -168,15 +144,6 @@ watch(
     openrouterKey.value = val;
   }
 );
-
-const handleSaveOpenAI = async () => {
-  try {
-    await updateSettings({ openaiApiKey: openaiKey.value });
-    ElMessage.success('OpenAI API密钥已保存');
-  } catch (error) {
-    ElMessage.error('保存失败: ' + (error as Error).message);
-  }
-};
 
 const handleSaveDeepSeek = async () => {
   try {
@@ -206,7 +173,6 @@ const handleSaveParams = async () => {
 };
 
 const handleClose = () => {
-  openaiKey.value = '';
   deepseekKey.value = '';
   openrouterKey.value = '';
   tempValue.value = temperature.value;

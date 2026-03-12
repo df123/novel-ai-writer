@@ -223,7 +223,7 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const response = await llmApi.chat(
-        options.providerName || 'openai',
+        options.providerName || 'deepseek',
         messagesForLLM,
         { 
           model: options.modelName,

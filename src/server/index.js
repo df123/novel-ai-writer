@@ -619,7 +619,6 @@ app.post('/api/llm/chat', async (req, res) => {
     if (settings.length === 0) {
       console.error(`API key not configured for provider: ${provider}`);
       const providerNames = {
-        openai: 'OpenAI',
         deepseek: 'DeepSeek',
         openrouter: 'OpenRouter'
       };
@@ -642,10 +641,7 @@ app.post('/api/llm/chat', async (req, res) => {
     console.log(`API key loaded for ${provider}, length: ${apiKey.length}`);
     
     let apiUrl, modelName;
-    if (provider === 'openai') {
-      apiUrl = 'https://api.openai.com/v1/chat/completions';
-      modelName = options.model || 'gpt-3.5-turbo';
-    } else if (provider === 'deepseek') {
+    if (provider === 'deepseek') {
       apiUrl = 'https://api.deepseek.com/v1/chat/completions';
       modelName = options.model || 'deepseek-reasoner';
     } else if (provider === 'openrouter') {
@@ -728,6 +724,67 @@ app.post('/api/llm/chat', async (req, res) => {
     
     res.end();
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// LLM Models
+app.post('/api/models/:provider', async (req, res) => {
+  try {
+    const { provider } = req.params;
+    const { apiKey } = req.body;
+    
+    if (!apiKey) {
+      return res.status(400).json({ error: 'API key is required' });
+    }
+    
+    let apiUrl;
+    if (provider === 'deepseek') {
+      apiUrl = 'https://api.deepseek.com/v1/models';
+    } else if (provider === 'openrouter') {
+      apiUrl = 'https://openrouter.ai/api/v1/models';
+    } else {
+      return res.status(400).json({ error: 'Invalid provider' });
+    }
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Failed to fetch models for ${provider}:`, errorText);
+      return res.status(response.status).json({ error: errorText });
+    }
+    
+    const data = await response.json();
+    
+    let models = [];
+    if (provider === 'deepseek') {
+      models = data.data.map(m => ({
+        id: m.id,
+        name: m.id
+      }));
+    } else if (provider === 'openrouter') {
+      models = data.data
+        .filter(m => 
+          m.output_modalities && m.output_modalities.includes('text') &&
+          !m.id.includes(':') && 
+          !m.id.includes('free') &&
+          !m.id.includes('router')
+        )
+        .map(m => ({
+          id: m.id,
+          name: m.name || m.id
+        }));
+    }
+    
+    res.json({ models });
+  } catch (error) {
+    console.error('Error fetching models:', error);
     res.status(500).json({ error: error.message });
   }
 });

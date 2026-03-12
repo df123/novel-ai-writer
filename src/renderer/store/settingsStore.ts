@@ -2,16 +2,16 @@ import { create } from 'zustand';
 import { settingsApi } from '../utils/api';
 
 interface SettingsState {
-  openaiApiKey: string;
   deepseekApiKey: string;
+  openrouterApiKey: string;
   isLoading: boolean;
   loadSettings: () => Promise<void>;
-  updateSettings: (settings: { openaiApiKey?: string; deepseekApiKey?: string }) => Promise<void>;
+  updateSettings: (settings: { deepseekApiKey?: string; openrouterApiKey?: string }) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  openaiApiKey: '',
   deepseekApiKey: '',
+  openrouterApiKey: '',
   isLoading: false,
 
   loadSettings: async () => {
@@ -20,8 +20,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const response = await settingsApi.get();
       const settings = response.data;
       set({
-        openaiApiKey: settings.openai_api_key || '',
         deepseekApiKey: settings.deepseek_api_key || '',
+        openrouterApiKey: settings.openrouter_api_key || '',
         isLoading: false,
       });
     } catch (error) {
@@ -32,16 +32,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   updateSettings: async (settings) => {
     const currentSettings = {
-      openai_api_key: settings.openaiApiKey || get().openaiApiKey,
       deepseek_api_key: settings.deepseekApiKey || get().deepseekApiKey,
+      openrouter_api_key: settings.openrouterApiKey || get().openrouterApiKey,
     };
     
     const response = await settingsApi.update(currentSettings);
     const updated = response.data;
     
     set({
-      openaiApiKey: updated.openai_api_key || '',
       deepseekApiKey: updated.deepseek_api_key || '',
+      openrouterApiKey: updated.openrouter_api_key || '',
     });
   },
 }));

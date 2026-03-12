@@ -3,10 +3,12 @@
     <el-header style="border-bottom: 1px solid #e0e0e0; padding: 0; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px">
       <span style="font-size: 16px; font-weight: 500">写作区</span>
       <div style="display: flex; align-items: center; gap: 12px">
-        <el-select v-model="selectedProvider" size="small" style="width: 120px">
+        <el-select v-model="selectedProvider" size="small" style="width: 100px" @change="handleProviderChange">
           <el-option label="DeepSeek" value="deepseek" />
-          <el-option label="OpenAI" value="openai" />
           <el-option label="OpenRouter" value="openrouter" />
+        </el-select>
+        <el-select v-model="selectedModel" size="small" style="width: 200px" :loading="isLoadingModels" @change="handleModelChange">
+          <el-option v-for="model in models" :key="model.id" :label="model.name" :value="model.id" />
         </el-select>
         <el-tag size="small" type="info">
           {{ totalTokens }} tokens
@@ -134,17 +136,12 @@ const { chats, currentChat, messages, isLoading, isStreaming, currentStreamConte
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters, selectedCharacters } = storeToRefs(characterStore);
-const { selectedProvider } = storeToRefs(settingsStore);
+const { selectedProvider, selectedModel, models, isLoadingModels } = storeToRefs(settingsStore);
+const { loadModels, updateSettings } = settingsStore;
 
 const { createChat, sendMessage, deleteMessage } = chatStore;
 
-const providerModels = {
-  deepseek: 'deepseek-reasoner',
-  openai: 'gpt-3.5-turbo',
-  openrouter: 'openai/gpt-3.5-turbo',
-};
-
-const currentModel = computed(() => providerModels[selectedProvider.value] || 'deepseek-reasoner');
+const currentModel = computed(() => selectedModel.value || 'deepseek-reasoner');
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
@@ -228,6 +225,19 @@ const handleMessageCommand = async (command: string, messageId: string) => {
     await deleteMessage(messageId);
   }
 };
+
+const handleProviderChange = async () => {
+  await loadModels(selectedProvider.value);
+  await updateSettings({ selectedProvider: selectedProvider.value });
+};
+
+const handleModelChange = async () => {
+  await updateSettings({ selectedModel: selectedModel.value });
+};
+
+onMounted(async () => {
+  await loadModels(selectedProvider.value);
+});
 </script>
 
 <style scoped>
