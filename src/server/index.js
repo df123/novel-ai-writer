@@ -764,10 +764,16 @@ app.post('/api/models/:provider', async (req, res) => {
     
     let models = [];
     if (provider === 'deepseek') {
-      models = data.data.map(m => ({
-        id: m.id,
-        name: m.id
-      }));
+      models = [
+        {
+          id: 'deepseek-chat',
+          name: 'DeepSeek Chat',
+        },
+        {
+          id: 'deepseek-reasoner',
+          name: 'DeepSeek Reasoner',
+        }
+      ];
     } else if (provider === 'openrouter') {
       models = data.data
         .filter(m => 
@@ -776,10 +782,30 @@ app.post('/api/models/:provider', async (req, res) => {
           !m.id.includes('free') &&
           !m.id.includes('router')
         )
-        .map(m => ({
-          id: m.id,
-          name: m.name || m.id
-        }));
+        .map(m => {
+          const pricing = m.pricing || {};
+          const promptPrice = pricing.prompt ? parseFloat(pricing.prompt) : null;
+          const completionPrice = pricing.completion ? parseFloat(pricing.completion) : null;
+          
+          let priceDisplay = '';
+          if (promptPrice !== null && completionPrice !== null) {
+            if (promptPrice === 0 && completionPrice === 0) {
+              priceDisplay = '免费';
+            } else {
+              priceDisplay = `$${promptPrice}/M`;
+            }
+          }
+          
+          return {
+            id: m.id,
+            name: m.name || m.id,
+            price: priceDisplay,
+            pricing: {
+              prompt: promptPrice,
+              completion: completionPrice
+            }
+          };
+        });
     }
     
     res.json({ models });

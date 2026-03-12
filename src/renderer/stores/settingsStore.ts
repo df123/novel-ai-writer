@@ -8,7 +8,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const temperature = ref(0.7);
   const selectedProvider = ref('deepseek');
   const selectedModel = ref('deepseek-reasoner');
-  const models = ref<Array<{ id: string; name: string }>>([]);
+  const models = ref<Array<{ id: string; name: string; price?: string; pricing?: { prompt: number | null; completion: number | null } }>>([]);
   const isLoading = ref(false);
   const isLoadingModels = ref(false);
 
