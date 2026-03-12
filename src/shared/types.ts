@@ -28,6 +28,15 @@ export interface TimelineNode {
   createdAt: number;
 }
 
+export interface TimelineNodeVersion {
+  id: string;
+  timelineNodeId: string;
+  title: string;
+  content: string;
+  version: number;
+  createdAt: number;
+}
+
 export interface Character {
   id: string;
   projectId: string;
@@ -37,6 +46,18 @@ export interface Character {
   personality?: string;
   background?: string;
   relationships?: string;
+  createdAt: number;
+}
+
+export interface CharacterVersion {
+  id: string;
+  characterId: string;
+  name: string;
+  description?: string;
+  personality?: string;
+  background?: string;
+  avatar?: string;
+  version: number;
   createdAt: number;
 }
 

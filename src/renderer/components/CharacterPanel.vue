@@ -14,6 +14,13 @@
 
     <el-scrollbar v-if="!isCollapsed" style="flex: 1">
       <div style="padding: 8px">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px">
+          <el-button size="small" @click="toggleAllCharacters(true)">全选</el-button>
+          <el-button size="small" @click="toggleAllCharacters(false)">取消全选</el-button>
+          <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+            已选 {{ selectedCharacters.size }} / {{ characters.length }}
+          </span>
+        </div>
         <div
           v-for="character in characters"
           :key="character.id"
@@ -39,6 +46,7 @@
           </div>
           <div class="character-actions">
             <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(character)" />
+            <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(character.id)" title="查看版本" />
             <el-button :icon="Delete" circle size="small" text @click.stop="deleteCharacter(character.id)" />
           </div>
         </div>
@@ -90,18 +98,60 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="versionsDialogOpen"
+      title="版本历史"
+      width="700px"
+    >
+      <div v-if="isLoadingVersions" style="text-align: center; padding: 20px">
+        <el-icon class="is-loading" :size="24">
+          <Loading />
+        </el-icon>
+        <div style="margin-top: 8px; color: #999">加载中...</div>
+      </div>
+      <div v-else-if="versions.length === 0" style="text-align: center; padding: 40px; color: #999">
+        暂无版本记录
+      </div>
+      <div v-else style="max-height: 400px; overflow-y: auto">
+        <div
+          v-for="version in versions"
+          :key="version.id"
+          style="padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; margin-bottom: 8px"
+        >
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+            <span style="font-weight: 500">版本 {{ version.version }}</span>
+            <el-button type="primary" size="small" @click="handleRestoreVersion(version.id)">
+              恢复此版本
+            </el-button>
+          </div>
+          <div style="font-size: 13px; color: #666; margin-bottom: 4px">
+            姓名: {{ version.name }}
+          </div>
+          <div v-if="version.personality" style="font-size: 12px; color: #999">
+            性格: {{ version.personality }}
+          </div>
+          <div v-if="version.background" style="font-size: 12px; color: #999">
+            背景: {{ version.background }}
+          </div>
+          <div style="font-size: 11px; color: #ccc; margin-top: 4px">
+            {{ new Date(version.createdAt * 1000).toLocaleString('zh-CN') }}
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </el-aside>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
 import { useCharacterStore } from '../stores/characterStore';
 
 const characterStore = useCharacterStore();
-const { characters, selectedCharacters } = storeToRefs(characterStore);
-const { createCharacter, updateCharacter, deleteCharacter, toggleCharacterSelection } = characterStore;
+const { characters, selectedCharacters, versions, isLoadingVersions } = storeToRefs(characterStore);
+const { createCharacter, updateCharacter, deleteCharacter, toggleCharacterSelection, clearCharacterSelection, loadVersions, restoreVersion } = characterStore;
 
 const dialogOpen = ref(false);
 const editMode = ref(false);
@@ -111,9 +161,20 @@ const personality = ref('');
 const background = ref('');
 const relationships = ref('');
 const isCollapsed = ref(false);
+const versionsDialogOpen = ref(false);
+const versionCharacterId = ref<string | null>(null);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
+};
+
+const toggleAllCharacters = (selectAll: boolean) => {
+  if (selectAll) {
+    const allCharacterIds = new Set(characters.value.map(c => c.id));
+    selectedCharacters.value = allCharacterIds;
+  } else {
+    clearCharacterSelection();
+  }
 };
 
 const handleOpenCreateDialog = () => {
@@ -153,6 +214,7 @@ const handleSubmit = async () => {
       background: background.value,
       relationships: relationships.value,
       avatar: '',
+      createVersion: true,
     };
 
     if (editMode.value && editId.value) {
@@ -163,6 +225,22 @@ const handleSubmit = async () => {
     handleCloseDialog();
   } catch (error) {
     console.error('Failed to save character:', error);
+  }
+};
+
+const handleOpenVersionsDialog = async (characterId: string) => {
+  versionCharacterId.value = characterId;
+  versionsDialogOpen.value = true;
+  await loadVersions(characterId);
+};
+
+const handleRestoreVersion = async (versionId: string) => {
+  if (!versionCharacterId.value) return;
+  try {
+    await restoreVersion(versionCharacterId.value, versionId);
+    versionsDialogOpen.value = false;
+  } catch (error) {
+    console.error('Failed to restore version:', error);
   }
 };
 </script>

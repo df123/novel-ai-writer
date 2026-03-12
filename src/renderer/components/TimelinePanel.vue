@@ -10,6 +10,13 @@
 
     <el-scrollbar v-if="!isCollapsed" style="flex: 1">
       <div style="padding: 8px">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px">
+          <el-button size="small" @click="toggleAllNodes(true)">全选</el-button>
+          <el-button size="small" @click="toggleAllNodes(false)">取消全选</el-button>
+          <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+            已选 {{ selectedNodes.size }} / {{ nodes.length }}
+          </span>
+        </div>
         <div
           v-for="node in nodes"
           :key="node.id"
@@ -17,9 +24,7 @@
           @click="handleSelect(node.id)"
         >
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-            <el-icon v-if="selectedNode?.id === node.id" color="#409eff">
-              <CircleCheck />
-            </el-icon>
+            <el-checkbox :model-value="selectedNodes.has(node.id)" @change="(val: any) => toggleNodeSelection(node.id)" @click.stop />
             <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
           </div>
           <div style="font-size: 12px; color: #666; margin-bottom: 2px">
@@ -30,6 +35,7 @@
           </div>
           <div class="node-actions">
             <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(node)" />
+            <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(node.id)" title="查看版本" />
             <el-button :icon="Delete" circle size="small" text @click.stop="deleteNode(node.id)" />
           </div>
         </div>
@@ -71,19 +77,58 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="versionsDialogOpen"
+      title="版本历史"
+      width="700px"
+    >
+      <div v-if="isLoadingVersions" style="text-align: center; padding: 20px">
+        <el-icon class="is-loading" :size="24">
+          <Loading />
+        </el-icon>
+        <div style="margin-top: 8px; color: #999">加载中...</div>
+      </div>
+      <div v-else-if="versions.length === 0" style="text-align: center; padding: 40px; color: #999">
+        暂无版本记录
+      </div>
+      <div v-else style="max-height: 400px; overflow-y: auto">
+        <div
+          v-for="version in versions"
+          :key="version.id"
+          style="padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; margin-bottom: 8px"
+        >
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+            <span style="font-weight: 500">版本 {{ version.version }}</span>
+            <el-button type="primary" size="small" @click="handleRestoreVersion(version.id)">
+              恢复此版本
+            </el-button>
+          </div>
+          <div style="font-size: 13px; color: #666; margin-bottom: 4px">
+            标题: {{ version.title }}
+          </div>
+          <div v-if="version.content" style="font-size: 12px; color: #999; white-space: pre-wrap">
+            {{ version.content }}
+          </div>
+          <div style="font-size: 11px; color: #ccc; margin-top: 4px">
+            {{ new Date(version.createdAt * 1000).toLocaleString('zh-CN') }}
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </el-aside>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
 import { useTimelineStore } from '../stores/timelineStore';
 import { formatDate } from '../../shared/utils';
 
 const timelineStore = useTimelineStore();
-const { nodes, selectedNode } = storeToRefs(timelineStore);
-const { createNode, updateNode, deleteNode, selectNode } = timelineStore;
+const { nodes, selectedNode, selectedNodes, versions, isLoadingVersions } = storeToRefs(timelineStore);
+const { createNode, updateNode, deleteNode, selectNode, toggleNodeSelection, toggleAllNodes, loadVersions, restoreVersion } = timelineStore;
 
 const dialogOpen = ref(false);
 const editMode = ref(false);
@@ -92,6 +137,8 @@ const title = ref('');
 const date = ref('');
 const description = ref('');
 const isCollapsed = ref(false);
+const versionsDialogOpen = ref(false);
+const versionNodeId = ref<string | null>(null);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -127,7 +174,7 @@ const handleSubmit = async () => {
   try {
     const content = `Date: ${date.value}\nDescription: ${description.value}`;
     if (editMode.value && editId.value) {
-      await updateNode(editId.value, { title: title.value, content });
+      await updateNode(editId.value, { title: title.value, content, createVersion: true });
     } else {
       await createNode(title.value, content);
     }
@@ -142,6 +189,22 @@ const handleSelect = (id: string) => {
     selectNode(null);
   } else {
     selectNode(id);
+  }
+};
+
+const handleOpenVersionsDialog = async (nodeId: string) => {
+  versionNodeId.value = nodeId;
+  versionsDialogOpen.value = true;
+  await loadVersions(nodeId);
+};
+
+const handleRestoreVersion = async (versionId: string) => {
+  if (!versionNodeId.value) return;
+  try {
+    await restoreVersion(versionNodeId.value, versionId);
+    versionsDialogOpen.value = false;
+  } catch (error) {
+    console.error('Failed to restore version:', error);
   }
 };
 </script>

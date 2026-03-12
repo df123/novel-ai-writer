@@ -40,9 +40,11 @@ export const timelineApi = {
   list: (projectId: string) => api.get(`/projects/${projectId}/timeline`),
   create: (projectId: string, data: { title: string; content?: string; orderIndex?: number }) =>
     api.post(`/projects/${projectId}/timeline`, data),
-  update: (id: string, data: { title: string; content?: string; orderIndex?: number }) =>
+  update: (id: string, data: { title: string; content?: string; orderIndex?: number; createVersion?: boolean }) =>
     api.put(`/timeline/${id}`, data),
   delete: (id: string) => api.delete(`/timeline/${id}`),
+  getVersions: (nodeId: string) => api.get(`/timeline/${nodeId}/versions`),
+  restoreVersion: (nodeId: string, versionId: string) => api.post(`/timeline/${nodeId}/versions/${versionId}/restore`),
 };
 
 // Characters
@@ -61,14 +63,17 @@ export const characterApi = {
   update: (
     id: string,
     data: {
-      name: string;
+      name?: string;
       description?: string;
       personality?: string;
       background?: string;
       avatar?: string;
+      createVersion?: boolean;
     },
   ) => api.put(`/characters/${id}`, data),
   delete: (id: string) => api.delete(`/characters/${id}`),
+  getVersions: (characterId: string) => api.get(`/characters/${characterId}/versions`),
+  restoreVersion: (characterId: string, versionId: string) => api.post(`/characters/${characterId}/versions/${versionId}/restore`),
 };
 
 // LLM

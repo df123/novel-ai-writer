@@ -192,33 +192,35 @@ export const useChatStore = defineStore('chat', () => {
 \`\`\`
 `;
 
-    if (timelineStore.nodes.length > 0) {
-      const timelineSummary = timelineStore.nodes
+    if (timelineStore.selectedNodes.size > 0) {
+      const selectedTimelineNodes = timelineStore.nodes.filter(n => timelineStore.selectedNodes.has(n.id));
+      const timelineSummary = selectedTimelineNodes
         .map((node, i) => `${i + 1}. [ID: ${node.id}] ${node.title}: ${node.description || '无内容'}`)
         .join('\n');
       systemPrompt += `\n\n当前时间线：\n${timelineSummary}`;
     }
 
-    if (characterStore.characters.length > 0) {
-      const characterSummary = characterStore.characters
+    if (characterStore.selectedCharacters.size > 0) {
+      const selectedCharacters = characterStore.characters.filter(c => characterStore.selectedCharacters.has(c.id));
+      const characterSummary = selectedCharacters
         .map(char => `[ID: ${char.id}] ${char.name}: ${char.description || '无描述'}; 性格: ${char.personality || '未知'}`)
         .join('\n');
       systemPrompt += `\n\n涉及角色：\n${characterSummary}`;
     }
 
     const messagesForLLM: any[] = [];
-    
+
     if (systemPrompt) {
       messagesForLLM.push({ role: 'system', content: systemPrompt });
     }
-    
+
     const validMessages = messages.value
       .filter(m => m.id !== assistantMessageId && m.content && m.content.trim())
       .map(m => ({
         role: m.role,
         content: m.content,
       }));
-    
+
     messagesForLLM.push(...validMessages);
 
     const apiKey = options.providerName === 'deepseek'
@@ -228,15 +230,6 @@ export const useChatStore = defineStore('chat', () => {
     if (!apiKey) {
       throw new Error(`请先配置 ${options.providerName === 'deepseek' ? 'DeepSeek' : 'OpenRouter'} API 密钥`);
     }
-
-    console.log('[DEBUG] Sending chat request:', {
-      provider: options.providerName,
-      model: options.modelName,
-      apiKeyLength: apiKey?.length,
-      apiKeyPrefix: apiKey?.substring(0, 10) + '...',
-      temperature: settingsStore.temperature,
-      messagesCount: messagesForLLM.length
-    });
 
     try {
       const response = await llmApi.chat(

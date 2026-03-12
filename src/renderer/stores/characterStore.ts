@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { Character } from '../../shared/types';
+import { Character, CharacterVersion } from '../../shared/types';
 import { characterApi } from '../utils/api';
 import { useProjectStore } from './projectStore';
 
@@ -8,6 +8,8 @@ export const useCharacterStore = defineStore('character', () => {
   const characters = ref<Character[]>([]);
   const selectedCharacters = ref<Set<string>>(new Set());
   const isLoading = ref(false);
+  const versions = ref<CharacterVersion[]>([]);
+  const isLoadingVersions = ref(false);
 
   const loadCharacters = async (projectId: string) => {
     isLoading.value = true;
@@ -31,7 +33,7 @@ export const useCharacterStore = defineStore('character', () => {
     return newCharacter;
   };
 
-  const updateCharacter = async (id: string, updates: Partial<Character>) => {
+  const updateCharacter = async (id: string, updates: Partial<Character> & { createVersion?: boolean }) => {
     const response = await characterApi.update(id, updates);
     const updated = response.data;
     characters.value = characters.value.map(c => (c.id === id ? updated : c));
@@ -59,15 +61,47 @@ export const useCharacterStore = defineStore('character', () => {
     selectedCharacters.value = new Set<string>();
   };
 
+  const loadVersions = async (characterId: string) => {
+    isLoadingVersions.value = true;
+    try {
+      const response = await characterApi.getVersions(characterId);
+      versions.value = response.data;
+    } catch (error) {
+      console.error('Failed to load character versions:', error);
+    } finally {
+      isLoadingVersions.value = false;
+    }
+  };
+
+  const restoreVersion = async (characterId: string, versionId: string) => {
+    try {
+      const response = await characterApi.restoreVersion(characterId, versionId);
+      const updatedCharacter = response.data;
+
+      const index = characters.value.findIndex(c => c.id === characterId);
+      if (index !== -1) {
+        characters.value[index] = updatedCharacter;
+      }
+      return updatedCharacter;
+    } catch (error) {
+      console.error('Failed to restore character version:', error);
+      throw error;
+    }
+  };
+
   return {
     characters,
     selectedCharacters,
     isLoading,
+    versions,
+    isLoadingVersions,
     loadCharacters,
     createCharacter,
     updateCharacter,
     deleteCharacter,
     toggleCharacterSelection,
     clearCharacterSelection,
+    loadVersions,
+    restoreVersion,
   };
 });

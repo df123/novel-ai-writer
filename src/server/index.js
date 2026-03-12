@@ -100,9 +100,34 @@ const initDB = async () => {
         value TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS timeline_versions (
+        id TEXT PRIMARY KEY,
+        timeline_node_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT,
+        version INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (timeline_node_id) REFERENCES timeline_nodes(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS character_versions (
+        id TEXT PRIMARY KEY,
+        character_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        personality TEXT,
+        background TEXT,
+        avatar_url TEXT,
+        version INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
       CREATE INDEX IF NOT EXISTS idx_timeline_project_id ON timeline_nodes(project_id);
       CREATE INDEX IF NOT EXISTS idx_characters_project_id ON characters(project_id);
+      CREATE INDEX IF NOT EXISTS idx_timeline_versions_node_id ON timeline_versions(timeline_node_id);
+      CREATE INDEX IF NOT EXISTS idx_character_versions_character_id ON character_versions(character_id);
     `);
     
     // 初始化默认提示词模板
@@ -528,12 +553,25 @@ app.post('/api/projects/:projectId/timeline', (req, res) => {
 
 app.put('/api/timeline/:id', (req, res) => {
   try {
-    const { title, content, orderIndex } = req.body;
+    const { title, content, orderIndex, createVersion } = req.body;
     const updatedAt = now();
-    
+
+    if (createVersion) {
+      const existingNodes = query('SELECT * FROM timeline_nodes WHERE id = ?', [req.params.id]);
+      if (existingNodes.length > 0) {
+        const existingNode = existingNodes[0];
+        const versionCount = query('SELECT COUNT(*) as count FROM timeline_versions WHERE timeline_node_id = ?', [req.params.id])[0].count;
+        const newVersion = versionCount + 1;
+        const versionId = generateId();
+
+        run('INSERT INTO timeline_versions (id, timeline_node_id, title, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [versionId, req.params.id, existingNode.title, existingNode.content, newVersion, now()]);
+      }
+    }
+
     run('UPDATE timeline_nodes SET title = ?, content = ?, order_index = ?, updated_at = ? WHERE id = ?',
       [title, content || null, orderIndex || 0, updatedAt, req.params.id]);
-    
+
     saveDB();
 
     const nodes = query('SELECT * FROM timeline_nodes WHERE id = ?', [req.params.id]);
@@ -557,6 +595,49 @@ app.delete('/api/timeline/:id', (req, res) => {
     run('DELETE FROM timeline_nodes WHERE id = ?', [req.params.id]);
     saveDB();
     res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/timeline/:nodeId/versions', (req, res) => {
+  try {
+    const versions = query('SELECT * FROM timeline_versions WHERE timeline_node_id = ? ORDER BY version DESC', [req.params.nodeId]);
+    const formattedVersions = versions.map(v => ({
+      ...v,
+      timelineNodeId: v.timeline_node_id,
+      createdAt: v.created_at
+    }));
+    res.json(formattedVersions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/timeline/:nodeId/versions/:versionId/restore', (req, res) => {
+  try {
+    const version = query('SELECT * FROM timeline_versions WHERE id = ? AND timeline_node_id = ?', [req.params.versionId, req.params.nodeId])[0];
+
+    if (!version) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    run('UPDATE timeline_nodes SET title = ?, content = ?, updated_at = ? WHERE id = ?',
+      [version.title, version.content, now(), req.params.nodeId]);
+
+    saveDB();
+
+    const nodes = query('SELECT * FROM timeline_nodes WHERE id = ?', [req.params.nodeId]);
+    const { date, description } = parseTimelineContent(nodes[0].content);
+    const node = {
+      ...nodes[0],
+      date,
+      description,
+      projectId: nodes[0].project_id,
+      orderIndex: nodes[0].order_index,
+      createdAt: nodes[0].created_at
+    };
+    res.json(node);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -606,14 +687,27 @@ app.post('/api/projects/:projectId/characters', (req, res) => {
 
 app.put('/api/characters/:id', (req, res) => {
   try {
-    const { name, description, personality, background, avatar } = req.body;
+    const { name, description, personality, background, avatar, createVersion } = req.body;
     const updatedAt = now();
-    
+
+    if (createVersion) {
+      const existingCharacters = query('SELECT * FROM characters WHERE id = ?', [req.params.id]);
+      if (existingCharacters.length > 0) {
+        const existingCharacter = existingCharacters[0];
+        const versionCount = query('SELECT COUNT(*) as count FROM character_versions WHERE character_id = ?', [req.params.id])[0].count;
+        const newVersion = versionCount + 1;
+        const versionId = generateId();
+
+        run('INSERT INTO character_versions (id, character_id, name, description, personality, background, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [versionId, req.params.id, existingCharacter.name, existingCharacter.description, existingCharacter.personality, existingCharacter.background, existingCharacter.avatar_url, newVersion, now()]);
+      }
+    }
+
     run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
       [name, description || null, personality || null, background || null, avatar || null, updatedAt, req.params.id]);
-    
+
     saveDB();
-    
+
     const characters = query('SELECT * FROM characters WHERE id = ?', [req.params.id]);
     const character = {
       ...characters[0],
@@ -632,6 +726,47 @@ app.delete('/api/characters/:id', (req, res) => {
     run('DELETE FROM characters WHERE id = ?', [req.params.id]);
     saveDB();
     res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/characters/:characterId/versions', (req, res) => {
+  try {
+    const versions = query('SELECT * FROM character_versions WHERE character_id = ? ORDER BY version DESC', [req.params.characterId]);
+    const formattedVersions = versions.map(v => ({
+      ...v,
+      characterId: v.character_id,
+      avatar: v.avatar_url,
+      createdAt: v.created_at
+    }));
+    res.json(formattedVersions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/characters/:characterId/versions/:versionId/restore', (req, res) => {
+  try {
+    const version = query('SELECT * FROM character_versions WHERE id = ? AND character_id = ?', [req.params.versionId, req.params.characterId])[0];
+
+    if (!version) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
+      [version.name, version.description, version.personality, version.background, version.avatar_url, now(), req.params.characterId]);
+
+    saveDB();
+
+    const characters = query('SELECT * FROM characters WHERE id = ?', [req.params.characterId]);
+    const character = {
+      ...characters[0],
+      avatar: characters[0].avatar_url,
+      projectId: characters[0].project_id,
+      createdAt: characters[0].created_at
+    };
+    res.json(character);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -692,20 +827,6 @@ app.post('/api/llm/chat', async (req, res) => {
       headers['X-OpenRouter-Title'] = 'NovelAI Writer';
     }
 
-    console.log('[DEBUG] Request headers:', {
-      ...headers,
-      'Authorization': headers['Authorization'].substring(0, 15) + '...'
-    });
-
-    console.log('[DEBUG] Request body:', JSON.stringify({
-      model: modelName,
-      messagesCount: messages?.length,
-      stream: true,
-      temperature: options.temperature,
-      top_p: options.topP,
-      max_tokens: options.maxTokens
-    }));
-
     try {
       const requestBody = {
         model: modelName,
@@ -727,7 +848,6 @@ app.post('/api/llm/chat', async (req, res) => {
         headers: headers,
         body: JSON.stringify(requestBody)
       });
-      console.log('[DEBUG] LLM API response status:', response.status, response.statusText);
     } catch (fetchError) {
       console.error('[DEBUG] Fetch error:', fetchError);
       return res.status(500).json({ error: fetchError.message });
