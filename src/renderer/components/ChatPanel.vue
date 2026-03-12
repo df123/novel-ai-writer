@@ -7,7 +7,7 @@
           <el-option label="DeepSeek" value="deepseek" />
           <el-option label="OpenRouter" value="openrouter" />
         </el-select>
-        <el-select v-model="selectedModel" size="small" style="width: 260px" :loading="isLoadingModels" @change="handleModelChange">
+        <el-select v-model="selectedModel" size="small" style="width: 260px" filterable :loading="isLoadingModels" @change="handleModelChange" placeholder="选择模型">
           <el-option v-for="model in models" :key="model.id" :label="model.name" :value="model.id">
             <span>{{ model.name }}</span>
             <span v-if="model.price" style="float: right; color: #909399; font-size: 12px">{{ model.price }}</span>

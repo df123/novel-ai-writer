@@ -734,6 +734,8 @@ app.post('/api/models/:provider', async (req, res) => {
     const { provider } = req.params;
     const { apiKey } = req.body;
     
+    console.log(`Fetching models for provider: ${provider}, API key provided: ${!!apiKey}`);
+    
     let models = [];
     
     if (provider === 'deepseek') {
@@ -749,8 +751,11 @@ app.post('/api/models/:provider', async (req, res) => {
       ];
     } else if (provider === 'openrouter') {
       if (!apiKey) {
+        console.log('No API key provided for OpenRouter');
         return res.status(400).json({ error: 'API key is required' });
       }
+      
+      console.log(`Calling OpenRouter API with key: ${apiKey.substring(0, 10)}...`);
       
       const response = await fetch('https://openrouter.ai/api/v1/models', {
         method: 'GET',
@@ -759,6 +764,8 @@ app.post('/api/models/:provider', async (req, res) => {
         }
       });
       
+      console.log(`OpenRouter API response status: ${response.status}`);
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Failed to fetch models for ${provider}:`, errorText);
@@ -766,13 +773,20 @@ app.post('/api/models/:provider', async (req, res) => {
       }
       
       const data = await response.json();
+      console.log(`OpenRouter returned ${data.data?.length || 0} models`);
+      
       models = data.data
-        .filter(m => 
-          m.output_modalities && m.output_modalities.includes('text') &&
-          !m.id.includes(':') && 
-          !m.id.includes('free') &&
-          !m.id.includes('router')
-        )
+        .filter(m => {
+          const hasTextOutput = !m.output_modalities || m.output_modalities.includes('text');
+          const hasPricing = m.pricing && (m.pricing.prompt !== undefined || m.pricing.completion !== undefined);
+          const noFree = !m.id.includes('free');
+          const noRouter = !m.id.includes('router');
+          
+          const result = hasTextOutput && hasPricing && noFree && noRouter;
+          console.log(`Model ${m.id}: output_modalities=${m.output_modalities}, hasPricing=${hasPricing}, noFree=${noFree}, noRouter=${noRouter}, included=${result}`);
+          
+          return result;
+        })
         .map(m => {
           const pricing = m.pricing || {};
           const promptPrice = pricing.prompt ? parseFloat(pricing.prompt) : null;
@@ -797,6 +811,8 @@ app.post('/api/models/:provider', async (req, res) => {
             }
           };
         });
+      
+      console.log(`Filtered to ${models.length} models`);
     } else {
       return res.status(400).json({ error: 'Invalid provider' });
     }
