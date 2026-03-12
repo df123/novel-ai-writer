@@ -779,11 +779,10 @@ app.post('/api/models/:provider', async (req, res) => {
         .filter(m => {
           const hasTextOutput = !m.output_modalities || m.output_modalities.includes('text');
           const hasPricing = m.pricing && (m.pricing.prompt !== undefined || m.pricing.completion !== undefined);
-          const noFree = !m.id.includes('free');
           const noRouter = !m.id.includes('router');
           
-          const result = hasTextOutput && hasPricing && noFree && noRouter;
-          console.log(`Model ${m.id}: output_modalities=${m.output_modalities}, hasPricing=${hasPricing}, noFree=${noFree}, noRouter=${noRouter}, included=${result}`);
+          const result = hasTextOutput && hasPricing && noRouter;
+          console.log(`Model ${m.id}: output_modalities=${m.output_modalities}, hasPricing=${hasPricing}, noRouter=${noRouter}, included=${result}`);
           
           return result;
         })
