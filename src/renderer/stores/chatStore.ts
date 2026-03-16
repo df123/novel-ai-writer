@@ -139,10 +139,14 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push(userMessage);
     updateTokenCount();
     
-    await messageApi.create(currentChat.value.id, {
+    const userResponse = await messageApi.create(currentChat.value.id, {
       role: 'user',
       content,
     });
+    const userMessageIndex = messages.value.findIndex(m => m.id === userMessageId);
+    if (userMessageIndex !== -1) {
+      messages.value[userMessageIndex].id = userResponse.data.id;
+    }
 
     const assistantMessageId = generateId();
     const assistantMessage: Message = {
@@ -291,11 +295,16 @@ export const useChatStore = defineStore('chat', () => {
         };
       }
 
-      await messageApi.create(currentChat.value.id, {
+      const assistantResponse = await messageApi.create(currentChat.value.id, {
         role: 'assistant',
         content: fullContent,
         reasoning_content: fullReasoning || undefined,
       });
+      
+      const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+      if (newMessageIndex !== -1) {
+        messages.value[newMessageIndex].id = assistantResponse.data.id;
+      }
 
       const assistantActions = parseAssistantActions(fullContent);
 
