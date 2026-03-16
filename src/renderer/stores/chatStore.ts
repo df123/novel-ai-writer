@@ -182,12 +182,6 @@ export const useChatStore = defineStore('chat', () => {
       providerName === 'deepseek' ? ALL_TOOLS : undefined
     );
 
-    const messagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
-
-    if (systemPrompt) {
-      messagesForLLM.push({ role: 'system', content: systemPrompt });
-    }
-
     const validMessages = messages.value
       .filter(m => m.content && m.content.trim())
       .map(m => ({
@@ -195,8 +189,14 @@ export const useChatStore = defineStore('chat', () => {
         content: m.content,
       }));
 
-    messagesForLLM.push(...validMessages);
-    messagesForLLM.push({ role: 'user', content });
+    const baseMessagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
+
+    if (systemPrompt) {
+      baseMessagesForLLM.push({ role: 'system', content: systemPrompt });
+    }
+
+    baseMessagesForLLM.push(...validMessages);
+    baseMessagesForLLM.push({ role: 'user', content });
 
     const executeToolCall = async (toolCall: ToolCall): Promise<string> => {
       const { name, arguments: args } = toolCall.function;
@@ -262,10 +262,14 @@ export const useChatStore = defineStore('chat', () => {
 
     let assistantMessageId: string | null = null;
 
-    const runLLMTurn = async (): Promise<void> => {
+    const runLLMTurn = async (
+      currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>
+    ): Promise<void> => {
+      console.log('Starting LLM turn with messages:', currentMessages.map(m => ({ role: m.role, content: m.content?.substring(0, 50) })));
+
       const response = await llmApi.chat(
         providerName,
-        messagesForLLM,
+        currentMessages,
         {
           model: options.modelName,
           temperature: settingsStore.temperature,
@@ -299,6 +303,7 @@ export const useChatStore = defineStore('chat', () => {
 
             try {
               const parsed = JSON.parse(data) as StreamChunk;
+              console.log('Stream chunk:', parsed);
               const delta = parsed.choices[0]?.delta;
 
               if (delta?.content) {
@@ -328,11 +333,14 @@ export const useChatStore = defineStore('chat', () => {
                   }
                 }
               }
-            } catch {
+            } catch (e) {
+              console.error('Failed to parse stream chunk:', e, data);
             }
           }
         }
       }
+
+      console.log('LLM response - fullContent:', fullContent, 'fullReasoning:', fullReasoning, 'toolCalls:', Object.values(accumulatedToolCalls));
 
       const toolCalls = Object.values(accumulatedToolCalls);
 
@@ -360,25 +368,34 @@ export const useChatStore = defineStore('chat', () => {
           messages.value[newMessageIndex].id = assistantResponse.data.id;
         }
 
-        messagesForLLM.push({
-          role: 'assistant',
-          content: fullContent,
-          reasoning_content: fullReasoning,
-          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-        });
-      }
+        const newMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [
+          ...currentMessages,
+          {
+            role: 'assistant',
+            content: fullContent,
+            reasoning_content: fullReasoning,
+            tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+          },
+        ];
 
-      if (toolCalls.length > 0) {
-        for (const toolCall of toolCalls) {
-          const result = await executeToolCall(toolCall);
-          messagesForLLM.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: result,
-          });
+        if (toolCalls.length > 0) {
+          for (const toolCall of toolCalls) {
+            const result = await executeToolCall(toolCall);
+            newMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: result,
+            });
+          }
+
+          await runLLMTurn(newMessages);
+        } else {
+          updateTokenCount();
+          isLoading.value = false;
+          isStreaming.value = false;
+          currentStreamContent.value = '';
+          currentStreamReasoning.value = '';
         }
-
-        await runLLMTurn();
       } else {
         updateTokenCount();
         isLoading.value = false;
@@ -389,7 +406,7 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     try {
-      await runLLMTurn();
+      await runLLMTurn(baseMessagesForLLM);
     } catch (error) {
       console.error('Send message error:', error);
       isLoading.value = false;
