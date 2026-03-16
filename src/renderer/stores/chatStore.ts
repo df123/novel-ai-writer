@@ -276,6 +276,7 @@ export const useChatStore = defineStore('chat', () => {
                 currentStreamReasoning.value = fullReasoning;
               }
             } catch (e) {
+              // Ignore JSON parse errors for individual chunks
             }
           }
         }

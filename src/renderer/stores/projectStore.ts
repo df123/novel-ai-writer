@@ -48,8 +48,8 @@ export const useProjectStore = defineStore('project', () => {
     if (!currentProject.value) return;
 
     const response = await projectApi.update(currentProject.value.id, {
-      title: updates.title,
-      description: updates.description,
+      title: updates.title ?? currentProject.value.title,
+      description: updates.description ?? currentProject.value.description,
     });
     const updated = response.data;
     
