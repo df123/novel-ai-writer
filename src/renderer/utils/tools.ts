@@ -1,0 +1,209 @@
+/**
+ * 工具调用定义
+ * 为 DeepSeek 等支持 Function Calling 的 LLM 提供工具定义
+ */
+
+/**
+ * 工具定义接口
+ */
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, {
+        type: string;
+        description: string;
+      }>;
+      required: string[];
+    };
+  };
+}
+
+/**
+ * 创建时间线节点工具
+ */
+export const createTimelineTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'create_timeline',
+    description: '创建一个新的时间线节点',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: '时间线节点的标题',
+        },
+        description: {
+          type: 'string',
+          description: '时间线节点的描述内容',
+        },
+      },
+      required: ['title', 'description'],
+    },
+  },
+};
+
+/**
+ * 更新时间线节点工具
+ */
+export const updateTimelineTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_timeline',
+    description: '更新已存在的时间线节点',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '时间线节点的 ID',
+        },
+        title: {
+          type: 'string',
+          description: '新标题',
+        },
+        description: {
+          type: 'string',
+          description: '新描述内容',
+        },
+      },
+      required: ['id'],
+    },
+  },
+};
+
+/**
+ * 删除时间线节点工具
+ */
+export const deleteTimelineTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'delete_timeline',
+    description: '删除指定的时间线节点',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '时间线节点的 ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+};
+
+/**
+ * 创建人物工具
+ */
+export const createCharacterTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'create_character',
+    description: '创建一个新的人物角色',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: '人物姓名',
+        },
+        description: {
+          type: 'string',
+          description: '人物描述',
+        },
+        personality: {
+          type: 'string',
+          description: '人物性格特点',
+        },
+        background: {
+          type: 'string',
+          description: '人物背景故事',
+        },
+        relationships: {
+          type: 'string',
+          description: '人物关系描述',
+        },
+      },
+      required: ['name'],
+    },
+  },
+};
+
+/**
+ * 更新人物工具
+ */
+export const updateCharacterTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_character',
+    description: '更新已存在的人物角色',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '人物的 ID',
+        },
+        name: {
+          type: 'string',
+          description: '新姓名',
+        },
+        description: {
+          type: 'string',
+          description: '新描述',
+        },
+        personality: {
+          type: 'string',
+          description: '新性格特点',
+        },
+        background: {
+          type: 'string',
+          description: '新背景故事',
+        },
+        relationships: {
+          type: 'string',
+          description: '新关系描述',
+        },
+      },
+      required: ['id'],
+    },
+  },
+};
+
+/**
+ * 删除人物工具
+ */
+export const deleteCharacterTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'delete_character',
+    description: '删除指定的人物角色',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '人物的 ID',
+        },
+      },
+      required: ['id'],
+    },
+  },
+};
+
+/**
+ * 所有可用工具
+ */
+export const ALL_TOOLS: ToolDefinition[] = [
+  createTimelineTool,
+  updateTimelineTool,
+  deleteTimelineTool,
+  createCharacterTool,
+  updateCharacterTool,
+  deleteCharacterTool,
+];

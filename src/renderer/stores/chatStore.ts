@@ -4,35 +4,39 @@ import { Message, Chat } from '../../shared/types';
 import { chatApi, messageApi, llmApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
-import { ChatOptions, AssistantAction } from './chatStoreTypes';
+import { ALL_TOOLS } from '../utils/tools';
+import { ChatOptions } from './chatStoreTypes';
 import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
 import { useSettingsStore } from './settingsStore';
 
-const parseAssistantActions = (content: string): AssistantAction[] => {
-  const actions: AssistantAction[] = [];
-  const regex = /```action\s*([\s\S]*?)```/g;
-  let match;
+/**
+ * 工具调用接口
+ */
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+  index: number;
+}
 
-  while ((match = regex.exec(content)) !== null) {
-    try {
-      const actionJson = match[1].trim();
-      const action = JSON.parse(actionJson);
-      if (action.type && action.data) {
-        actions.push(action);
-      }
-    } catch (e) {
-      console.error('Failed to parse action:', match[0], e);
-    }
-  }
-
-  if (actions.length > 0) {
-    console.warn('⚠️ Security Warning: Executing AI-generated actions automatically. Consider adding user confirmation for safety.');
-  }
-
-  return actions;
-};
+/**
+ * 流式响应块接口
+ */
+interface StreamChunk {
+  choices: Array<{
+    delta: {
+      role?: string;
+      content?: string;
+      reasoning_content?: string;
+      tool_calls?: ToolCall[];
+    };
+  }>;
+}
 
 export const useChatStore = defineStore('chat', () => {
   const chats = ref<Chat[]>([]);
@@ -168,17 +172,6 @@ export const useChatStore = defineStore('chat', () => {
       messages.value[userMessageIndex].id = userResponse.data.id;
     }
 
-    const assistantMessageId = generateId();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      chatId: currentChat.value.id,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-      orderIndex: messages.value.length + 1,
-    };
-    messages.value.push(assistantMessage);
-
     const selectedTimelineNodes = timelineStore.nodes.filter(n => timelineStore.selectedNodes.has(n.id));
     const selectedCharacters = characterStore.characters.filter(c => characterStore.selectedCharacters.has(c.id));
 
@@ -188,29 +181,96 @@ export const useChatStore = defineStore('chat', () => {
       selectedCharacters.map(c => ({ id: c.id, name: c.name, description: c.description, personality: c.personality }))
     );
 
-    const messagesForLLM: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
+    const messagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
 
     if (systemPrompt) {
       messagesForLLM.push({ role: 'system', content: systemPrompt });
     }
 
     const validMessages = messages.value
-      .filter(m => m.id !== assistantMessageId && m.content && m.content.trim())
+      .filter(m => m.content && m.content.trim())
       .map(m => ({
         role: m.role,
         content: m.content,
       }));
 
     messagesForLLM.push(...validMessages);
+    messagesForLLM.push({ role: 'user', content });
 
-    try {
+    const executeToolCall = async (toolCall: ToolCall): Promise<string> => {
+      const { name, arguments: args } = toolCall.function;
+      const parsedArgs = JSON.parse(args);
+
+      console.log(`Executing tool: ${name}`, parsedArgs);
+
+      try {
+        switch (name) {
+          case 'create_timeline':
+            await timelineStore.createNode(parsedArgs.title, parsedArgs.description);
+            return JSON.stringify({ success: true, message: `Created timeline node: ${parsedArgs.title}` });
+          case 'update_timeline':
+            if (parsedArgs.id) {
+              await timelineStore.updateNode(parsedArgs.id, {
+                title: parsedArgs.title,
+                content: parsedArgs.description,
+              });
+              return JSON.stringify({ success: true, message: `Updated timeline node: ${parsedArgs.title}` });
+            }
+            return JSON.stringify({ success: false, message: 'Missing required id' });
+          case 'delete_timeline':
+            if (parsedArgs.id) {
+              await timelineStore.deleteNode(parsedArgs.id);
+              return JSON.stringify({ success: true, message: `Deleted timeline node` });
+            }
+            return JSON.stringify({ success: false, message: 'Missing required id' });
+          case 'create_character':
+            await characterStore.createCharacter({
+              name: parsedArgs.name,
+              personality: parsedArgs.personality,
+              background: parsedArgs.background,
+              relationships: parsedArgs.relationships,
+              description: parsedArgs.description,
+            });
+            return JSON.stringify({ success: true, message: `Created character: ${parsedArgs.name}` });
+          case 'update_character':
+            if (parsedArgs.id) {
+              await characterStore.updateCharacter(parsedArgs.id, {
+                name: parsedArgs.name,
+                personality: parsedArgs.personality,
+                background: parsedArgs.background,
+                relationships: parsedArgs.relationships,
+                description: parsedArgs.description,
+              });
+              return JSON.stringify({ success: true, message: `Updated character: ${parsedArgs.name}` });
+            }
+            return JSON.stringify({ success: false, message: 'Missing required id' });
+          case 'delete_character':
+            if (parsedArgs.id) {
+              await characterStore.deleteCharacter(parsedArgs.id);
+              return JSON.stringify({ success: true, message: `Deleted character` });
+            }
+            return JSON.stringify({ success: false, message: 'Missing required id' });
+          default:
+            return JSON.stringify({ success: false, message: `Unknown tool: ${name}` });
+        }
+      } catch (error) {
+        console.error(`Failed to execute tool ${name}:`, error);
+        return JSON.stringify({ success: false, message: `Error: ${error}` });
+      }
+    };
+
+    let assistantMessageId: string | null = null;
+
+    const runLLMTurn = async (): Promise<void> => {
       const response = await llmApi.chat(
         providerName,
         messagesForLLM,
         {
           model: options.modelName,
           temperature: settingsStore.temperature,
-          apiKey
+          apiKey,
+          tools: providerName === 'deepseek' ? ALL_TOOLS : undefined,
+          thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
         }
       );
 
@@ -222,6 +282,7 @@ export const useChatStore = defineStore('chat', () => {
       const decoder = new TextDecoder();
       let fullContent = '';
       let fullReasoning = '';
+      const accumulatedToolCalls: Record<number, ToolCall> = {};
 
       while (true) {
         const { done, value } = await reader.read();
@@ -236,16 +297,30 @@ export const useChatStore = defineStore('chat', () => {
             if (data === '[DONE]') break;
 
             try {
-              const parsed = JSON.parse(data);
-              const content = parsed.content;
-              const reasoning_content = parsed.reasoning_content;
-              if (content) {
-                fullContent += content;
+              const parsed = JSON.parse(data) as StreamChunk;
+              const delta = parsed.choices[0]?.delta;
+
+              if (delta?.content) {
+                fullContent += delta.content;
                 currentStreamContent.value = fullContent;
               }
-              if (reasoning_content) {
-                fullReasoning += reasoning_content;
+              if (delta?.reasoning_content) {
+                fullReasoning += delta.reasoning_content;
                 currentStreamReasoning.value = fullReasoning;
+              }
+              if (delta?.tool_calls) {
+                for (const toolCall of delta.tool_calls) {
+                  const index = toolCall.index;
+                  if (!accumulatedToolCalls[index]) {
+                    accumulatedToolCalls[index] = { ...toolCall, function: { ...toolCall.function } };
+                  }
+                  if (toolCall.function.name) {
+                    accumulatedToolCalls[index].function.name = toolCall.function.name;
+                  }
+                  if (toolCall.function.arguments) {
+                    accumulatedToolCalls[index].function.arguments += toolCall.function.arguments;
+                  }
+                }
               }
             } catch {
             }
@@ -253,42 +328,62 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      const lastMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-      if (lastMessageIndex !== -1) {
-        messages.value[lastMessageIndex] = {
-          ...messages.value[lastMessageIndex],
+      const toolCalls = Object.values(accumulatedToolCalls);
+
+      if (!assistantMessageId && currentChat.value) {
+        assistantMessageId = generateId();
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          chatId: currentChat.value.id,
+          role: 'assistant',
           content: fullContent,
           reasoning_content: fullReasoning || undefined,
+          timestamp: Date.now(),
+          orderIndex: messages.value.length + 1,
         };
-      }
+        messages.value.push(assistantMessage);
 
-      const assistantResponse = await messageApi.create(currentChat.value.id, {
-        role: 'assistant',
-        content: fullContent,
-        reasoning_content: fullReasoning || undefined,
-      });
+        const assistantResponse = await messageApi.create(currentChat.value.id, {
+          role: 'assistant',
+          content: fullContent,
+          reasoning_content: fullReasoning || undefined,
+        });
 
-      const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-      if (newMessageIndex !== -1) {
-        messages.value[newMessageIndex].id = assistantResponse.data.id;
-      }
-
-      const assistantActions = parseAssistantActions(fullContent);
-
-      for (const action of assistantActions) {
-        try {
-          await executeAssistantAction(action);
-        } catch (e) {
-          console.error('Failed to execute action:', action, e);
+        const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+        if (newMessageIndex !== -1) {
+          messages.value[newMessageIndex].id = assistantResponse.data.id;
         }
+
+        messagesForLLM.push({
+          role: 'assistant',
+          content: fullContent,
+          reasoning_content: fullReasoning,
+          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+        });
       }
 
-      updateTokenCount();
+      if (toolCalls.length > 0) {
+        for (const toolCall of toolCalls) {
+          const result = await executeToolCall(toolCall);
+          messagesForLLM.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: result,
+          });
+        }
 
-      isLoading.value = false;
-      isStreaming.value = false;
-      currentStreamContent.value = '';
-      currentStreamReasoning.value = '';
+        await runLLMTurn();
+      } else {
+        updateTokenCount();
+        isLoading.value = false;
+        isStreaming.value = false;
+        currentStreamContent.value = '';
+        currentStreamReasoning.value = '';
+      }
+    };
+
+    try {
+      await runLLMTurn();
     } catch (error) {
       console.error('Send message error:', error);
       isLoading.value = false;
@@ -317,55 +412,6 @@ export const useChatStore = defineStore('chat', () => {
     } catch (error) {
       console.error('Failed to clear history:', error);
       throw error;
-    }
-  };
-
-  const executeAssistantAction = async (action: AssistantAction) => {
-    const timelineStore = useTimelineStore();
-    const characterStore = useCharacterStore();
-
-    switch (action.type) {
-      case 'create_timeline':
-        await timelineStore.createNode(action.data.title, action.data.description);
-        break;
-      case 'update_timeline':
-        if (action.data.id) {
-          await timelineStore.updateNode(action.data.id, {
-            title: action.data.title,
-            content: action.data.description,
-          });
-        }
-        break;
-      case 'delete_timeline':
-        if (action.data.id) {
-          await timelineStore.deleteNode(action.data.id);
-        }
-        break;
-      case 'create_character':
-        await characterStore.createCharacter({
-          name: action.data.name,
-          personality: action.data.personality,
-          background: action.data.background,
-          relationships: action.data.relationships,
-          avatar: action.data.avatar || '',
-        });
-        break;
-      case 'update_character':
-        if (action.data.id) {
-          await characterStore.updateCharacter(action.data.id, {
-            name: action.data.name,
-            personality: action.data.personality,
-            background: action.data.background,
-            relationships: action.data.relationships,
-            avatar: action.data.avatar,
-          });
-        }
-        break;
-      case 'delete_character':
-        if (action.data.id) {
-          await characterStore.deleteCharacter(action.data.id);
-        }
-        break;
     }
   };
 

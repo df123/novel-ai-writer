@@ -78,7 +78,7 @@ export const characterApi = {
 
 // LLM
 export const llmApi = {
-  chat: (provider: string, messages: any[], options?: any) => {
+  chat: (provider: string, messages: any[], options?: { model?: string; temperature?: number; apiKey?: string; tools?: any[]; thinking?: { type: string } }) => {
     return fetch(`${API_BASE_URL}/llm/chat`, {
       method: 'POST',
       headers: {
