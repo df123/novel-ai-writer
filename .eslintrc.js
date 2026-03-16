@@ -19,11 +19,12 @@ module.exports = {
   ],
   rules: {
     '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': ['warn', { 
+    '@typescript-eslint/no-unused-vars': ['warn', {
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_',
     }],
     'no-constant-condition': 'off',
+    'no-empty': 'off',
   },
   ignorePatterns: [
     'dist',

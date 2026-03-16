@@ -3,15 +3,12 @@ import { ref } from 'vue';
 import { Message, Chat } from '../../shared/types';
 import { chatApi, messageApi, llmApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
+import { buildSystemPrompt } from '../utils/prompts';
+import { ChatOptions, AssistantAction } from './chatStoreTypes';
 import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
 import { useSettingsStore } from './settingsStore';
-
-interface AssistantAction {
-  type: 'create_timeline' | 'update_timeline' | 'delete_timeline' | 'create_character' | 'update_character' | 'delete_character';
-  data: any;
-}
 
 const parseAssistantActions = (content: string): AssistantAction[] => {
   const actions: AssistantAction[] = [];
@@ -30,6 +27,10 @@ const parseAssistantActions = (content: string): AssistantAction[] => {
     }
   }
 
+  if (actions.length > 0) {
+    console.warn('⚠️ Security Warning: Executing AI-generated actions automatically. Consider adding user confirmation for safety.');
+  }
+
   return actions;
 };
 
@@ -44,24 +45,29 @@ export const useChatStore = defineStore('chat', () => {
   const totalTokens = ref(0);
 
   const loadChats = async (projectId: string) => {
-    const response = await chatApi.list(projectId);
-    chats.value = response.data;
-    
-    if (chats.value.length > 0) {
-      if (!currentChat.value) {
-        await selectChat(chats.value[0].id);
-      } else {
-        const exists = chats.value.some(c => c.id === currentChat.value!.id);
-        if (!exists) {
+    try {
+      const response = await chatApi.list(projectId);
+      chats.value = response.data;
+
+      if (chats.value.length > 0) {
+        if (!currentChat.value) {
           await selectChat(chats.value[0].id);
         } else {
-          await loadMessages(currentChat.value!.id);
+          const exists = chats.value.some(c => c.id === currentChat.value!.id);
+          if (!exists) {
+            await selectChat(chats.value[0].id);
+          } else {
+            await loadMessages(currentChat.value!.id);
+          }
         }
+      } else {
+        currentChat.value = null;
+        messages.value = [];
+        totalTokens.value = 0;
       }
-    } else {
-      currentChat.value = null;
-      messages.value = [];
-      totalTokens.value = 0;
+    } catch (error) {
+      console.error('Failed to load chats:', error);
+      throw error;
     }
   };
 
@@ -86,21 +92,26 @@ export const useChatStore = defineStore('chat', () => {
     const projectStore = useProjectStore();
     if (!projectStore.currentProject) throw new Error('No project selected');
 
-    const response = await chatApi.create(projectStore.currentProject.id, { name: title });
-    const chat = response.data;
-    chats.value.unshift(chat);
-    currentChat.value = chat;
-    messages.value = [];
-    totalTokens.value = 0;
-    
-    return chat;
+    try {
+      const response = await chatApi.create(projectStore.currentProject.id, { name: title });
+      const chat = response.data;
+      chats.value.unshift(chat);
+      currentChat.value = chat;
+      messages.value = [];
+      totalTokens.value = 0;
+
+      return chat;
+    } catch (error) {
+      console.error('Failed to create chat:', error);
+      throw error;
+    }
   };
 
   const selectChat = async (chatId: string | null) => {
     if (!chatId) {
       currentChat.value = null;
       messages.value = [];
-      totalTokens.value = 0;
+      updateTokenCount();
       return;
     }
 
@@ -111,14 +122,23 @@ export const useChatStore = defineStore('chat', () => {
     }
   };
 
-  const sendMessage = async (content: string, options: any = {}) => {
+  const sendMessage = async (content: string, options: ChatOptions = {}) => {
     const projectStore = useProjectStore();
     const timelineStore = useTimelineStore();
     const characterStore = useCharacterStore();
     const settingsStore = useSettingsStore();
-    
+
     if (!currentChat.value || !projectStore.currentProject) {
       throw new Error('No chat or project selected');
+    }
+
+    const providerName = options.providerName || 'deepseek';
+    const apiKey = providerName === 'deepseek'
+      ? settingsStore.deepseekApiKey
+      : settingsStore.openrouterApiKey;
+
+    if (!apiKey) {
+      throw new Error(`请先配置 ${providerName === 'deepseek' ? 'DeepSeek' : 'OpenRouter'} API 密钥`);
     }
 
     isLoading.value = true;
@@ -138,7 +158,7 @@ export const useChatStore = defineStore('chat', () => {
 
     messages.value.push(userMessage);
     updateTokenCount();
-    
+
     const userResponse = await messageApi.create(currentChat.value.id, {
       role: 'user',
       content,
@@ -159,60 +179,16 @@ export const useChatStore = defineStore('chat', () => {
     };
     messages.value.push(assistantMessage);
 
-    let systemPrompt = options.systemPrompt || '';
+    const selectedTimelineNodes = timelineStore.nodes.filter(n => timelineStore.selectedNodes.has(n.id));
+    const selectedCharacters = characterStore.characters.filter(c => characterStore.selectedCharacters.has(c.id));
 
-    systemPrompt += `
+    const systemPrompt = buildSystemPrompt(
+      options.systemPrompt,
+      selectedTimelineNodes.map(n => ({ id: n.id, title: n.title, description: n.description })),
+      selectedCharacters.map(c => ({ id: c.id, name: c.name, description: c.description, personality: c.personality }))
+    );
 
-你可以通过在回复中包含特殊格式的 JSON 代码块来修改时间线和人物信息：
-
-1. 创建时间线节点：
-\`\`\`action
-{"type": "create_timeline", "data": {"title": "标题", "description": "描述内容"}}
-\`\`\`
-
-2. 编辑时间线节点：
-\`\`\`action
-{"type": "update_timeline", "data": {"id": "节点ID", "title": "新标题", "description": "新描述"}}
-\`\`\`
-
-3. 删除时间线节点：
-\`\`\`action
-{"type": "delete_timeline", "data": {"id": "节点ID"}}
-\`\`\`
-
-4. 创建人物：
-\`\`\`action
-{"type": "create_character", "data": {"name": "姓名", "personality": "性格描述", "background": "背景故事", "relationships": "关系"}}
-\`\`\`
-
-5. 编辑人物：
-\`\`\`action
-{"type": "update_character", "data": {"id": "人物ID", "name": "新姓名", "personality": "新性格", "background": "新背景", "relationships": "新关系"}}
-\`\`\`
-
-6. 删除人物：
-\`\`\`action
-{"type": "delete_character", "data": {"id": "人物ID"}}
-\`\`\`
-`;
-
-    if (timelineStore.selectedNodes.size > 0) {
-      const selectedTimelineNodes = timelineStore.nodes.filter(n => timelineStore.selectedNodes.has(n.id));
-      const timelineSummary = selectedTimelineNodes
-        .map((node, i) => `${i + 1}. [ID: ${node.id}] ${node.title}: ${node.description || '无内容'}`)
-        .join('\n');
-      systemPrompt += `\n\n当前时间线：\n${timelineSummary}`;
-    }
-
-    if (characterStore.selectedCharacters.size > 0) {
-      const selectedCharacters = characterStore.characters.filter(c => characterStore.selectedCharacters.has(c.id));
-      const characterSummary = selectedCharacters
-        .map(char => `[ID: ${char.id}] ${char.name}: ${char.description || '无描述'}; 性格: ${char.personality || '未知'}`)
-        .join('\n');
-      systemPrompt += `\n\n涉及角色：\n${characterSummary}`;
-    }
-
-    const messagesForLLM: any[] = [];
+    const messagesForLLM: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
     if (systemPrompt) {
       messagesForLLM.push({ role: 'system', content: systemPrompt });
@@ -227,17 +203,9 @@ export const useChatStore = defineStore('chat', () => {
 
     messagesForLLM.push(...validMessages);
 
-    const apiKey = options.providerName === 'deepseek'
-      ? settingsStore.deepseekApiKey
-      : settingsStore.openrouterApiKey;
-
-    if (!apiKey) {
-      throw new Error(`请先配置 ${options.providerName === 'deepseek' ? 'DeepSeek' : 'OpenRouter'} API 密钥`);
-    }
-
     try {
       const response = await llmApi.chat(
-        options.providerName || 'deepseek',
+        providerName,
         messagesForLLM,
         {
           model: options.modelName,
@@ -279,8 +247,7 @@ export const useChatStore = defineStore('chat', () => {
                 fullReasoning += reasoning_content;
                 currentStreamReasoning.value = fullReasoning;
               }
-            } catch (e) {
-              // Ignore JSON parse errors for individual chunks
+            } catch {
             }
           }
         }
@@ -300,7 +267,7 @@ export const useChatStore = defineStore('chat', () => {
         content: fullContent,
         reasoning_content: fullReasoning || undefined,
       });
-      
+
       const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
       if (newMessageIndex !== -1) {
         messages.value[newMessageIndex].id = assistantResponse.data.id;
@@ -338,15 +305,19 @@ export const useChatStore = defineStore('chat', () => {
     updateTokenCount();
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
     if (!currentChat.value) return;
 
-    for (const message of messages.value) {
-      messageApi.delete(message.id);
+    try {
+      await Promise.all(
+        messages.value.map(m => messageApi.delete(m.id))
+      );
+      messages.value = [];
+      updateTokenCount();
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+      throw error;
     }
-
-    messages.value = [];
-    totalTokens.value = 0;
   };
 
   const executeAssistantAction = async (action: AssistantAction) => {
@@ -362,7 +333,7 @@ export const useChatStore = defineStore('chat', () => {
           await timelineStore.updateNode(action.data.id, {
             title: action.data.title,
             content: action.data.description,
-          } as any);
+          });
         }
         break;
       case 'delete_timeline':
