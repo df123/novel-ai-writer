@@ -7,8 +7,8 @@
   >
     <el-tabs v-model="activeTab">
       <el-tab-pane label="DeepSeek" name="deepseek">
-        <div style="padding: 16px 0">
-          <p style="font-size: 14px; color: #666; margin-bottom: 16px">
+        <div class="tab-content">
+          <p class="description">
             输入您的DeepSeek API密钥。密钥将加密存储在本地。
           </p>
           <el-input
@@ -20,12 +20,12 @@
         </div>
       </el-tab-pane>
       <el-tab-pane label="OpenRouter" name="openrouter">
-        <div style="padding: 16px 0">
-          <p style="font-size: 14px; color: #666; margin-bottom: 16px">
+        <div class="tab-content">
+          <p class="description">
             输入您的OpenRouter API密钥。密钥将加密存储在本地。OpenRouter提供统一访问多个AI模型的接口。
           </p>
-          <p style="font-size: 12px; color: #999; margin-bottom: 12px">
-            <a href="https://openrouter.ai/keys" target="_blank" style="color: #409eff">获取API密钥</a>
+          <p class="note">
+            <a href="https://openrouter.ai/keys" target="_blank" class="link">获取API密钥</a>
           </p>
           <el-input
             v-model="openrouterKey"
@@ -36,12 +36,12 @@
         </div>
       </el-tab-pane>
       <el-tab-pane label="模型参数" name="params">
-        <div style="padding: 16px 0">
-          <div style="margin-bottom: 24px">
-            <label style="display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px">
+        <div class="tab-content">
+          <div class="param-section">
+            <label class="param-label">
               Temperature
             </label>
-            <p style="font-size: 12px; color: #666; margin-bottom: 12px">
+            <p class="param-description">
               控制模型输出的随机性。值越高输出越随机，值越低输出越确定。建议范围：0.0 - 1.0
             </p>
             <el-slider
@@ -51,9 +51,9 @@
               :step="0.1"
               :marks="{ 0: '0.0', 0.7: '0.7', 1.0: '1.0', 2.0: '2.0' }"
               show-stops
-              style="margin-bottom: 12px"
+              class="slider"
             />
-            <div style="text-align: center; font-size: 14px; font-weight: bold; color: #409eff">
+            <div class="temp-display">
               {{ tempValue }}
             </div>
           </div>
@@ -63,14 +63,6 @@
         </div>
       </el-tab-pane>
     </el-tabs>
-
-    <el-alert
-      v-if="message"
-      :type="message.type"
-      :title="message.text"
-      style="margin-top: 16px"
-      :closable="false"
-    />
 
     <template #footer>
       <el-button @click="handleClose">关闭</el-button>
@@ -85,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useSettingsStore } from '../stores/settingsStore';
 import { ElMessage } from 'element-plus';
@@ -94,56 +86,34 @@ interface Props {
   modelValue: boolean;
 }
 
-interface Emits {
-  (e: 'update:modelValue', value: boolean): void;
-  (e: 'close'): void;
-}
-
 const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+
+const emit = defineEmits<{
+  'update:modelValue': [value: boolean];
+}>();
 
 const settingsStore = useSettingsStore();
 const { deepseekApiKey, openrouterApiKey, temperature } = storeToRefs(settingsStore);
 const { loadSettings, updateSettings } = settingsStore;
 
-const visible = ref(props.modelValue);
+const visible = computed({
+  get: () => props.modelValue,
+  set: (val) => emit('update:modelValue', val),
+});
+
 const activeTab = ref('deepseek');
 const deepseekKey = ref('');
 const openrouterKey = ref('');
 const tempValue = ref(0.7);
-const message = ref<{ type: 'success' | 'error'; text: string } | null>(null);
 
-watch(
-  () => props.modelValue,
-  async (val) => {
-    visible.value = val;
-    if (val) {
-      await loadSettings();
-      tempValue.value = temperature.value;
-    }
+watch(visible, async (val) => {
+  if (val) {
+    await loadSettings();
+    tempValue.value = temperature.value;
+    deepseekKey.value = deepseekApiKey.value;
+    openrouterKey.value = openrouterApiKey.value;
   }
-);
-
-watch(
-  visible,
-  (val) => {
-    emit('update:modelValue', val);
-  }
-);
-
-watch(
-  () => deepseekApiKey.value,
-  (val) => {
-    deepseekKey.value = val;
-  }
-);
-
-watch(
-  () => openrouterApiKey.value,
-  (val) => {
-    openrouterKey.value = val;
-  }
-);
+});
 
 const handleSaveDeepSeek = async () => {
   try {
@@ -173,10 +143,60 @@ const handleSaveParams = async () => {
 };
 
 const handleClose = () => {
-  deepseekKey.value = '';
-  openrouterKey.value = '';
+  deepseekKey.value = deepseekApiKey.value;
+  openrouterKey.value = openrouterApiKey.value;
   tempValue.value = temperature.value;
-  message.value = null;
   visible.value = false;
 };
 </script>
+
+<style scoped>
+.tab-content {
+  padding: 16px 0;
+}
+
+.description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.note {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 12px;
+}
+
+.link {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.param-section {
+  margin-bottom: 24px;
+}
+
+.param-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.param-description {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.slider {
+  margin-bottom: 12px;
+}
+
+.temp-display {
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #409eff;
+}
+</style>
