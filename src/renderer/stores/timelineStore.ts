@@ -9,7 +9,7 @@ export const useTimelineStore = defineStore('timeline', () => {
   const selectedNode = ref<TimelineNode | null>(null);
   const selectedNodes = ref<Set<string>>(new Set());
   const isLoading = ref(false);
-  const versions = ref<TimelineNodeVersion[]>([]);
+  const versions = ref<Map<string, TimelineNodeVersion[]>>(new Map());
   const isLoadingVersions = ref(false);
 
   const loadNodes = async (projectId: string) => {
@@ -28,41 +28,58 @@ export const useTimelineStore = defineStore('timeline', () => {
     const projectStore = useProjectStore();
     if (!projectStore.currentProject) throw new Error('No project selected');
 
-    const orderIndex = nodes.value.length;
-    const response = await timelineApi.create(projectStore.currentProject.id, {
-      title,
-      content: content || '',
-      orderIndex,
-    });
-    const node = response.data;
-    
-    nodes.value.push(node);
-    selectedNode.value = node;
-    
-    return node;
+    try {
+      const orderIndex = nodes.value.length > 0 ? Math.max(...nodes.value.map(n => n.orderIndex)) + 1 : 0;
+      const response = await timelineApi.create(projectStore.currentProject.id, {
+        title,
+        content: content ?? '',
+        orderIndex,
+      });
+      const node = response.data;
+
+      nodes.value.push(node);
+      selectedNode.value = node;
+
+      return node;
+    } catch (error) {
+      console.error('Failed to create timeline node:', error);
+      throw error;
+    }
   };
 
   const updateNode = async (id: string, updates: Partial<TimelineNode>) => {
     const node = nodes.value.find(n => n.id === id);
     if (!node) return;
 
-    const response = await timelineApi.update(id, {
-      title: updates.title || node.title,
-      content: (updates as any).content || (node as any).content,
-      orderIndex: updates.orderIndex || node.orderIndex,
-    });
+    try {
+      const response = await timelineApi.update(id, {
+        title: updates.title ?? node.title,
+        content: updates.content ?? (node.content ?? ''),
+        orderIndex: updates.orderIndex ?? node.orderIndex,
+      });
 
-    nodes.value = nodes.value.map(n => (n.id === id ? response.data : n));
-    if (selectedNode.value?.id === id) {
-      selectedNode.value = response.data;
+      nodes.value = nodes.value.map(n => (n.id === id ? response.data : n));
+      if (selectedNode.value?.id === id) {
+        selectedNode.value = response.data;
+      }
+    } catch (error) {
+      console.error('Failed to update timeline node:', error);
+      throw error;
     }
   };
 
   const deleteNode = async (id: string) => {
-    await timelineApi.delete(id);
-    nodes.value = nodes.value.filter(n => n.id !== id);
-    if (selectedNode.value?.id === id) {
-      selectedNode.value = null;
+    try {
+      await timelineApi.delete(id);
+      nodes.value = nodes.value.filter(n => n.id !== id);
+      selectedNodes.value.delete(id);
+      versions.value.delete(id);
+      if (selectedNode.value?.id === id) {
+        selectedNode.value = null;
+      }
+    } catch (error) {
+      console.error('Failed to delete timeline node:', error);
+      throw error;
     }
   };
 
@@ -79,37 +96,39 @@ export const useTimelineStore = defineStore('timeline', () => {
   };
 
   const toggleNodeSelection = (id: string) => {
-    const newSelected = new Set(selectedNodes.value);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
+    if (selectedNodes.value.has(id)) {
+      selectedNodes.value.delete(id);
     } else {
-      newSelected.add(id);
+      selectedNodes.value.add(id);
     }
-    selectedNodes.value = newSelected;
   };
 
   const toggleAllNodes = (selectAll: boolean) => {
     if (selectAll) {
-      selectedNodes.value = new Set(nodes.value.map(n => n.id));
+      nodes.value.forEach(n => selectedNodes.value.add(n.id));
     } else {
-      selectedNodes.value = new Set();
+      selectedNodes.value.clear();
     }
   };
 
   const clearNodeSelection = () => {
-    selectedNodes.value = new Set<string>();
+    selectedNodes.value.clear();
   };
 
   const loadVersions = async (nodeId: string) => {
     isLoadingVersions.value = true;
     try {
       const response = await timelineApi.getVersions(nodeId);
-      versions.value = response.data;
+      versions.value.set(nodeId, response.data);
     } catch (error) {
       console.error('Failed to load timeline node versions:', error);
     } finally {
       isLoadingVersions.value = false;
     }
+  };
+
+  const getVersions = (nodeId: string): TimelineNodeVersion[] => {
+    return versions.value.get(nodeId) || [];
   };
 
   const restoreVersion = async (nodeId: string, versionId: string) => {
@@ -147,6 +166,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     toggleAllNodes,
     clearNodeSelection,
     loadVersions,
+    getVersions,
     restoreVersion,
   };
 });

@@ -65,22 +65,25 @@ export interface Chat {
 export interface TimelineNode {
   /** 节点唯一标识符（UUID） */
   id: string;
-  
+
   /** 所属项目的 ID */
   projectId: string;
-  
+
   /** 节点标题 */
   title: string;
-  
+
   /** 时间节点的日期 */
   date: string;
-  
+
   /** 节点描述内容 */
   description: string;
-  
+
+  /** 节点详细内容 */
+  content?: string;
+
   /** 节点在时间线中的顺序索引 */
   orderIndex: number;
-  
+
   /** 节点创建时间戳（秒） */
   createdAt: number;
 }

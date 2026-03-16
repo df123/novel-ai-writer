@@ -8,7 +8,7 @@ export const useCharacterStore = defineStore('character', () => {
   const characters = ref<Character[]>([]);
   const selectedCharacters = ref<Set<string>>(new Set());
   const isLoading = ref(false);
-  const versions = ref<CharacterVersion[]>([]);
+  const versions = ref<Map<string, CharacterVersion[]>>(new Map());
   const isLoadingVersions = ref(false);
 
   const loadCharacters = async (projectId: string) => {
@@ -27,50 +27,66 @@ export const useCharacterStore = defineStore('character', () => {
     const projectStore = useProjectStore();
     if (!projectStore.currentProject) throw new Error('No project selected');
 
-    const response = await characterApi.create(projectStore.currentProject.id, character);
-    const newCharacter = response.data;
-    characters.value.push(newCharacter);
-    return newCharacter;
+    try {
+      const response = await characterApi.create(projectStore.currentProject.id, character);
+      const newCharacter = response.data;
+      characters.value.push(newCharacter);
+      return newCharacter;
+    } catch (error) {
+      console.error('Failed to create character:', error);
+      throw error;
+    }
   };
 
   const updateCharacter = async (id: string, updates: Partial<Character> & { createVersion?: boolean }) => {
-    const response = await characterApi.update(id, updates);
-    const updated = response.data;
-    characters.value = characters.value.map(c => (c.id === id ? updated : c));
+    try {
+      const response = await characterApi.update(id, updates);
+      const updated = response.data;
+      characters.value = characters.value.map(c => (c.id === id ? updated : c));
+    } catch (error) {
+      console.error('Failed to update character:', error);
+      throw error;
+    }
   };
 
   const deleteCharacter = async (id: string) => {
-    await characterApi.delete(id);
-    characters.value = characters.value.filter(c => c.id !== id);
-    const newSelected = new Set(selectedCharacters.value);
-    newSelected.delete(id);
-    selectedCharacters.value = newSelected;
+    try {
+      await characterApi.delete(id);
+      characters.value = characters.value.filter(c => c.id !== id);
+      selectedCharacters.value.delete(id);
+      versions.value.delete(id);
+    } catch (error) {
+      console.error('Failed to delete character:', error);
+      throw error;
+    }
   };
 
   const toggleCharacterSelection = (id: string) => {
-    const newSelected = new Set(selectedCharacters.value);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
+    if (selectedCharacters.value.has(id)) {
+      selectedCharacters.value.delete(id);
     } else {
-      newSelected.add(id);
+      selectedCharacters.value.add(id);
     }
-    selectedCharacters.value = newSelected;
   };
 
   const clearCharacterSelection = () => {
-    selectedCharacters.value = new Set<string>();
+    selectedCharacters.value.clear();
   };
 
   const loadVersions = async (characterId: string) => {
     isLoadingVersions.value = true;
     try {
       const response = await characterApi.getVersions(characterId);
-      versions.value = response.data;
+      versions.value.set(characterId, response.data);
     } catch (error) {
       console.error('Failed to load character versions:', error);
     } finally {
       isLoadingVersions.value = false;
     }
+  };
+
+  const getVersions = (characterId: string): CharacterVersion[] => {
+    return versions.value.get(characterId) || [];
   };
 
   const restoreVersion = async (characterId: string, versionId: string) => {
@@ -102,6 +118,7 @@ export const useCharacterStore = defineStore('character', () => {
     toggleCharacterSelection,
     clearCharacterSelection,
     loadVersions,
+    getVersions,
     restoreVersion,
   };
 });

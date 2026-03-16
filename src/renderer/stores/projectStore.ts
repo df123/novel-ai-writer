@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { Project } from '../../shared/types';
 import { projectApi } from '../utils/api';
 
