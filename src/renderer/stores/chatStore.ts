@@ -178,7 +178,8 @@ export const useChatStore = defineStore('chat', () => {
     const systemPrompt = buildSystemPrompt(
       options.systemPrompt,
       selectedTimelineNodes.map(n => ({ id: n.id, title: n.title, description: n.description })),
-      selectedCharacters.map(c => ({ id: c.id, name: c.name, description: c.description, personality: c.personality }))
+      selectedCharacters.map(c => ({ id: c.id, name: c.name, description: c.description, personality: c.personality })),
+      providerName === 'deepseek' ? ALL_TOOLS : undefined
     );
 
     const messagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
