@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { settingsApi } from '../utils/api';
+import { settingsApi, modelsApi } from '../utils/api';
+import type { Model } from '../../shared/types';
 
 export const useSettingsStore = defineStore('settings', () => {
   const deepseekApiKey = ref('');
@@ -8,7 +9,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const temperature = ref(0.7);
   const selectedProvider = ref('deepseek');
   const selectedModel = ref('deepseek-reasoner');
-  const models = ref<Array<{ id: string; name: string; price?: string; pricing?: { prompt: number | null; completion: number | null } }>>([]);
+  const models = ref<Model[]>([]);
   const isLoading = ref(false);
   const isLoadingModels = ref(false);
 
@@ -18,76 +19,57 @@ export const useSettingsStore = defineStore('settings', () => {
       const response = await settingsApi.get();
       const settings = response.data;
 
-      console.log('[DEBUG] Loaded settings from backend:', {
-        hasDeepseekKey: !!settings.deepseek_api_key,
-        deepseekKeyLength: settings.deepseek_api_key?.length,
-        deepseekKeyPrefix: settings.deepseek_api_key?.substring(0, 10) + '...',
-        hasOpenrouterKey: !!settings.openrouter_api_key,
-        openrouterKeyLength: settings.openrouter_api_key?.length,
-        openrouterKeyPrefix: settings.openrouter_api_key?.substring(0, 10) + '...',
-        temperature: settings.temperature,
-        selectedProvider: settings.selected_provider,
-        selectedModel: settings.selected_model
-      });
-
       deepseekApiKey.value = settings.deepseek_api_key || '';
       openrouterApiKey.value = settings.openrouter_api_key || '';
       temperature.value = settings.temperature ? parseFloat(settings.temperature) : 0.7;
       selectedProvider.value = settings.selected_provider || 'deepseek';
       selectedModel.value = settings.selected_model || 'deepseek-reasoner';
     } catch (error) {
-      console.error('[DEBUG] Failed to load settings:', error);
+      console.error('Failed to load settings:', error);
     } finally {
       isLoading.value = false;
     }
   };
 
   const updateSettings = async (settings: { deepseekApiKey?: string; openrouterApiKey?: string; temperature?: number; selectedProvider?: string; selectedModel?: string }) => {
-    const currentSettings: Record<string, string | number> = {};
+    isLoading.value = true;
+    try {
+      const currentSettings: Record<string, string | number> = {};
 
-    if (settings.deepseekApiKey !== undefined) {
-      currentSettings.deepseek_api_key = settings.deepseekApiKey;
+      if (settings.deepseekApiKey !== undefined) {
+        currentSettings.deepseek_api_key = settings.deepseekApiKey;
+      }
+
+      if (settings.openrouterApiKey !== undefined) {
+        currentSettings.openrouter_api_key = settings.openrouterApiKey;
+      }
+
+      if (settings.temperature !== undefined) {
+        currentSettings.temperature = settings.temperature;
+      }
+
+      if (settings.selectedProvider !== undefined) {
+        currentSettings.selected_provider = settings.selectedProvider;
+      }
+
+      if (settings.selectedModel !== undefined) {
+        currentSettings.selected_model = settings.selectedModel;
+      }
+
+      const response = await settingsApi.update(currentSettings);
+      const updated = response.data;
+
+      deepseekApiKey.value = updated.deepseek_api_key || '';
+      openrouterApiKey.value = updated.openrouter_api_key || '';
+      temperature.value = updated.temperature ? parseFloat(updated.temperature) : 0.7;
+      selectedProvider.value = updated.selected_provider || 'deepseek';
+      selectedModel.value = updated.selected_model || 'deepseek-reasoner';
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+      throw error;
+    } finally {
+      isLoading.value = false;
     }
-
-    if (settings.openrouterApiKey !== undefined) {
-      currentSettings.openrouter_api_key = settings.openrouterApiKey;
-    }
-
-    if (settings.temperature !== undefined) {
-      currentSettings.temperature = settings.temperature;
-    }
-
-    if (settings.selectedProvider !== undefined) {
-      currentSettings.selected_provider = settings.selectedProvider;
-    }
-
-    if (settings.selectedModel !== undefined) {
-      currentSettings.selected_model = settings.selectedModel;
-    }
-
-    console.log('[DEBUG] Saving settings:', {
-      hasDeepseekKey: !!settings.deepseekApiKey,
-      deepseekKeyLength: settings.deepseekApiKey?.length,
-      hasOpenrouterKey: !!settings.openrouterApiKey,
-      openrouterKeyLength: settings.openrouterApiKey?.length,
-      keysToSave: Object.keys(currentSettings)
-    });
-
-    const response = await settingsApi.update(currentSettings);
-    const updated = response.data;
-
-    console.log('[DEBUG] Saved settings response:', {
-      hasDeepseekKey: !!updated.deepseek_api_key,
-      deepseekKeyLength: updated.deepseek_api_key?.length,
-      hasOpenrouterKey: !!updated.openrouter_api_key,
-      openrouterKeyLength: updated.openrouter_api_key?.length
-    });
-
-    deepseekApiKey.value = updated.deepseek_api_key || '';
-    openrouterApiKey.value = updated.openrouter_api_key || '';
-    temperature.value = updated.temperature ? parseFloat(updated.temperature) : 0.7;
-    selectedProvider.value = updated.selected_provider || 'deepseek';
-    selectedModel.value = updated.selected_model || 'deepseek-reasoner';
   };
 
   const loadModels = async (provider: string) => {
@@ -101,30 +83,21 @@ export const useSettingsStore = defineStore('settings', () => {
         return;
       }
       
-      const response = await fetch('http://localhost:3002/api/models/' + provider, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: apiKey || 'dummy' })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to load models');
-      }
-      
-      const data = await response.json();
-      models.value = data.models || [];
+      const response = await modelsApi.list(provider, apiKey || 'dummy');
+      models.value = response.data.models || [];
       
       if (!selectedModel.value || !models.value.find(m => m.id === selectedModel.value)) {
         selectedModel.value = models.value[0]?.id || '';
       }
     } catch (error) {
-      console.error('Failed to load models:', error);
-      if (provider === 'openrouter') {
-        models.value = [{ id: '', name: '加载模型失败，请检查 API 密钥' }];
-        selectedModel.value = '';
-      } else {
-        models.value = [];
-      }
+      console.error(`Failed to load ${provider} models:`, error);
+      
+      const errorMessage = provider === 'openrouter' 
+        ? '加载模型失败，请检查 API 密钥'
+        : '加载模型失败，请稍后重试';
+      
+      models.value = [{ id: '', name: errorMessage }];
+      selectedModel.value = '';
     } finally {
       isLoadingModels.value = false;
     }

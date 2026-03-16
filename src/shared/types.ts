@@ -195,3 +195,26 @@ export interface Project {
   /** 项目最后更新时间戳（秒） */
   updatedAt: number;
 }
+
+/**
+ * LLM 模型接口
+ * 表示一个可用的语言模型
+ */
+export interface Model {
+  /** 模型唯一标识符 */
+  id: string;
+  
+  /** 模型显示名称 */
+  name: string;
+  
+  /** 模型价格描述（可选） */
+  price?: string;
+  
+  /** 模型定价信息（可选） */
+  pricing?: {
+    /** 提示词价格 */
+    prompt: number | null;
+    /** 补全价格 */
+    completion: number | null;
+  };
+}

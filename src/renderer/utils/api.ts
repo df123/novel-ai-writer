@@ -92,7 +92,13 @@ export const llmApi = {
 // Settings
 export const settingsApi = {
   get: () => api.get('/settings'),
-  update: (data: Record<string, any>) => api.put('/settings', data),
+  update: (settings: Record<string, string | number>) => api.put('/settings', settings),
+};
+
+// Models
+export const modelsApi = {
+  list: (provider: string, apiKey: string) => 
+    api.post(`/models/${provider}`, { apiKey }),
 };
 
 // Prompts
