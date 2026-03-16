@@ -313,10 +313,15 @@ export const useChatStore = defineStore('chat', () => {
                 for (const toolCall of delta.tool_calls) {
                   const index = toolCall.index;
                   if (!accumulatedToolCalls[index]) {
-                    accumulatedToolCalls[index] = { ...toolCall, function: { ...toolCall.function } };
-                  }
-                  if (toolCall.function.name) {
-                    accumulatedToolCalls[index].function.name = toolCall.function.name;
+                    accumulatedToolCalls[index] = {
+                      id: toolCall.id,
+                      type: toolCall.type,
+                      index: toolCall.index,
+                      function: {
+                        name: toolCall.function.name || '',
+                        arguments: '',
+                      },
+                    };
                   }
                   if (toolCall.function.arguments) {
                     accumulatedToolCalls[index].function.arguments += toolCall.function.arguments;
@@ -331,7 +336,7 @@ export const useChatStore = defineStore('chat', () => {
 
       const toolCalls = Object.values(accumulatedToolCalls);
 
-      if (!assistantMessageId && currentChat.value) {
+      if (currentChat.value && (fullContent || fullReasoning || toolCalls.length > 0)) {
         assistantMessageId = generateId();
         const assistantMessage: Message = {
           id: assistantMessageId,

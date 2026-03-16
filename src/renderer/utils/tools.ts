@@ -11,6 +11,7 @@ export interface ToolDefinition {
   function: {
     name: string;
     description: string;
+    strict?: boolean;
     parameters: {
       type: 'object';
       properties: Record<string, {
@@ -18,6 +19,7 @@ export interface ToolDefinition {
         description: string;
       }>;
       required: string[];
+      additionalProperties?: boolean;
     };
   };
 }
@@ -30,6 +32,7 @@ export const createTimelineTool: ToolDefinition = {
   function: {
     name: 'create_timeline',
     description: '创建一个新的时间线节点',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -43,6 +46,7 @@ export const createTimelineTool: ToolDefinition = {
         },
       },
       required: ['title', 'description'],
+      additionalProperties: false,
     },
   },
 };
@@ -55,6 +59,7 @@ export const updateTimelineTool: ToolDefinition = {
   function: {
     name: 'update_timeline',
     description: '更新已存在的时间线节点',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -72,6 +77,7 @@ export const updateTimelineTool: ToolDefinition = {
         },
       },
       required: ['id'],
+      additionalProperties: false,
     },
   },
 };
@@ -84,6 +90,7 @@ export const deleteTimelineTool: ToolDefinition = {
   function: {
     name: 'delete_timeline',
     description: '删除指定的时间线节点',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -93,6 +100,7 @@ export const deleteTimelineTool: ToolDefinition = {
         },
       },
       required: ['id'],
+      additionalProperties: false,
     },
   },
 };
@@ -105,6 +113,7 @@ export const createCharacterTool: ToolDefinition = {
   function: {
     name: 'create_character',
     description: '创建一个新的人物角色',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -130,6 +139,7 @@ export const createCharacterTool: ToolDefinition = {
         },
       },
       required: ['name'],
+      additionalProperties: false,
     },
   },
 };
@@ -142,6 +152,7 @@ export const updateCharacterTool: ToolDefinition = {
   function: {
     name: 'update_character',
     description: '更新已存在的人物角色',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -171,6 +182,7 @@ export const updateCharacterTool: ToolDefinition = {
         },
       },
       required: ['id'],
+      additionalProperties: false,
     },
   },
 };
@@ -183,6 +195,7 @@ export const deleteCharacterTool: ToolDefinition = {
   function: {
     name: 'delete_character',
     description: '删除指定的人物角色',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -192,6 +205,7 @@ export const deleteCharacterTool: ToolDefinition = {
         },
       },
       required: ['id'],
+      additionalProperties: false,
     },
   },
 };
