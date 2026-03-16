@@ -59,7 +59,3 @@ export function estimateConversationTokens(messages: { role?: string; content?: 
   
   return Math.ceil(totalTokens);
 }
-
-export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
