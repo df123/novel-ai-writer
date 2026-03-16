@@ -120,10 +120,3 @@ export interface ProjectExport {
   chats: Chat[];
   messages: Message[];
 }
-
-export interface TemplateContext {
-  timelineTitle?: string;
-  timelineDate?: string;
-  timelineDescription?: string;
-  characters?: Character[];
-}
