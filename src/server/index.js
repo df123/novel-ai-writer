@@ -837,10 +837,18 @@ app.post('/api/llm/chat', async (req, res) => {
         max_tokens: options.maxTokens
       };
 
+      if (options.tools && options.tools.length > 0) {
+        requestBody.tools = options.tools;
+      }
+
       if (provider === 'openrouter') {
         requestBody.reasoning = {
           enabled: true
         };
+      }
+
+      if (options.thinking && provider === 'deepseek') {
+        requestBody.thinking = options.thinking;
       }
 
       response = await fetch(apiUrl, {
