@@ -403,9 +403,9 @@ export const useChatStore = defineStore('chat', () => {
         finalReasoning = fullReasoning;
         console.log('Tool calls mode - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       } else if (!fullContent && fullReasoning) {
+        console.warn('Unexpected: reasoning without content or tool_calls - treating reasoning as content');
         finalContent = fullReasoning;
         finalReasoning = undefined;
-        console.log('Content in reasoning - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       } else {
         finalContent = fullContent;
         finalReasoning = fullReasoning || undefined;
