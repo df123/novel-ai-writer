@@ -21,25 +21,7 @@ export const buildSystemPrompt = (
   let systemPrompt = customPrompt || '你是一个专业的小说创作助手。';
 
   if (tools && tools.length > 0) {
-    systemPrompt += '\n\n你可以使用以下工具来修改时间线和人物信息：\n\n';
-
-    for (const tool of tools) {
-      const func = tool.function;
-      systemPrompt += `**${func.name}**: ${func.description}\n`;
-
-      if (func.parameters && func.parameters.properties) {
-        systemPrompt += `  参数:\n`;
-        for (const [paramName, param] of Object.entries(func.parameters.properties)) {
-          systemPrompt += `  - ${paramName}: ${(param as { description?: string }).description || ''}\n`;
-        }
-        if (func.parameters.required && func.parameters.required.length > 0) {
-          systemPrompt += `  必需参数: ${func.parameters.required.join(', ')}\n`;
-        }
-      }
-      systemPrompt += '\n';
-    }
-
-    systemPrompt += '当你需要修改时间线或人物信息时，请调用相应的工具。不要尝试手动输出格式化的代码块，直接调用工具即可。\n';
+    systemPrompt += '\n\n你可以使用工具来管理时间线和人物信息（create_timeline, update_timeline, delete_timeline, create_character, update_character, delete_character）。当你需要修改这些信息时，请直接调用相应的工具函数。\n';
   }
 
   if (selectedTimelineNodes.length > 0) {
