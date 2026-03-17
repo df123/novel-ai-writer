@@ -323,7 +323,8 @@ export const useChatStore = defineStore('chat', () => {
       let fullContent = '';
       let fullReasoning = '';
       const accumulatedToolCalls: Record<number, ToolCall> = {};
-      
+      let buffer = '';
+
       assistantMessageId = generateId();
       if (currentChat.value) {
         const assistantMessage: Message = {
@@ -345,12 +346,13 @@ export const useChatStore = defineStore('chat', () => {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6);
+            const data = line.slice(6).trim();
             if (data === '[DONE]') break;
 
             try {
