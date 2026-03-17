@@ -884,16 +884,9 @@ app.post('/api/llm/chat', async (req, res) => {
           
           try {
             const parsed = JSON.parse(data);
-            const content = parsed.choices?.[0]?.delta?.content;
-            const reasoning_content = parsed.choices?.[0]?.delta?.reasoning_content || parsed.choices?.[0]?.delta?.reasoning;
-            if (content) {
-              res.write(`data: ${JSON.stringify({ content })}\n\n`);
-            }
-            if (reasoning_content) {
-              res.write(`data: ${JSON.stringify({ reasoning_content })}\n\n`);
-            }
+            res.write(`data: ${JSON.stringify(parsed)}\n\n`);
           } catch (e) {
-            // 忽略解析错误
+            res.write(`data: ${data}\n\n`);
           }
         }
       }

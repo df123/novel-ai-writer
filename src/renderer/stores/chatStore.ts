@@ -265,7 +265,6 @@ export const useChatStore = defineStore('chat', () => {
     const runLLMTurn = async (
       currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>
     ): Promise<void> => {
-      console.log('Starting LLM turn with messages:', currentMessages.map(m => ({ role: m.role, content: m.content?.substring(0, 50) })));
 
       const response = await llmApi.chat(
         providerName,
@@ -303,7 +302,6 @@ export const useChatStore = defineStore('chat', () => {
 
             try {
               const parsed = JSON.parse(data) as StreamChunk;
-              console.log('Stream chunk:', parsed);
               const delta = parsed.choices[0]?.delta;
 
               if (delta?.content) {
