@@ -59,6 +59,7 @@ const initDB = async () => {
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         reasoning_content TEXT,
+        tool_calls TEXT,
         timestamp INTEGER NOT NULL,
         FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
       );
@@ -158,6 +159,13 @@ const initDB = async () => {
     for (const t of defaultTemplates) {
       run('INSERT INTO prompt_templates (id, name, template, type, created_at) VALUES (?, ?, ?, ?, ?)',
         [t.id, t.name, t.template, t.type, t.created_at]);
+    }
+    
+    // 确保tool_calls字段存在（用于现有数据库）
+    try {
+      run('ALTER TABLE messages ADD COLUMN tool_calls TEXT');
+    } catch (e) {
+      // 字段可能已存在，忽略错误
     }
     
     saveDB();

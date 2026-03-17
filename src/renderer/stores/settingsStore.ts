@@ -12,6 +12,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const models = ref<Model[]>([]);
   const isLoading = ref(false);
   const isLoadingModels = ref(false);
+  const showThinkingContent = ref(false);
+  const showToolCalls = ref(false);
 
   const loadSettings = async () => {
     isLoading.value = true;
@@ -24,6 +26,8 @@ export const useSettingsStore = defineStore('settings', () => {
       temperature.value = settings.temperature ? parseFloat(settings.temperature) : 0.7;
       selectedProvider.value = settings.selected_provider || 'deepseek';
       selectedModel.value = settings.selected_model || 'deepseek-reasoner';
+      showThinkingContent.value = settings.show_thinking_content === 'true' || settings.show_thinking_content === true;
+      showToolCalls.value = settings.show_tool_calls === 'true' || settings.show_tool_calls === true;
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
@@ -31,7 +35,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   };
 
-  const updateSettings = async (settings: { deepseekApiKey?: string; openrouterApiKey?: string; temperature?: number; selectedProvider?: string; selectedModel?: string }) => {
+  const updateSettings = async (settings: { deepseekApiKey?: string; openrouterApiKey?: string; temperature?: number; selectedProvider?: string; selectedModel?: string; showThinkingContent?: boolean; showToolCalls?: boolean }) => {
     isLoading.value = true;
     try {
       const currentSettings: Record<string, string | number> = {};
@@ -56,6 +60,14 @@ export const useSettingsStore = defineStore('settings', () => {
         currentSettings.selected_model = settings.selectedModel;
       }
 
+      if (settings.showThinkingContent !== undefined) {
+        currentSettings.show_thinking_content = settings.showThinkingContent ? 'true' : 'false';
+      }
+
+      if (settings.showToolCalls !== undefined) {
+        currentSettings.show_tool_calls = settings.showToolCalls ? 'true' : 'false';
+      }
+
       const response = await settingsApi.update(currentSettings);
       const updated = response.data;
 
@@ -64,6 +76,8 @@ export const useSettingsStore = defineStore('settings', () => {
       temperature.value = updated.temperature ? parseFloat(updated.temperature) : 0.7;
       selectedProvider.value = updated.selected_provider || 'deepseek';
       selectedModel.value = updated.selected_model || 'deepseek-reasoner';
+      showThinkingContent.value = updated.show_thinking_content === 'true' || updated.show_thinking_content === true;
+      showToolCalls.value = updated.show_tool_calls === 'true' || updated.show_tool_calls === true;
     } catch (error) {
       console.error('Failed to update settings:', error);
       throw error;
@@ -112,6 +126,8 @@ export const useSettingsStore = defineStore('settings', () => {
     models,
     isLoading,
     isLoadingModels,
+    showThinkingContent,
+    showToolCalls,
     loadSettings,
     updateSettings,
     loadModels,

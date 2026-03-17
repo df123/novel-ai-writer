@@ -66,25 +66,42 @@
             }"
             shadow="never"
           >
-            <div v-if="message.role === 'assistant' && message.tool_calls && message.tool_calls.length > 0">
-              <el-collapse>
-                <el-collapse-item :title="`工具调用 (${message.tool_calls.length})`" name="tool_calls">
-                  <div v-for="(toolCall, i) in message.tool_calls" :key="i" style="margin-bottom: 12px; padding: 8px; background: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
-                    <div style="font-weight: 600; margin-bottom: 4px; color: #409eff;">{{ toolCall.function.name }}</div>
-                    <pre style="margin: 0; white-space: pre-wrap; font-size: 12px; color: #666; background: #f9f9f9; padding: 8px; border-radius: 4px;">{{ JSON.stringify(JSON.parse(toolCall.function.arguments), null, 2) }}</pre>
-                  </div>
-                </el-collapse-item>
-              </el-collapse>
-            </div>
             <div v-if="message.role === 'assistant' && displayReasoning(message)">
-              <el-collapse>
-                <el-collapse-item title="思考过程" name="reasoning">
-                  <div class="markdown-content" style="color: #666; font-size: 13px" v-html="renderMarkdown(displayReasoning(message))"></div>
-                </el-collapse-item>
-              </el-collapse>
+              <div style="margin-bottom: 8px; padding: 8px; background: #fff; border-left: 3px solid #409eff; border-radius: 4px;">
+                <div style="font-size: 13px; font-weight: 600; color: #409eff; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                  <span>💭 思考过程</span>
+                  <el-button link size="small" style="padding: 0; min-height: auto;" @click="toggleCollapse('reasoning-' + message.id)">
+                    <span style="font-size: 12px;">{{ collapsedReasoning[message.id] ? '展开' : '收起' }}</span>
+                  </el-button>
+                </div>
+                <div v-if="!collapsedReasoning[message.id]" class="markdown-content" style="color: #666; font-size: 13px; line-height: 1.6;" v-html="renderMarkdown(displayReasoning(message))"></div>
+              </div>
             </div>
-            <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1 && currentStreamContent" class="markdown-content" v-html="renderMarkdown(currentStreamContent)"></div>
-            <div v-else class="markdown-content" v-html="renderMarkdown(message.content)"></div>
+
+            <div v-if="message.role === 'assistant' && message.tool_calls && message.tool_calls.length > 0">
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 13px; font-weight: 600; color: #67c23a; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
+                  <span>🔧 工具调用 ({{ message.tool_calls.length }})</span>
+                  <el-button link size="small" style="padding: 0; min-height: auto;" @click="toggleCollapse('tools-' + message.id)">
+                    <span style="font-size: 12px;">{{ collapsedTools[message.id] ? '展开' : '收起' }}</span>
+                  </el-button>
+                </div>
+                <div v-if="!collapsedTools[message.id]">
+                  <div v-for="(toolCall, i) in message.tool_calls" :key="i" style="margin-bottom: 8px; padding: 8px; background: #fff; border-left: 3px solid #67c23a; border-radius: 4px;">
+                    <div style="font-weight: 600; margin-bottom: 4px; color: #67c23a;">{{ toolCall.function.name }}</div>
+                    <pre style="margin: 0; white-space: pre-wrap; font-size: 12px; color: #666; background: #f9f9f9; padding: 8px; border-radius: 4px;">{{ formatToolArguments(toolCall.function.arguments) }}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="message.role === 'assistant' && displayContent(message)">
+              <div style="padding: 8px; background: #fff; border-left: 3px solid #909399; border-radius: 4px;">
+                <div style="font-size: 13px; font-weight: 600; color: #909399; margin-bottom: 4px;">✍️ 回答</div>
+                <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1" class="markdown-content" v-html="renderMarkdown(displayContent(message))"></div>
+                <div v-else class="markdown-content" v-html="renderMarkdown(displayContent(message))"></div>
+              </div>
+            </div>
           </el-card>
         </div>
         <div ref="messagesEndRef"></div>
@@ -150,6 +167,8 @@ const currentModel = computed(() => selectedModel.value || 'deepseek-reasoner');
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
+const collapsedReasoning = ref<Record<string, boolean>>({});
+const collapsedTools = ref<Record<string, boolean>>({});
 
 watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning]) => {
   nextTick(() => {
@@ -162,13 +181,32 @@ watch(messages, async () => {
   messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
 });
 
+const toggleCollapse = (key: string) => {
+  if (key.startsWith('reasoning-')) {
+    const messageId = key.replace('reasoning-', '');
+    collapsedReasoning.value[messageId] = !collapsedReasoning.value[messageId];
+  } else if (key.startsWith('tools-')) {
+    const messageId = key.replace('tools-', '');
+    collapsedTools.value[messageId] = !collapsedTools.value[messageId];
+  }
+};
+
+const formatToolArguments = (args: string) => {
+  try {
+    const parsed = JSON.parse(args);
+    return JSON.stringify(parsed, null, 2);
+  } catch (error) {
+    return args;
+  }
+};
+
 const displayContent = (message: Message) => {
   const isLastAssistantMessage = isStreaming.value && 
     message.role === 'assistant' && 
     messages.value.length > 0 && 
     messages.value[messages.value.length - 1].id === message.id;
   
-  if (isLastAssistantMessage) {
+  if (isLastAssistantMessage && currentStreamContent.value) {
     return currentStreamContent.value;
   }
   return message.content;
@@ -180,7 +218,7 @@ const displayReasoning = (message: Message) => {
     messages.value.length > 0 && 
     messages.value[messages.value.length - 1].id === message.id;
   
-  if (isLastAssistantMessage) {
+  if (isLastAssistantMessage && currentStreamReasoning.value) {
     return currentStreamReasoning.value;
   }
   return message.reasoning_content;

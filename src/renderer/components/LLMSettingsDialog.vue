@@ -57,6 +57,25 @@
               {{ tempValue }}
             </div>
           </div>
+          <div class="param-section">
+            <label class="param-label">
+              显示选项
+            </label>
+            <div class="switch-item">
+              <el-switch v-model="showThinkingValue" />
+              <span class="switch-label">显示思考过程</span>
+            </div>
+            <p class="param-description">
+              开启后会在AI回答下方显示模型的思考过程（思维链）。
+            </p>
+            <div class="switch-item">
+              <el-switch v-model="showToolCallsValue" />
+              <span class="switch-label">显示工具调用</span>
+            </div>
+            <p class="param-description">
+              开启后会在AI回答下方显示模型的工具调用信息。
+            </p>
+          </div>
           <el-button type="primary" @click="handleSaveParams">
             保存参数设置
           </el-button>
@@ -93,7 +112,7 @@ const emit = defineEmits<{
 }>();
 
 const settingsStore = useSettingsStore();
-const { deepseekApiKey, openrouterApiKey, temperature } = storeToRefs(settingsStore);
+const { deepseekApiKey, openrouterApiKey, temperature, showThinkingContent, showToolCalls } = storeToRefs(settingsStore);
 const { loadSettings, updateSettings } = settingsStore;
 
 const visible = computed({
@@ -105,6 +124,8 @@ const activeTab = ref('deepseek');
 const deepseekKey = ref('');
 const openrouterKey = ref('');
 const tempValue = ref(0.7);
+const showThinkingValue = ref(false);
+const showToolCallsValue = ref(false);
 
 watch(visible, async (val) => {
   if (val) {
@@ -112,6 +133,8 @@ watch(visible, async (val) => {
     tempValue.value = temperature.value;
     deepseekKey.value = deepseekApiKey.value;
     openrouterKey.value = openrouterApiKey.value;
+    showThinkingValue.value = showThinkingContent.value;
+    showToolCallsValue.value = showToolCalls.value;
   }
 });
 

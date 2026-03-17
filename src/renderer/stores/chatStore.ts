@@ -311,7 +311,8 @@ export const useChatStore = defineStore('chat', () => {
 
     const runLLMTurn = async (
       currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>,
-      saveMessage: boolean = true
+      saveMessage: boolean = true,
+      isToolCallFollowup: boolean = false
     ): Promise<void> => {
 
       const response = await llmApi.chat(
@@ -335,6 +336,23 @@ export const useChatStore = defineStore('chat', () => {
       let fullContent = '';
       let fullReasoning = '';
       const accumulatedToolCalls: Record<number, ToolCall> = {};
+      
+      assistantMessageId = generateId();
+      if (currentChat.value) {
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          chatId: currentChat.value.id,
+          role: 'assistant',
+          content: '',
+          reasoning_content: undefined,
+          tool_calls: undefined,
+          timestamp: Date.now(),
+          orderIndex: messages.value.length + 1,
+        };
+        messages.value.push(assistantMessage);
+      }
+      currentStreamContent.value = '';
+      currentStreamReasoning.value = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -360,6 +378,7 @@ export const useChatStore = defineStore('chat', () => {
                 fullReasoning += delta.reasoning_content;
                 currentStreamReasoning.value = fullReasoning;
               }
+              console.log('Stream delta:', { content: delta?.content, reasoning: delta?.reasoning_content });
               if (delta?.tool_calls) {
                 for (const toolCall of delta.tool_calls) {
                   const index = toolCall.index;
@@ -391,24 +410,23 @@ export const useChatStore = defineStore('chat', () => {
       const toolCalls = Object.values(accumulatedToolCalls);
 
       if (currentChat.value && (fullContent || fullReasoning || toolCalls.length > 0)) {
-        assistantMessageId = generateId();
-        const assistantMessage: Message = {
-          id: assistantMessageId,
-          chatId: currentChat.value.id,
-          role: 'assistant',
-          content: fullContent,
-          reasoning_content: fullReasoning || undefined,
-          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-          timestamp: Date.now(),
-          orderIndex: messages.value.length + 1,
-        };
-        messages.value.push(assistantMessage);
+        const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+        if (msgIndex !== -1) {
+          messages.value = messages.value.map((m, i) => 
+            i === msgIndex ? { 
+              ...m, 
+              content: toolCalls.length === 0 ? fullContent : '',
+              reasoning_content: toolCalls.length > 0 ? fullReasoning : undefined,
+              tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+            } : m
+          );
+        }
 
         if (saveMessage) {
           const assistantResponse = await messageApi.create(currentChat.value.id, {
             role: 'assistant',
-            content: fullContent,
-            reasoning_content: fullReasoning || undefined,
+            content: toolCalls.length === 0 ? fullContent : '',
+            reasoning_content: toolCalls.length > 0 ? fullReasoning : undefined,
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
           });
           const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
@@ -424,8 +442,8 @@ export const useChatStore = defineStore('chat', () => {
           ...currentMessages,
           {
             role: 'assistant',
-            content: fullContent,
-            reasoning_content: fullReasoning,
+            content: toolCalls.length === 0 ? fullContent : undefined,
+            reasoning_content: toolCalls.length > 0 ? fullReasoning : undefined,
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
           },
         ];
@@ -449,6 +467,10 @@ export const useChatStore = defineStore('chat', () => {
           currentStreamReasoning.value = '';
         }
       } else {
+        const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+        if (msgIndex !== -1) {
+          messages.value = messages.value.filter(m => m.id !== assistantMessageId);
+        }
         updateTokenCount();
         isLoading.value = false;
         isStreaming.value = false;
