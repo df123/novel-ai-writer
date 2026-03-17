@@ -414,9 +414,10 @@ export const useChatStore = defineStore('chat', () => {
 
         if (saveMessage && toolCalls.length === 0) {
           const existingMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+          const isTemporaryId = assistantMessageId.includes('-') && assistantMessageId.length > 20;
           let assistantResponse: Awaited<ReturnType<typeof messageApi.create>> | Awaited<ReturnType<typeof messageApi.update>>;
           
-          if (existingMessageIndex !== -1) {
+          if (existingMessageIndex !== -1 && !isTemporaryId) {
             assistantResponse = await messageApi.update(assistantMessageId, {
               role: 'assistant',
               content: fullContent,
