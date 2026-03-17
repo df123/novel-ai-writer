@@ -485,6 +485,29 @@ app.post('/api/chats/:chatId/messages', (req, res) => {
   }
 });
 
+app.put('/api/messages/:id', (req, res) => {
+  try {
+    const { role, content, reasoning_content } = req.body;
+    
+    const existing = query('SELECT * FROM messages WHERE id = ?', [req.params.id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+    
+    run('UPDATE messages SET role = ?, content = ?, reasoning_content = ? WHERE id = ?',
+      [role, content, reasoning_content || null, req.params.id]);
+    
+    run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), existing[0].chat_id]);
+    
+    saveDB();
+    
+    const messages = query('SELECT * FROM messages WHERE id = ?', [req.params.id]);
+    res.json(messages[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/messages/:id', (req, res) => {
   try {
     const messages = query('SELECT * FROM messages WHERE id = ?', [req.params.id]);

@@ -181,7 +181,9 @@ export const useChatStore = defineStore('chat', () => {
     });
     const userMessageIndex = messages.value.findIndex(m => m.id === userMessageId);
     if (userMessageIndex !== -1) {
-      messages.value[userMessageIndex].id = userResponse.data.id;
+      messages.value = messages.value.map((m, i) =>
+        i === userMessageIndex ? { ...m, id: userResponse.data.id } : m
+      );
     }
 
     const selectedTimelineNodes = timelineStore.nodes.filter(n => timelineStore.selectedNodes.has(n.id));
@@ -218,10 +220,24 @@ export const useChatStore = defineStore('chat', () => {
 
       try {
         switch (name) {
-          case 'create_timeline':
+          case 'create_timeline': {
+            const existingTimeline = timelineStore.nodes.find(n => n.title === parsedArgs.title);
+            if (existingTimeline) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `时间线节点"${parsedArgs.title}"已存在，请使用update_timeline工具更新它`,
+                existingData: {
+                  id: existingTimeline.id,
+                  title: existingTimeline.title,
+                  description: existingTimeline.description || '',
+                },
+                suggestion: '使用 update_timeline 工具，传入上述 id 来更新此时间线节点'
+              });
+            }
             await timelineStore.createNode(parsedArgs.title, parsedArgs.description);
             return JSON.stringify({ success: true, message: `Created timeline node: ${parsedArgs.title}` });
-          case 'update_timeline':
+          }
+          case 'update_timeline': {
             if (parsedArgs.id) {
               await timelineStore.updateNode(parsedArgs.id, {
                 title: parsedArgs.title,
@@ -230,13 +246,31 @@ export const useChatStore = defineStore('chat', () => {
               return JSON.stringify({ success: true, message: `Updated timeline node: ${parsedArgs.title}` });
             }
             return JSON.stringify({ success: false, message: 'Missing required id' });
-          case 'delete_timeline':
+          }
+          case 'delete_timeline': {
             if (parsedArgs.id) {
               await timelineStore.deleteNode(parsedArgs.id);
               return JSON.stringify({ success: true, message: `Deleted timeline node` });
             }
             return JSON.stringify({ success: false, message: 'Missing required id' });
-          case 'create_character':
+          }
+          case 'create_character': {
+            const existingCharacter = characterStore.characters.find(c => c.name === parsedArgs.name);
+            if (existingCharacter) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `人物"${parsedArgs.name}"已存在，请使用update_character工具更新它`,
+                existingData: {
+                  id: existingCharacter.id,
+                  name: existingCharacter.name,
+                  description: existingCharacter.description || '',
+                  personality: existingCharacter.personality || '',
+                  background: existingCharacter.background || '',
+                  relationships: existingCharacter.relationships || '',
+                },
+                suggestion: '使用 update_character 工具，传入上述 id 来更新此人物'
+              });
+            }
             await characterStore.createCharacter({
               name: parsedArgs.name,
               personality: parsedArgs.personality,
@@ -245,7 +279,8 @@ export const useChatStore = defineStore('chat', () => {
               description: parsedArgs.description,
             });
             return JSON.stringify({ success: true, message: `Created character: ${parsedArgs.name}` });
-          case 'update_character':
+          }
+          case 'update_character': {
             if (parsedArgs.id) {
               await characterStore.updateCharacter(parsedArgs.id, {
                 name: parsedArgs.name,
@@ -257,12 +292,14 @@ export const useChatStore = defineStore('chat', () => {
               return JSON.stringify({ success: true, message: `Updated character: ${parsedArgs.name}` });
             }
             return JSON.stringify({ success: false, message: 'Missing required id' });
-          case 'delete_character':
+          }
+          case 'delete_character': {
             if (parsedArgs.id) {
               await characterStore.deleteCharacter(parsedArgs.id);
               return JSON.stringify({ success: true, message: `Deleted character` });
             }
             return JSON.stringify({ success: false, message: 'Missing required id' });
+          }
           default:
             return JSON.stringify({ success: false, message: `Unknown tool: ${name}` });
         }
@@ -368,20 +405,34 @@ export const useChatStore = defineStore('chat', () => {
         } else {
           const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
           if (msgIndex !== -1) {
-            messages.value[msgIndex].content = fullContent;
-            messages.value[msgIndex].reasoning_content = fullReasoning || undefined;
+            messages.value = messages.value.map((m, i) => 
+              i === msgIndex ? { ...m, content: fullContent, reasoning_content: fullReasoning || undefined } : m
+            );
           }
         }
 
-        const assistantResponse = await messageApi.create(currentChat.value.id, {
-          role: 'assistant',
-          content: fullContent,
-          reasoning_content: fullReasoning || undefined,
-        });
-
-        const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-        if (newMessageIndex !== -1) {
-          messages.value[newMessageIndex].id = assistantResponse.data.id;
+        const existingMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+        let assistantResponse: Awaited<ReturnType<typeof messageApi.create>> | Awaited<ReturnType<typeof messageApi.update>>;
+        
+        if (existingMessageIndex !== -1) {
+          assistantResponse = await messageApi.update(assistantMessageId, {
+            role: 'assistant',
+            content: fullContent,
+            reasoning_content: fullReasoning || undefined,
+          });
+        } else {
+          assistantResponse = await messageApi.create(currentChat.value.id, {
+            role: 'assistant',
+            content: fullContent,
+            reasoning_content: fullReasoning || undefined,
+          });
+          const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+          if (newMessageIndex !== -1) {
+            messages.value = messages.value.map((m, i) =>
+              i === newMessageIndex ? { ...m, id: assistantResponse.data.id } : m
+            );
+          }
+          assistantMessageId = assistantResponse.data.id;
         }
 
         const newMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [
