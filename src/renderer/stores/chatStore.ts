@@ -408,15 +408,29 @@ export const useChatStore = defineStore('chat', () => {
       console.log('LLM response - fullContent:', fullContent, 'fullReasoning:', fullReasoning, 'toolCalls:', Object.values(accumulatedToolCalls));
 
       const toolCalls = Object.values(accumulatedToolCalls);
+      
+      let finalContent = '';
+      let finalReasoning = undefined as string | undefined;
+      
+      if (toolCalls.length > 0) {
+        finalContent = '';
+        finalReasoning = fullReasoning;
+      } else if (!fullContent && fullReasoning) {
+        finalContent = fullReasoning;
+        finalReasoning = undefined;
+      } else {
+        finalContent = fullContent;
+        finalReasoning = undefined;
+      }
 
-      if (currentChat.value && (fullContent || fullReasoning || toolCalls.length > 0)) {
+      if (currentChat.value && (finalContent || finalReasoning || toolCalls.length > 0)) {
         const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
         if (msgIndex !== -1) {
           messages.value = messages.value.map((m, i) => 
             i === msgIndex ? { 
               ...m, 
-              content: toolCalls.length === 0 ? fullContent : '',
-              reasoning_content: toolCalls.length > 0 ? fullReasoning : undefined,
+              content: finalContent,
+              reasoning_content: finalReasoning,
               tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
             } : m
           );
@@ -425,8 +439,8 @@ export const useChatStore = defineStore('chat', () => {
         if (saveMessage) {
           const assistantResponse = await messageApi.create(currentChat.value.id, {
             role: 'assistant',
-            content: toolCalls.length === 0 ? fullContent : '',
-            reasoning_content: toolCalls.length > 0 ? fullReasoning : undefined,
+            content: finalContent,
+            reasoning_content: finalReasoning,
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
           });
           const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
@@ -442,8 +456,8 @@ export const useChatStore = defineStore('chat', () => {
           ...currentMessages,
           {
             role: 'assistant',
-            content: toolCalls.length === 0 ? fullContent : undefined,
-            reasoning_content: toolCalls.length > 0 ? fullReasoning : undefined,
+            content: finalContent,
+            reasoning_content: finalReasoning,
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
           },
         ];
