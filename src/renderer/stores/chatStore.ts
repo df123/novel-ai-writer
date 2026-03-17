@@ -164,17 +164,6 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push(userMessage);
     updateTokenCount();
 
-    assistantMessageId = generateId();
-    const assistantPlaceholder: Message = {
-      id: assistantMessageId,
-      chatId: currentChat.value.id,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-      orderIndex: messages.value.length + 1,
-    };
-    messages.value.push(assistantPlaceholder);
-
     const userResponse = await messageApi.create(currentChat.value.id, {
       role: 'user',
       content,
@@ -196,12 +185,19 @@ export const useChatStore = defineStore('chat', () => {
       providerName === 'deepseek' ? ALL_TOOLS : undefined
     );
 
-    const validMessages = messages.value
-      .filter(m => m.content && m.content.trim())
-      .map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+    const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
+      .filter(m => m.role !== 'system' && m.role !== 'tool')
+      .map(m => {
+        const msg: { role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string } = {
+          role: m.role,
+          content: m.content || undefined,
+        };
+        if (m.role === 'assistant' && m.tool_calls) {
+          msg.tool_calls = m.tool_calls;
+        }
+        return msg;
+      })
+      .filter(m => m.content || m.tool_calls);
 
     const baseMessagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
 
@@ -210,7 +206,6 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     baseMessagesForLLM.push(...validMessages);
-    baseMessagesForLLM.push({ role: 'user', content });
 
     const executeToolCall = async (toolCall: ToolCall): Promise<string> => {
       const { name, arguments: args } = toolCall.function;
@@ -311,8 +306,7 @@ export const useChatStore = defineStore('chat', () => {
 
     const runLLMTurn = async (
       currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>,
-      saveMessage: boolean = true,
-      isToolCallFollowup: boolean = false
+      saveMessage: boolean = true
     ): Promise<void> => {
 
       const response = await llmApi.chat(
