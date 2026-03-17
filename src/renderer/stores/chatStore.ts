@@ -131,6 +131,7 @@ export const useChatStore = defineStore('chat', () => {
     const timelineStore = useTimelineStore();
     const characterStore = useCharacterStore();
     const settingsStore = useSettingsStore();
+    let assistantMessageId: string | null = null;
 
     if (!currentChat.value || !projectStore.currentProject) {
       throw new Error('No chat or project selected');
@@ -162,6 +163,17 @@ export const useChatStore = defineStore('chat', () => {
 
     messages.value.push(userMessage);
     updateTokenCount();
+
+    assistantMessageId = generateId();
+    const assistantPlaceholder: Message = {
+      id: assistantMessageId,
+      chatId: currentChat.value.id,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      orderIndex: messages.value.length + 1,
+    };
+    messages.value.push(assistantPlaceholder);
 
     const userResponse = await messageApi.create(currentChat.value.id, {
       role: 'user',
@@ -260,8 +272,6 @@ export const useChatStore = defineStore('chat', () => {
       }
     };
 
-    let assistantMessageId: string | null = null;
-
     const runLLMTurn = async (
       currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>
     ): Promise<void> => {
@@ -343,17 +353,25 @@ export const useChatStore = defineStore('chat', () => {
       const toolCalls = Object.values(accumulatedToolCalls);
 
       if (currentChat.value && (fullContent || fullReasoning || toolCalls.length > 0)) {
-        assistantMessageId = generateId();
-        const assistantMessage: Message = {
-          id: assistantMessageId,
-          chatId: currentChat.value.id,
-          role: 'assistant',
-          content: fullContent,
-          reasoning_content: fullReasoning || undefined,
-          timestamp: Date.now(),
-          orderIndex: messages.value.length + 1,
-        };
-        messages.value.push(assistantMessage);
+        if (!assistantMessageId) {
+          assistantMessageId = generateId();
+          const assistantMessage: Message = {
+            id: assistantMessageId,
+            chatId: currentChat.value.id,
+            role: 'assistant',
+            content: fullContent,
+            reasoning_content: fullReasoning || undefined,
+            timestamp: Date.now(),
+            orderIndex: messages.value.length + 1,
+          };
+          messages.value.push(assistantMessage);
+        } else {
+          const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+          if (msgIndex !== -1) {
+            messages.value[msgIndex].content = fullContent;
+            messages.value[msgIndex].reasoning_content = fullReasoning || undefined;
+          }
+        }
 
         const assistantResponse = await messageApi.create(currentChat.value.id, {
           role: 'assistant',
