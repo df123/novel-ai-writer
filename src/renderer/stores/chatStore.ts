@@ -182,15 +182,21 @@ export const useChatStore = defineStore('chat', () => {
       options.systemPrompt,
       selectedTimelineNodes.map(n => ({ id: n.id, title: n.title, description: n.description })),
       selectedCharacters.map(c => ({ id: c.id, name: c.name, description: c.description, personality: c.personality })),
-      providerName === 'deepseek' ? ALL_TOOLS : undefined
+      ALL_TOOLS
     );
 
-    const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
-      .filter(m => m.role !== 'system' && m.role !== 'tool' && m.content && m.content.trim())
-      .map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+    const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
+      .filter(m => m.role !== 'system')
+      .filter(m => m.role === 'tool' || (m.content && m.content.trim()))
+      .map(m => {
+        if (m.role === 'tool') {
+          return { role: m.role as 'tool', tool_call_id: m.tool_call_id, content: m.content };
+        }
+        if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
+          return { role: m.role as 'assistant', content: m.content || '', tool_calls: m.tool_calls };
+        }
+        return { role: m.role, content: m.content };
+      });
 
     const baseMessagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
 
@@ -309,7 +315,7 @@ export const useChatStore = defineStore('chat', () => {
           model: options.modelName,
           temperature: settingsStore.temperature,
           apiKey,
-          tools: providerName === 'deepseek' ? ALL_TOOLS : undefined,
+          tools: ALL_TOOLS,
           thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
         }
       );

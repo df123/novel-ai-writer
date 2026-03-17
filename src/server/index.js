@@ -897,12 +897,6 @@ app.post('/api/llm/chat', async (req, res) => {
         requestBody.tools = options.tools;
       }
 
-      if (provider === 'openrouter') {
-        requestBody.reasoning = {
-          enabled: true
-        };
-      }
-
       if (options.thinking && provider === 'deepseek') {
         requestBody.thinking = options.thinking;
       }
@@ -930,27 +924,29 @@ app.post('/api/llm/chat', async (req, res) => {
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    
+    let serverBuffer = '';
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
-      
+
+      serverBuffer += decoder.decode(value, { stream: true });
+      const lines = serverBuffer.split('\n');
+      serverBuffer = lines.pop() ?? '';
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          const data = line.slice(6);
+          const data = line.slice(6).trim();
           if (data === '[DONE]') {
             res.write('data: [DONE]\n\n');
             break;
           }
-          
+
           try {
             const parsed = JSON.parse(data);
             res.write(`data: ${JSON.stringify(parsed)}\n\n`);
           } catch (e) {
-            res.write(`data: ${data}\n\n`);
+            console.error('[SSE] Skipping malformed line:', e.message);
           }
         }
       }
