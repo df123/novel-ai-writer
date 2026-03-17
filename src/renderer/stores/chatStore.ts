@@ -414,7 +414,7 @@ export const useChatStore = defineStore('chat', () => {
         finalReasoning = undefined;
       } else {
         finalContent = fullContent;
-        finalReasoning = undefined;
+        finalReasoning = fullReasoning || undefined;
       }
 
       if (currentChat.value && (finalContent || finalReasoning || toolCalls.length > 0)) {
