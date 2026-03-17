@@ -186,18 +186,11 @@ export const useChatStore = defineStore('chat', () => {
     );
 
     const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
-      .filter(m => m.role !== 'system' && m.role !== 'tool')
-      .map(m => {
-        const msg: { role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string } = {
-          role: m.role,
-          content: m.content || undefined,
-        };
-        if (m.role === 'assistant' && m.tool_calls) {
-          msg.tool_calls = m.tool_calls;
-        }
-        return msg;
-      })
-      .filter(m => m.content || m.tool_calls);
+      .filter(m => m.role !== 'system' && m.role !== 'tool' && m.content && m.content.trim())
+      .map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
 
     const baseMessagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];
 
