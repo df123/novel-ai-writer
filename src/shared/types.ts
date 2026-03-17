@@ -5,6 +5,20 @@
  */
 
 /**
+ * 工具调用接口
+ * 表示 LLM 调用工具的请求
+ */
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  index: number;
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+/**
  * 聊天消息接口
  * 表示一次对话中的单条消息
  */
@@ -15,14 +29,20 @@ export interface Message {
   /** 所属聊天的 ID */
   chatId: string;
   
-  /** 消息角色：系统提示、用户、助手 */
-  role: 'system' | 'user' | 'assistant';
+  /** 消息角色：系统提示、用户、助手、工具 */
+  role: 'system' | 'user' | 'assistant' | 'tool';
   
   /** 消息内容 */
   content: string;
   
   /** 助手的思考过程（仅助手角色，可选） */
   reasoning_content?: string;
+  
+  /** 工具调用（仅助手角色，可选） */
+  tool_calls?: ToolCall[];
+  
+  /** 工具调用 ID（仅工具角色，可选） */
+  tool_call_id?: string;
   
   /** 消息创建时间戳（毫秒） */
   timestamp: number;

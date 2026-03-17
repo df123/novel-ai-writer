@@ -391,52 +391,33 @@ export const useChatStore = defineStore('chat', () => {
       const toolCalls = Object.values(accumulatedToolCalls);
 
       if (currentChat.value && (fullContent || fullReasoning || toolCalls.length > 0)) {
-        if (!assistantMessageId) {
-          assistantMessageId = generateId();
-          const assistantMessage: Message = {
-            id: assistantMessageId,
-            chatId: currentChat.value.id,
+        assistantMessageId = generateId();
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          chatId: currentChat.value.id,
+          role: 'assistant',
+          content: fullContent,
+          reasoning_content: fullReasoning || undefined,
+          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+          timestamp: Date.now(),
+          orderIndex: messages.value.length + 1,
+        };
+        messages.value.push(assistantMessage);
+
+        if (saveMessage) {
+          const assistantResponse = await messageApi.create(currentChat.value.id, {
             role: 'assistant',
             content: fullContent,
             reasoning_content: fullReasoning || undefined,
-            timestamp: Date.now(),
-            orderIndex: messages.value.length + 1,
-          };
-          messages.value.push(assistantMessage);
-        } else {
-          const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-          if (msgIndex !== -1) {
-            messages.value = messages.value.map((m, i) => 
-              i === msgIndex ? { ...m, content: fullContent, reasoning_content: fullReasoning || undefined } : m
+            tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+          });
+          const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+          if (newMessageIndex !== -1) {
+            messages.value = messages.value.map((m, i) =>
+              i === newMessageIndex ? { ...m, id: assistantResponse.data.id } : m
             );
           }
-        }
-
-        if (saveMessage && toolCalls.length === 0) {
-          const existingMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-          const isTemporaryId = assistantMessageId.includes('-') && assistantMessageId.length > 20;
-          let assistantResponse: Awaited<ReturnType<typeof messageApi.create>> | Awaited<ReturnType<typeof messageApi.update>>;
-          
-          if (existingMessageIndex !== -1 && !isTemporaryId) {
-            assistantResponse = await messageApi.update(assistantMessageId, {
-              role: 'assistant',
-              content: fullContent,
-              reasoning_content: fullReasoning || undefined,
-            });
-          } else {
-            assistantResponse = await messageApi.create(currentChat.value.id, {
-              role: 'assistant',
-              content: fullContent,
-              reasoning_content: fullReasoning || undefined,
-            });
-            const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-            if (newMessageIndex !== -1) {
-              messages.value = messages.value.map((m, i) =>
-                i === newMessageIndex ? { ...m, id: assistantResponse.data.id } : m
-              );
-            }
-            assistantMessageId = assistantResponse.data.id;
-          }
+          assistantMessageId = assistantResponse.data.id;
         }
 
         const newMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [

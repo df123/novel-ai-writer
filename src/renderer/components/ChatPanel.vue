@@ -66,6 +66,16 @@
             }"
             shadow="never"
           >
+            <div v-if="message.role === 'assistant' && message.tool_calls && message.tool_calls.length > 0">
+              <el-collapse>
+                <el-collapse-item :title="`工具调用 (${message.tool_calls.length})`" name="tool_calls">
+                  <div v-for="(toolCall, i) in message.tool_calls" :key="i" style="margin-bottom: 12px; padding: 8px; background: #fff; border-radius: 4px; border: 1px solid #e0e0e0;">
+                    <div style="font-weight: 600; margin-bottom: 4px; color: #409eff;">{{ toolCall.function.name }}</div>
+                    <pre style="margin: 0; white-space: pre-wrap; font-size: 12px; color: #666; background: #f9f9f9; padding: 8px; border-radius: 4px;">{{ JSON.stringify(JSON.parse(toolCall.function.arguments), null, 2) }}</pre>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+            </div>
             <div v-if="message.role === 'assistant' && displayReasoning(message)">
               <el-collapse>
                 <el-collapse-item title="思考过程" name="reasoning">

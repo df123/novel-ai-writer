@@ -459,6 +459,15 @@ app.delete('/api/chats/:id', (req, res) => {
 app.get('/api/chats/:chatId/messages', (req, res) => {
   try {
     const messages = query('SELECT * FROM messages WHERE chat_id = ? ORDER BY timestamp ASC', [req.params.chatId]);
+    messages.forEach(msg => {
+      if (msg.tool_calls) {
+        try {
+          msg.tool_calls = JSON.parse(msg.tool_calls);
+        } catch (e) {
+          msg.tool_calls = null;
+        }
+      }
+    });
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -467,18 +476,26 @@ app.get('/api/chats/:chatId/messages', (req, res) => {
 
 app.post('/api/chats/:chatId/messages', (req, res) => {
   try {
-    const { role, content, reasoning_content } = req.body;
+    const { role, content, reasoning_content, tool_calls } = req.body;
     const id = generateId();
     const timestamp = now();
+    const toolCallsJson = tool_calls ? JSON.stringify(tool_calls) : null;
     
-    run('INSERT INTO messages (id, chat_id, role, content, reasoning_content, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, req.params.chatId, role, content, reasoning_content || null, timestamp]);
+    run('INSERT INTO messages (id, chat_id, role, content, reasoning_content, tool_calls, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, req.params.chatId, role, content, reasoning_content || null, toolCallsJson, timestamp]);
     
     run('UPDATE chats SET updated_at = ? WHERE id = ?', [timestamp, req.params.chatId]);
     
     saveDB();
     
     const messages = query('SELECT * FROM messages WHERE id = ?', [id]);
+    if (messages[0].tool_calls) {
+      try {
+        messages[0].tool_calls = JSON.parse(messages[0].tool_calls);
+      } catch (e) {
+        messages[0].tool_calls = null;
+      }
+    }
     res.status(201).json(messages[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -487,21 +504,29 @@ app.post('/api/chats/:chatId/messages', (req, res) => {
 
 app.put('/api/messages/:id', (req, res) => {
   try {
-    const { role, content, reasoning_content } = req.body;
+    const { role, content, reasoning_content, tool_calls } = req.body;
     
     const existing = query('SELECT * FROM messages WHERE id = ?', [req.params.id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Message not found' });
     }
     
-    run('UPDATE messages SET role = ?, content = ?, reasoning_content = ? WHERE id = ?',
-      [role, content, reasoning_content || null, req.params.id]);
+    const toolCallsJson = tool_calls ? JSON.stringify(tool_calls) : null;
+    run('UPDATE messages SET role = ?, content = ?, reasoning_content = ?, tool_calls = ? WHERE id = ?',
+      [role, content, reasoning_content || null, toolCallsJson, req.params.id]);
     
     run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), existing[0].chat_id]);
     
     saveDB();
     
     const messages = query('SELECT * FROM messages WHERE id = ?', [req.params.id]);
+    if (messages[0].tool_calls) {
+      try {
+        messages[0].tool_calls = JSON.parse(messages[0].tool_calls);
+      } catch (e) {
+        messages[0].tool_calls = null;
+      }
+    }
     res.json(messages[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
