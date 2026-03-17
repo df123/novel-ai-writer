@@ -310,7 +310,8 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     const runLLMTurn = async (
-      currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>
+      currentMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }>,
+      saveMessage: boolean = true
     ): Promise<void> => {
 
       const response = await llmApi.chat(
@@ -411,28 +412,30 @@ export const useChatStore = defineStore('chat', () => {
           }
         }
 
-        const existingMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-        let assistantResponse: Awaited<ReturnType<typeof messageApi.create>> | Awaited<ReturnType<typeof messageApi.update>>;
-        
-        if (existingMessageIndex !== -1) {
-          assistantResponse = await messageApi.update(assistantMessageId, {
-            role: 'assistant',
-            content: fullContent,
-            reasoning_content: fullReasoning || undefined,
-          });
-        } else {
-          assistantResponse = await messageApi.create(currentChat.value.id, {
-            role: 'assistant',
-            content: fullContent,
-            reasoning_content: fullReasoning || undefined,
-          });
-          const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
-          if (newMessageIndex !== -1) {
-            messages.value = messages.value.map((m, i) =>
-              i === newMessageIndex ? { ...m, id: assistantResponse.data.id } : m
-            );
+        if (saveMessage && toolCalls.length === 0) {
+          const existingMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+          let assistantResponse: Awaited<ReturnType<typeof messageApi.create>> | Awaited<ReturnType<typeof messageApi.update>>;
+          
+          if (existingMessageIndex !== -1) {
+            assistantResponse = await messageApi.update(assistantMessageId, {
+              role: 'assistant',
+              content: fullContent,
+              reasoning_content: fullReasoning || undefined,
+            });
+          } else {
+            assistantResponse = await messageApi.create(currentChat.value.id, {
+              role: 'assistant',
+              content: fullContent,
+              reasoning_content: fullReasoning || undefined,
+            });
+            const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
+            if (newMessageIndex !== -1) {
+              messages.value = messages.value.map((m, i) =>
+                i === newMessageIndex ? { ...m, id: assistantResponse.data.id } : m
+              );
+            }
+            assistantMessageId = assistantResponse.data.id;
           }
-          assistantMessageId = assistantResponse.data.id;
         }
 
         const newMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [
@@ -455,7 +458,7 @@ export const useChatStore = defineStore('chat', () => {
             });
           }
 
-          await runLLMTurn(newMessages);
+          await runLLMTurn(newMessages, true);
         } else {
           updateTokenCount();
           isLoading.value = false;
@@ -473,7 +476,7 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     try {
-      await runLLMTurn(baseMessagesForLLM);
+      await runLLMTurn(baseMessagesForLLM, true);
     } catch (error) {
       console.error('Send message error:', error);
       isLoading.value = false;
