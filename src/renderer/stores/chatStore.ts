@@ -365,7 +365,6 @@ export const useChatStore = defineStore('chat', () => {
                 fullReasoning += delta.reasoning_content;
                 currentStreamReasoning.value = fullReasoning;
               }
-              console.log('Stream delta:', { content: delta?.content, reasoning: delta?.reasoning_content });
               if (delta?.tool_calls) {
                 for (const toolCall of delta.tool_calls) {
                   const index = toolCall.index;
@@ -402,12 +401,15 @@ export const useChatStore = defineStore('chat', () => {
       if (toolCalls.length > 0) {
         finalContent = '';
         finalReasoning = fullReasoning;
+        console.log('Tool calls mode - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       } else if (!fullContent && fullReasoning) {
         finalContent = fullReasoning;
         finalReasoning = undefined;
+        console.log('Content in reasoning - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       } else {
         finalContent = fullContent;
         finalReasoning = fullReasoning || undefined;
+        console.log('Normal mode - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       }
 
       if (currentChat.value && (finalContent || finalReasoning || toolCalls.length > 0)) {
