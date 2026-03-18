@@ -214,8 +214,6 @@ export const useChatStore = defineStore('chat', () => {
       const { name, arguments: args } = toolCall.function;
       const parsedArgs = JSON.parse(args);
 
-      console.log(`[Tool Execution] Executing tool: ${name}`, parsedArgs);
-
       try {
         switch (name) {
           case 'create_timeline': {
@@ -463,8 +461,6 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      console.log('LLM response - fullContent:', fullContent, 'fullReasoning:', fullReasoning, 'toolCalls:', Object.values(accumulatedToolCalls));
-
       const toolCalls = Object.values(accumulatedToolCalls);
       
       let finalContent = '';
@@ -473,7 +469,6 @@ export const useChatStore = defineStore('chat', () => {
       if (toolCalls.length > 0) {
         finalContent = '';
         finalReasoning = fullReasoning;
-        console.log('Tool calls mode - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       } else if (!fullContent && fullReasoning) {
         console.warn('Unexpected: reasoning without content or tool_calls - treating reasoning as content');
         finalContent = fullReasoning;
@@ -481,7 +476,6 @@ export const useChatStore = defineStore('chat', () => {
       } else {
         finalContent = fullContent;
         finalReasoning = fullReasoning || undefined;
-        console.log('Normal mode - finalContent:', finalContent, 'finalReasoning:', finalReasoning);
       }
 
       if (currentChat.value && (finalContent || finalReasoning || toolCalls.length > 0)) {
@@ -526,7 +520,6 @@ export const useChatStore = defineStore('chat', () => {
         if (toolCalls.length > 0) {
           for (const toolCall of toolCalls) {
             const result = await executeToolCall(toolCall);
-            console.log(`[Tool Result] Tool: ${toolCall.function.name}, Result:`, result);
             
             if (saveMessage && currentChat.value) {
               const toolResponse = await messageApi.create(currentChat.value.id, {
@@ -551,8 +544,7 @@ export const useChatStore = defineStore('chat', () => {
               content: result,
             });
           }
-          console.log(`[Tool Messages] Total tool messages added: ${newMessages.length}, messages:`, newMessages);
-
+          
           await runLLMTurn(newMessages, true);
         } else {
           updateTokenCount();

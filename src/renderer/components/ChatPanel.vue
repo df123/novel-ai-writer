@@ -32,7 +32,6 @@
           v-for="(message, index) in messages"
           :key="message.id + index"
           style="width: 100%"
-          @click="debugMessage(message)"
         >
           <div style="display: flex; align-items: center; width: 100%; margin-bottom: 8px">
             <span style="margin-left: 16px; font-size: 10px; color: #ccc;">
@@ -74,7 +73,6 @@
               {{ message.content }}
             </div>
             <div v-if="message.role === 'tool'">
-              {{ (() => { console.log('[ChatPanel] Rendering tool message:', { id: message.id, tool_call_id: message.tool_call_id, contentLength: message.content?.length }) })() }}
               <div style="padding: 8px; background: #f0f9eb; border-left: 3px solid #67c23a; border-radius: 4px; font-size: 12px;">
                 <div style="font-weight: 600; color: #67c23a; margin-bottom: 4px;">📋 工具结果</div>
                 <pre style="margin: 0; white-space: pre-wrap; color: #555;">{{ formatToolArguments(message.content) }}</pre>
@@ -191,7 +189,6 @@ watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning
 });
 
 watch(messages, async () => {
-  console.log('[ChatPanel] Messages updated:', messages.value);
   await nextTick();
   messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
 });
@@ -237,17 +234,6 @@ const displayReasoning = (message: Message) => {
     return currentStreamReasoning.value;
   }
   return message.reasoning_content;
-};
-
-const debugMessage = (message: Message) => {
-  console.log('[ChatPanel] Rendering message:', {
-    id: message.id,
-    role: message.role,
-    content: message.content?.substring(0, 100),
-    tool_call_id: message.tool_call_id,
-    tool_calls: message.tool_calls,
-    reasoning_content: message.reasoning_content?.substring(0, 100)
-  });
 };
 
 const renderMarkdown = (content: string) => {

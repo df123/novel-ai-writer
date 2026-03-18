@@ -215,15 +215,8 @@ function decrypt(text, key) {
   const crypto = require('crypto');
   const algorithm = 'aes-256-cbc';
   const parts = text.split(':');
-  console.log('[DEBUG] Decrypt - Input:', {
-    inputLength: text.length,
-    inputPrefix: text.substring(0, 50) + '...',
-    partsCount: parts.length,
-    keyPrefix: key.substring(0, 10) + '...'
-  });
 
   if (parts.length < 2) {
-    console.warn('[DEBUG] Encrypted text does not have proper format, returning as is');
     return text;
   }
 
@@ -231,28 +224,14 @@ function decrypt(text, key) {
   const encrypted = parts.join(':');
   const keyBuffer = crypto.createHash('sha256').update(key).digest();
 
-  console.log('[DEBUG] Decrypt - Components:', {
-    ivLength: iv.length,
-    ivHex: iv.toString('hex').substring(0, 20) + '...',
-    encryptedLength: encrypted.length,
-    encryptedPrefix: encrypted.substring(0, 50) + '...',
-    keyBufferLength: keyBuffer.length,
-    keyBufferPrefix: keyBuffer.toString('hex').substring(0, 20) + '...'
-  });
-
   const decipher = crypto.createDecipheriv(algorithm, keyBuffer, iv);
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   try {
     decrypted += decipher.final('utf8');
   } catch (finalError) {
-    console.error('[DEBUG] Decipher.final() error:', finalError);
+    console.error('Decipher.final() error:', finalError);
     throw finalError;
   }
-
-  console.log('[DEBUG] Decrypt - Output:', {
-    decryptedLength: decrypted.length,
-    decryptedPrefix: decrypted.substring(0, 20) + '...'
-  });
 
   return decrypted;
 }
@@ -834,17 +813,7 @@ app.post('/api/llm/chat', async (req, res) => {
     const { provider, messages, options = {} } = req.body;
     const apiKey = options.apiKey;
 
-    console.log('[DEBUG] LLM Chat request:', {
-      provider,
-      messagesCount: messages?.length,
-      optionsKeys: Object.keys(options || {}),
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey?.length,
-      apiKeyPrefix: apiKey?.substring(0, 10) + '...'
-    });
-
     if (!apiKey) {
-      console.error(`[DEBUG] API key not provided for provider: ${provider}`);
       const providerNames = {
         deepseek: 'DeepSeek',
         openrouter: 'OpenRouter'
@@ -855,8 +824,6 @@ app.post('/api/llm/chat', async (req, res) => {
         message: `请在设置中配置 ${providerNames[provider] || provider} API 密钥`
       });
     }
-
-    console.log(`[DEBUG] API key provided for ${provider}, length: ${apiKey.length}`);
     
     let apiUrl, modelName;
     if (provider === 'deepseek') {
@@ -870,8 +837,6 @@ app.post('/api/llm/chat', async (req, res) => {
       return res.status(400).json({ error: 'Invalid provider', provider });
     }
     
-    console.log(`[DEBUG] Calling LLM API: ${apiUrl} with model: ${modelName}`);
-
     let response;
     const headers = {
       'Content-Type': 'application/json',
@@ -964,8 +929,6 @@ app.post('/api/models/:provider', async (req, res) => {
     const { provider } = req.params;
     const { apiKey } = req.body;
     
-    console.log(`Fetching models for provider: ${provider}, API key provided: ${!!apiKey}`);
-    
     let models = [];
     
     if (provider === 'deepseek') {
@@ -981,11 +944,8 @@ app.post('/api/models/:provider', async (req, res) => {
       ];
     } else if (provider === 'openrouter') {
       if (!apiKey) {
-        console.log('No API key provided for OpenRouter');
         return res.status(400).json({ error: 'API key is required' });
       }
-      
-      console.log(`Calling OpenRouter API with key: ${apiKey.substring(0, 10)}...`);
       
       const response = await fetch('https://openrouter.ai/api/v1/models', {
         method: 'GET',
@@ -994,8 +954,6 @@ app.post('/api/models/:provider', async (req, res) => {
         }
       });
       
-      console.log(`OpenRouter API response status: ${response.status}`);
-      
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Failed to fetch models for ${provider}:`, errorText);
@@ -1003,7 +961,6 @@ app.post('/api/models/:provider', async (req, res) => {
       }
       
       const data = await response.json();
-      console.log(`OpenRouter returned ${data.data?.length || 0} models`);
       
       models = data.data
         .filter(m => {
@@ -1011,10 +968,7 @@ app.post('/api/models/:provider', async (req, res) => {
           const hasPricing = m.pricing && (m.pricing.prompt !== undefined || m.pricing.completion !== undefined);
           const noRouter = !m.id.includes('router');
           
-          const result = hasTextOutput && hasPricing && noRouter;
-          console.log(`Model ${m.id}: output_modalities=${m.output_modalities}, hasPricing=${hasPricing}, noRouter=${noRouter}, included=${result}`);
-          
-          return result;
+          return hasTextOutput && hasPricing && noRouter;
         })
         .map(m => {
           const pricing = m.pricing || {};
@@ -1040,8 +994,6 @@ app.post('/api/models/:provider', async (req, res) => {
             }
           };
         });
-      
-      console.log(`Filtered to ${models.length} models`);
     } else {
       return res.status(400).json({ error: 'Invalid provider' });
     }
@@ -1058,27 +1010,13 @@ app.get('/api/settings', (req, res) => {
   try {
     const settings = query('SELECT * FROM settings');
 
-    console.log('[DEBUG] Loading settings from DB:', {
-      count: settings.length,
-      keys: settings.map(s => s.key)
-    });
-
     const settingsMap = {};
     for (const setting of settings) {
       if (setting.key.endsWith('_api_key') && setting.value) {
         try {
           const crypto = require('crypto');
           const machineId = crypto.createHash('sha256').update(os.hostname() + os.platform()).digest('hex').substring(0, 32);
-          console.log(`[DEBUG] Decrypting ${setting.key}:`, {
-            encryptedLength: setting.value.length,
-            encryptedPrefix: setting.value.substring(0, 30) + '...',
-            machineId: machineId.substring(0, 10) + '...'
-          });
           settingsMap[setting.key] = decrypt(setting.value, machineId);
-          console.log(`[DEBUG] Decrypted ${setting.key}:`, {
-            length: settingsMap[setting.key].length,
-            prefix: settingsMap[setting.key].substring(0, 10) + '...'
-          });
         } catch (error) {
           console.error(`[DEBUG] Failed to decrypt ${setting.key}:`, error);
           settingsMap[setting.key] = '';
@@ -1087,13 +1025,6 @@ app.get('/api/settings', (req, res) => {
         settingsMap[setting.key] = setting.value;
       }
     }
-
-    console.log('[DEBUG] Returning settings:', {
-      hasDeepseekKey: !!settingsMap.deepseek_api_key,
-      deepseekKeyLength: settingsMap.deepseek_api_key?.length,
-      hasOpenrouterKey: !!settingsMap.openrouter_api_key,
-      openrouterKeyLength: settingsMap.openrouter_api_key?.length
-    });
 
     res.json(settingsMap);
   } catch (error) {
@@ -1108,25 +1039,9 @@ app.put('/api/settings', (req, res) => {
     const crypto = require('crypto');
     const machineId = crypto.createHash('sha256').update(os.hostname() + os.platform()).digest('hex').substring(0, 32);
 
-    console.log('[DEBUG] Saving settings:', {
-      keys: Object.keys(settings),
-      hasDeepseekKey: !!settings.deepseek_api_key,
-      deepseekKeyLength: settings.deepseek_api_key?.length,
-      deepseekKeyPrefix: settings.deepseek_api_key?.substring(0, 10) + '...',
-      hasOpenrouterKey: !!settings.openrouter_api_key,
-      openrouterKeyLength: settings.openrouter_api_key?.length,
-      openrouterKeyPrefix: settings.openrouter_api_key?.substring(0, 10) + '...',
-      machineId: machineId.substring(0, 10) + '...'
-    });
-
     for (const [key, value] of Object.entries(settings)) {
       if (key.endsWith('_api_key') && value) {
         const encrypted = encrypt(value, machineId);
-        console.log(`[DEBUG] Encrypting ${key}:`, {
-          originalLength: value.length,
-          encryptedLength: encrypted.length,
-          encryptedPrefix: encrypted.substring(0, 30) + '...'
-        });
         run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, encrypted]);
       } else {
         run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
@@ -1149,16 +1064,6 @@ app.put('/api/settings', (req, res) => {
         settingsMap[setting.key] = setting.value;
       }
     }
-
-    console.log('[DEBUG] Settings saved:', {
-      keys: Object.keys(settingsMap),
-      hasDeepseekKey: !!settingsMap.deepseek_api_key,
-      deepseekKeyLength: settingsMap.deepseek_api_key?.length,
-      deepseekKeyPrefix: settingsMap.deepseek_api_key?.substring(0, 10) + '...',
-      hasOpenrouterKey: !!settingsMap.openrouter_api_key,
-      openrouterKeyLength: settingsMap.openrouter_api_key?.length,
-      openrouterKeyPrefix: settingsMap.openrouter_api_key?.substring(0, 10) + '...'
-    });
 
     res.json(settingsMap);
   } catch (error) {
