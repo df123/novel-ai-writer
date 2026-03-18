@@ -187,7 +187,11 @@ export const useChatStore = defineStore('chat', () => {
 
     const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
       .filter(m => m.role !== 'system')
-      .filter(m => m.role === 'tool' || (m.content && m.content.trim()))
+      .filter(m => 
+        m.role === 'tool' || 
+        (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) ||
+        (m.content && m.content.trim())
+      )
       .map(m => {
         if (m.role === 'tool') {
           return { role: m.role as 'tool', tool_call_id: m.tool_call_id, content: m.content };
@@ -210,7 +214,7 @@ export const useChatStore = defineStore('chat', () => {
       const { name, arguments: args } = toolCall.function;
       const parsedArgs = JSON.parse(args);
 
-      console.log(`Executing tool: ${name}`, parsedArgs);
+      console.log(`[Tool Execution] Executing tool: ${name}`, parsedArgs);
 
       try {
         switch (name) {
@@ -358,7 +362,7 @@ export const useChatStore = defineStore('chat', () => {
             return JSON.stringify({ success: false, message: `Unknown tool: ${name}` });
         }
       } catch (error) {
-        console.error(`Failed to execute tool ${name}:`, error);
+        console.error(`[Tool Execution] Failed to execute tool ${name}:`, error);
         return JSON.stringify({ success: false, message: `Error: ${error}` });
       }
     };
@@ -522,12 +526,32 @@ export const useChatStore = defineStore('chat', () => {
         if (toolCalls.length > 0) {
           for (const toolCall of toolCalls) {
             const result = await executeToolCall(toolCall);
+            console.log(`[Tool Result] Tool: ${toolCall.function.name}, Result:`, result);
+            
+            if (saveMessage && currentChat.value) {
+              const toolResponse = await messageApi.create(currentChat.value.id, {
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: result,
+              });
+              messages.value.push({
+                id: toolResponse.data.id,
+                chatId: currentChat.value.id,
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: result,
+                timestamp: Date.now(),
+                orderIndex: messages.value.length + 1,
+              });
+            }
+            
             newMessages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
               content: result,
             });
           }
+          console.log(`[Tool Messages] Total tool messages added: ${newMessages.length}, messages:`, newMessages);
 
           await runLLMTurn(newMessages, true);
         } else {
