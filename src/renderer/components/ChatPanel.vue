@@ -66,6 +66,9 @@
             }"
             shadow="never"
           >
+            <div v-if="message.role === 'user'" style="white-space: pre-wrap; line-height: 1.6;">
+              {{ message.content }}
+            </div>
             <div v-if="message.role === 'assistant' && displayReasoning(message)">
               <div style="margin-bottom: 8px; padding: 8px; background: #fff; border-left: 3px solid #409eff; border-radius: 4px;">
                 <div style="font-size: 13px; font-weight: 600; color: #409eff; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
