@@ -1,5 +1,5 @@
 <template>
-  <div v-if="projects.length > 0" style="min-width: 200px; margin-left: 8px">
+  <div v-if="projects.length > 0" style="min-width: 200px; margin-left: 8px" v-bind="$attrs">
     <el-select
       v-model="selectedProjectId"
       placeholder="选择项目"

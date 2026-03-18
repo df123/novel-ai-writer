@@ -4,7 +4,6 @@
     <WelcomeDialog />
   </div>
   <div v-else class="loading-container">
-    <el-loading :fullscreen="true" />
     <div class="loading-text">加载中...</div>
   </div>
 </template>
