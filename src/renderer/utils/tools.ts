@@ -106,6 +106,29 @@ export const deleteTimelineTool: ToolDefinition = {
 };
 
 /**
+ * 查询时间线节点工具
+ */
+export const getTimelineTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'get_timeline',
+    description: '查询时间线节点列表或指定ID的时间线节点详情。如果不提供id参数，返回所有时间线节点列表。',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '时间线节点的 ID（可选，不提供则返回所有节点）',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
  * 创建人物工具
  */
 export const createCharacterTool: ToolDefinition = {
@@ -211,13 +234,38 @@ export const deleteCharacterTool: ToolDefinition = {
 };
 
 /**
+ * 查询人物工具
+ */
+export const getCharacterTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'get_character',
+    description: '查询人物列表或指定ID的人物详情。如果不提供id参数，返回所有人物列表。',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '人物的 ID（可选，不提供则返回所有人物）',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
  * 所有可用工具
  */
 export const ALL_TOOLS: ToolDefinition[] = [
   createTimelineTool,
   updateTimelineTool,
   deleteTimelineTool,
+  getTimelineTool,
   createCharacterTool,
   updateCharacterTool,
   deleteCharacterTool,
+  getCharacterTool,
 ];

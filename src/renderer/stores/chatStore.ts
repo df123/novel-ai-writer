@@ -294,6 +294,66 @@ export const useChatStore = defineStore('chat', () => {
             }
             return JSON.stringify({ success: false, message: 'Missing required id' });
           }
+          case 'get_timeline': {
+            if (parsedArgs.id) {
+              const node = timelineStore.nodes.find(n => n.id === parsedArgs.id);
+              if (node) {
+                return JSON.stringify({
+                  success: true,
+                  data: {
+                    id: node.id,
+                    title: node.title,
+                    description: node.content || '',
+                  },
+                });
+              }
+              return JSON.stringify({ success: false, message: `Timeline node not found: ${parsedArgs.id}` });
+            } else {
+              const nodes = timelineStore.nodes.map(n => ({
+                id: n.id,
+                title: n.title,
+                description: n.content || '',
+              }));
+              return JSON.stringify({
+                success: true,
+                data: nodes,
+                count: nodes.length,
+              });
+            }
+          }
+          case 'get_character': {
+            if (parsedArgs.id) {
+              const character = characterStore.characters.find(c => c.id === parsedArgs.id);
+              if (character) {
+                return JSON.stringify({
+                  success: true,
+                  data: {
+                    id: character.id,
+                    name: character.name,
+                    description: character.description || '',
+                    personality: character.personality || '',
+                    background: character.background || '',
+                    relationships: character.relationships || '',
+                  },
+                });
+              }
+              return JSON.stringify({ success: false, message: `Character not found: ${parsedArgs.id}` });
+            } else {
+              const characters = characterStore.characters.map(c => ({
+                id: c.id,
+                name: c.name,
+                description: c.description || '',
+                personality: c.personality || '',
+                background: c.background || '',
+                relationships: c.relationships || '',
+              }));
+              return JSON.stringify({
+                success: true,
+                data: characters,
+                count: characters.length,
+              });
+            }
+          }
           default:
             return JSON.stringify({ success: false, message: `Unknown tool: ${name}` });
         }
