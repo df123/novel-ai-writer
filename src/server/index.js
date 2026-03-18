@@ -26,112 +26,115 @@ let db;
 let SQL;
 const initDB = async () => {
   SQL = await initSqlJs();
-  
+
   // 检查数据库文件是否存在
   if (fs.existsSync(dbPath)) {
     const fileBuffer = fs.readFileSync(dbPath);
     db = new SQL.Database(fileBuffer);
   } else {
     db = new SQL.Database();
-    
-    // 创建表
-    db.run(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        description TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
+  }
 
-      CREATE TABLE IF NOT EXISTS chats (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      );
+  // 始终创建表（如果不存在）
+  db.run(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
 
-      CREATE TABLE IF NOT EXISTS messages (
-        id TEXT PRIMARY KEY,
-        chat_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        reasoning_content TEXT,
-        tool_calls TEXT,
-        timestamp INTEGER NOT NULL,
-        FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-      );
+    CREATE TABLE IF NOT EXISTS chats (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
 
-      CREATE TABLE IF NOT EXISTS timeline_nodes (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT,
-        order_index INTEGER NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      );
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      chat_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      reasoning_content TEXT,
+      tool_calls TEXT,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+    );
 
-      CREATE TABLE IF NOT EXISTS characters (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        personality TEXT,
-        background TEXT,
-        avatar_url TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      );
+    CREATE TABLE IF NOT EXISTS timeline_nodes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      order_index INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
 
-      CREATE TABLE IF NOT EXISTS prompt_templates (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        template TEXT NOT NULL,
-        type TEXT NOT NULL,
-        created_at INTEGER NOT NULL
-      );
+    CREATE TABLE IF NOT EXISTS characters (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      personality TEXT,
+      background TEXT,
+      avatar_url TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
 
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );
+    CREATE TABLE IF NOT EXISTS prompt_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      template TEXT NOT NULL,
+      type TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
 
-      CREATE TABLE IF NOT EXISTS timeline_versions (
-        id TEXT PRIMARY KEY,
-        timeline_node_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT,
-        version INTEGER NOT NULL,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY (timeline_node_id) REFERENCES timeline_nodes(id) ON DELETE CASCADE
-      );
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
 
-      CREATE TABLE IF NOT EXISTS character_versions (
-        id TEXT PRIMARY KEY,
-        character_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT,
-        personality TEXT,
-        background TEXT,
-        avatar_url TEXT,
-        version INTEGER NOT NULL,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
-      );
+    CREATE TABLE IF NOT EXISTS timeline_versions (
+      id TEXT PRIMARY KEY,
+      timeline_node_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      version INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (timeline_node_id) REFERENCES timeline_nodes(id) ON DELETE CASCADE
+    );
 
-      CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
-      CREATE INDEX IF NOT EXISTS idx_timeline_project_id ON timeline_nodes(project_id);
-      CREATE INDEX IF NOT EXISTS idx_characters_project_id ON characters(project_id);
-      CREATE INDEX IF NOT EXISTS idx_timeline_versions_node_id ON timeline_versions(timeline_node_id);
-      CREATE INDEX IF NOT EXISTS idx_character_versions_character_id ON character_versions(character_id);
-    `);
-    
-    // 初始化默认提示词模板
+    CREATE TABLE IF NOT EXISTS character_versions (
+      id TEXT PRIMARY KEY,
+      character_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      personality TEXT,
+      background TEXT,
+      avatar_url TEXT,
+      version INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+    CREATE INDEX IF NOT EXISTS idx_timeline_project_id ON timeline_nodes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_characters_project_id ON characters(project_id);
+    CREATE INDEX IF NOT EXISTS idx_timeline_versions_node_id ON timeline_versions(timeline_node_id);
+    CREATE INDEX IF NOT EXISTS idx_character_versions_character_id ON character_versions(character_id);
+  `);
+
+  // 检查是否需要初始化默认提示词模板
+  const templatesCount = query('SELECT COUNT(*) as count FROM prompt_templates')[0].count;
+  if (templatesCount === 0) {
     const defaultTemplates = [
       {
         id: generateId(),
@@ -160,14 +163,24 @@ const initDB = async () => {
       run('INSERT INTO prompt_templates (id, name, template, type, created_at) VALUES (?, ?, ?, ?, ?)',
         [t.id, t.name, t.template, t.type, t.created_at]);
     }
-    
-    // 确保tool_calls字段存在（用于现有数据库）
-    try {
-      run('ALTER TABLE messages ADD COLUMN tool_calls TEXT');
-    } catch (e) {
-      // 字段可能已存在，忽略错误
-    }
-    
+  }
+
+  // 确保tool_calls字段存在（用于现有数据库）
+  try {
+    run('ALTER TABLE messages ADD COLUMN tool_calls TEXT');
+  } catch (e) {
+    // 字段可能已存在，忽略错误
+  }
+
+  // 确保tool_call_id字段存在（用于现有数据库）
+  try {
+    run('ALTER TABLE messages ADD COLUMN tool_call_id TEXT');
+  } catch (e) {
+    // 字段可能已存在，忽略错误
+  }
+
+  // 仅当数据库是新创建时才保存
+  if (!fs.existsSync(dbPath)) {
     saveDB();
   }
 };
@@ -463,13 +476,13 @@ app.get('/api/chats/:chatId/messages', (req, res) => {
 
 app.post('/api/chats/:chatId/messages', (req, res) => {
   try {
-    const { role, content, reasoning_content, tool_calls } = req.body;
+    const { role, content, reasoning_content, tool_calls, tool_call_id } = req.body;
     const id = generateId();
     const timestamp = now();
     const toolCallsJson = tool_calls ? JSON.stringify(tool_calls) : null;
-    
-    run('INSERT INTO messages (id, chat_id, role, content, reasoning_content, tool_calls, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, req.params.chatId, role, content, reasoning_content || null, toolCallsJson, timestamp]);
+
+    run('INSERT INTO messages (id, chat_id, role, content, reasoning_content, tool_calls, tool_call_id, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.params.chatId, role, content, reasoning_content || null, toolCallsJson, tool_call_id || null, timestamp]);
     
     run('UPDATE chats SET updated_at = ? WHERE id = ?', [timestamp, req.params.chatId]);
     
@@ -491,16 +504,16 @@ app.post('/api/chats/:chatId/messages', (req, res) => {
 
 app.put('/api/messages/:id', (req, res) => {
   try {
-    const { role, content, reasoning_content, tool_calls } = req.body;
-    
+    const { role, content, reasoning_content, tool_calls, tool_call_id } = req.body;
+
     const existing = query('SELECT * FROM messages WHERE id = ?', [req.params.id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Message not found' });
     }
-    
+
     const toolCallsJson = tool_calls ? JSON.stringify(tool_calls) : null;
-    run('UPDATE messages SET role = ?, content = ?, reasoning_content = ?, tool_calls = ? WHERE id = ?',
-      [role, content, reasoning_content || null, toolCallsJson, req.params.id]);
+    run('UPDATE messages SET role = ?, content = ?, reasoning_content = ?, tool_calls = ?, tool_call_id = ? WHERE id = ?',
+      [role, content, reasoning_content || null, toolCallsJson, tool_call_id || null, req.params.id]);
     
     run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), existing[0].chat_id]);
     
@@ -849,9 +862,17 @@ app.post('/api/llm/chat', async (req, res) => {
     }
 
     try {
+      const cleanedMessages = messages.map(msg => {
+        const cleaned = { role: msg.role };
+        if (msg.content !== undefined) cleaned.content = msg.content;
+        if (msg.tool_calls) cleaned.tool_calls = msg.tool_calls;
+        if (msg.tool_call_id) cleaned.tool_call_id = msg.tool_call_id;
+        return cleaned;
+      });
+
       const requestBody = {
         model: modelName,
-        messages: messages,
+        messages: cleanedMessages,
         stream: true,
         temperature: options.temperature,
         top_p: options.topP,
