@@ -115,6 +115,11 @@ import { formatTimestamp } from '../../shared/utils';
 - 数据库存储在 `~/.novel-ai-writer/database.db`
 - API 密钥使用 AES-256-CBC 加密，配合机器特定密钥
 
+**系统使用场景：**
+- ✅ 本系统仅在内网环境供单一用户使用
+- ✅ 部分安全检查（如严格的输入验证、CSRF 防护等）可适当简化
+- ✅ 代码审查时可考虑这一使用场景，避免过度安全检查
+
 **根目录管理规范：**
 - ✅ 根目录仅保留：`AGENTS.md`（开发指南）、`README.md`（项目说明）
 - ✅ 其他文档统一存放：`docs/` 文件夹
