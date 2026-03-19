@@ -19,6 +19,7 @@
             <el-dropdown-menu>
               <el-dropdown-item command="createProject">新建项目</el-dropdown-item>
               <el-dropdown-item command="settings">LLM设置</el-dropdown-item>
+              <el-dropdown-item command="database">数据库管理</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -40,6 +41,15 @@
       v-model="showSettings"
       @close="showSettings = false"
     />
+    
+    <el-dialog
+      v-model="showDatabase"
+      title="数据库管理"
+      width="80%"
+      :close-on-click-modal="false"
+    >
+      <DatabasePanel />
+    </el-dialog>
   </el-container>
 </template>
 
@@ -56,6 +66,7 @@ import CharacterPanel from './CharacterPanel.vue';
 import ProjectSelector from './ProjectSelector.vue';
 import CreateProjectDialog from './CreateProjectDialog.vue';
 import LLMSettingsDialog from './LLMSettingsDialog.vue';
+import DatabasePanel from './DatabasePanel.vue';
 
 const projectStore = useProjectStore();
 const chatStore = useChatStore();
@@ -64,6 +75,7 @@ const characterStore = useCharacterStore();
 
 const showSettings = ref(false);
 const showCreateProject = ref(false);
+const showDatabase = ref(false);
 
 watch(
   () => projectStore.currentProject,
@@ -82,6 +94,8 @@ const handleMenuCommand = (command: string) => {
     showCreateProject.value = true;
   } else if (command === 'settings') {
     showSettings.value = true;
+  } else if (command === 'database') {
+    showDatabase.value = true;
   }
 };
 </script>

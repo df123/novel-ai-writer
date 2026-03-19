@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { TableInfo, TableDataResponse, QueryResponse } from '@shared/types';
 
 const API_BASE_URL = 'http://localhost:3002/api';
 
@@ -126,6 +127,48 @@ export const promptApi = {
   list: () => api.get('/prompts'),
   create: (data: { name: string; template: string; type: string }) => api.post('/prompts', data),
   delete: (id: string) => api.delete(`/prompts/${id}`),
+};
+
+// 数据库管理 API
+export const dbApi = {
+  // 获取所有表信息
+  getTables: () => api.get<{ tables: TableInfo[] }>('/db/tables'),
+  
+  // 查询表数据
+  getTableData: (
+    tableName: string,
+    options?: {
+      page?: number;
+      pageSize?: number;
+      orderBy?: string;
+      order?: 'ASC' | 'DESC';
+    }
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.pageSize) params.append('pageSize', options.pageSize.toString());
+    if (options?.orderBy) params.append('orderBy', options.orderBy);
+    if (options?.order) params.append('order', options.order);
+    const queryString = params.toString();
+    const url = `/db/tables/${tableName}${queryString ? `?${queryString}` : ''}`;
+    return api.get<TableDataResponse>(url);
+  },
+  
+  // 执行自定义查询
+  executeQuery: (sql: string, params?: any[]) => 
+    api.post<QueryResponse>('/db/query', { sql, params }),
+  
+  // 插入数据
+  insert: (tableName: string, data: Record<string, any>) => 
+    api.post(`/db/tables/${tableName}`, data),
+  
+  // 更新数据
+  update: (tableName: string, id: string, data: Record<string, any>) => 
+    api.put(`/db/tables/${tableName}/${id}`, data),
+  
+  // 删除数据
+  delete: (tableName: string, id: string) => 
+    api.delete(`/db/tables/${tableName}/${id}`),
 };
 
 export default api;

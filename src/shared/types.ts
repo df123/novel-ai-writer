@@ -244,3 +244,77 @@ export interface Model {
     completion: number | null;
   };
 }
+
+/**
+ * 数据库管理相关类型
+ */
+
+/**
+ * 表信息接口
+ * 表示数据库中一个表的结构信息
+ */
+export interface TableInfo {
+  /** 表名 */
+  name: string;
+  /** 列信息列表 */
+  columns: ColumnInfo[];
+  /** 表中的行数 */
+  rowCount: number;
+}
+
+/**
+ * 列信息接口
+ * 表示表中的一个列的结构信息
+ */
+export interface ColumnInfo {
+  /** 列名 */
+  name: string;
+  /** 列类型 */
+  type: string;
+  /** 是否为主键 */
+  primaryKey?: boolean;
+  /** 是否非空 */
+  notNull?: boolean;
+  /** 默认值 */
+  defaultValue?: any;
+}
+
+/**
+ * 表数据响应接口
+ * 表示查询表数据的响应
+ */
+export interface TableDataResponse<T = any> {
+  /** 数据列表 */
+  data: T[];
+  /** 分页信息 */
+  pagination: {
+    /** 当前页码 */
+    page: number;
+    /** 每页大小 */
+    pageSize: number;
+    /** 总记录数 */
+    total: number;
+    /** 总页数 */
+    totalPages: number;
+  };
+}
+
+/**
+ * 查询请求接口
+ * 表示自定义 SQL 查询请求
+ */
+export interface QueryRequest {
+  /** SQL 语句 */
+  sql: string;
+  /** 查询参数（可选） */
+  params?: any[];
+}
+
+/**
+ * 查询响应接口
+ * 表示自定义 SQL 查询的响应
+ */
+export interface QueryResponse {
+  /** 查询结果列表 */
+  results: any[];
+}
