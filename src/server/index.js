@@ -568,7 +568,23 @@ app.delete('/api/messages/:id', (req, res) => {
 // Timeline
 app.get('/api/projects/:projectId/timeline', (req, res) => {
   try {
-    const nodes = query('SELECT * FROM timeline_nodes WHERE project_id = ? ORDER BY order_index ASC', [req.params.projectId]);
+    const { title, content } = req.query;
+    let sql = 'SELECT * FROM timeline_nodes WHERE project_id = ?';
+    const params = [req.params.projectId];
+    
+    if (title) {
+      sql += ' AND title LIKE ?';
+      params.push(`%${title}%`);
+    }
+    
+    if (content) {
+      sql += ' AND content LIKE ?';
+      params.push(`%${content}%`);
+    }
+    
+    sql += ' ORDER BY order_index ASC';
+    
+    const nodes = query(sql, params);
     // Format for frontend compatibility
     const formattedNodes = nodes.map(n => {
       const { date, description } = parseTimelineContent(n.content);
@@ -710,7 +726,33 @@ app.post('/api/timeline/:nodeId/versions/:versionId/restore', (req, res) => {
 // Characters
 app.get('/api/projects/:projectId/characters', (req, res) => {
   try {
-    const characters = query('SELECT * FROM characters WHERE project_id = ? ORDER BY created_at ASC', [req.params.projectId]);
+    const { name, description, personality, background } = req.query;
+    let sql = 'SELECT * FROM characters WHERE project_id = ?';
+    const params = [req.params.projectId];
+    
+    if (name) {
+      sql += ' AND name LIKE ?';
+      params.push(`%${name}%`);
+    }
+    
+    if (description) {
+      sql += ' AND description LIKE ?';
+      params.push(`%${description}%`);
+    }
+    
+    if (personality) {
+      sql += ' AND personality LIKE ?';
+      params.push(`%${personality}%`);
+    }
+    
+    if (background) {
+      sql += ' AND background LIKE ?';
+      params.push(`%${background}%`);
+    }
+    
+    sql += ' ORDER BY created_at ASC';
+    
+    const characters = query(sql, params);
     // Format for frontend compatibility
     const formattedCharacters = characters.map(c => ({
       ...c,
