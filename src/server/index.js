@@ -680,6 +680,27 @@ app.delete('/api/timeline/:id', (req, res) => {
   }
 });
 
+app.get('/api/timeline/:id', (req, res) => {
+  try {
+    const nodes = query('SELECT * FROM timeline_nodes WHERE id = ?', [req.params.id]);
+    if (nodes.length === 0) {
+      return res.status(404).json({ error: 'Timeline node not found' });
+    }
+    const { date, description } = parseTimelineContent(nodes[0].content);
+    const node = {
+      ...nodes[0],
+      date,
+      description,
+      projectId: nodes[0].project_id,
+      orderIndex: nodes[0].order_index,
+      createdAt: nodes[0].created_at
+    };
+    res.json(node);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/timeline/:nodeId/versions', (req, res) => {
   try {
     const versions = query('SELECT * FROM timeline_versions WHERE timeline_node_id = ? ORDER BY version DESC', [req.params.nodeId]);
@@ -832,6 +853,24 @@ app.delete('/api/characters/:id', (req, res) => {
     run('DELETE FROM characters WHERE id = ?', [req.params.id]);
     saveDB();
     res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/characters/:id', (req, res) => {
+  try {
+    const characters = query('SELECT * FROM characters WHERE id = ?', [req.params.id]);
+    if (characters.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+    const character = {
+      ...characters[0],
+      avatar: characters[0].avatar_url,
+      projectId: characters[0].project_id,
+      createdAt: characters[0].created_at
+    };
+    res.json(character);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

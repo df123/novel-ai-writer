@@ -38,7 +38,15 @@ export const messageApi = {
 
 // Timeline
 export const timelineApi = {
-  list: (projectId: string) => api.get(`/projects/${projectId}/timeline`),
+  list: (projectId: string, filters?: { title?: string; content?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.title) params.append('title', filters.title);
+    if (filters?.content) params.append('content', filters.content);
+    const queryString = params.toString();
+    const url = `/projects/${projectId}/timeline${queryString ? `?${queryString}` : ''}`;
+    return api.get(url);
+  },
+  get: (id: string) => api.get(`/timeline/${id}`),
   create: (projectId: string, data: { title: string; content?: string; orderIndex?: number }) =>
     api.post(`/projects/${projectId}/timeline`, data),
   update: (id: string, data: { title: string; content?: string; orderIndex?: number; createVersion?: boolean }) =>
@@ -50,7 +58,17 @@ export const timelineApi = {
 
 // Characters
 export const characterApi = {
-  list: (projectId: string) => api.get(`/projects/${projectId}/characters`),
+  list: (projectId: string, filters?: { name?: string; description?: string; personality?: string; background?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.name) params.append('name', filters.name);
+    if (filters?.description) params.append('description', filters.description);
+    if (filters?.personality) params.append('personality', filters.personality);
+    if (filters?.background) params.append('background', filters.background);
+    const queryString = params.toString();
+    const url = `/projects/${projectId}/characters${queryString ? `?${queryString}` : ''}`;
+    return api.get(url);
+  },
+  get: (id: string) => api.get(`/characters/${id}`),
   create: (
     projectId: string,
     data: {

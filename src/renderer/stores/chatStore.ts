@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { Message, Chat } from '../../shared/types';
-import { chatApi, messageApi, llmApi } from '../utils/api';
+import { Message, Chat, TimelineNode, Character } from '../../shared/types';
+import { chatApi, messageApi, llmApi, timelineApi, characterApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
 import { ALL_TOOLS } from '../utils/tools';
@@ -429,62 +429,146 @@ export const useChatStore = defineStore('chat', () => {
             return JSON.stringify({ success: true, message: `已删除人物: ${character.name}` });
           }
           case 'get_timeline': {
-            if (parsedArgs.id) {
-              const node = timelineStore.nodes.find(n => n.id === parsedArgs.id);
-              if (node) {
+            // 检查是否选择了项目
+            if (!projectStore.currentProject) {
+              return JSON.stringify({ 
+                success: false, 
+                message: '未选择项目，请先选择一个项目' 
+              });
+            }
+
+            try {
+              if (parsedArgs.id) {
+                // 使用 API 获取指定 ID 的时间线节点
+                const response = await timelineApi.get(parsedArgs.id);
+                const node = response.data;
+                if (node) {
+                  return JSON.stringify({
+                    success: true,
+                    data: {
+                      id: node.id,
+                      title: node.title,
+                      description: node.content || '',
+                    },
+                  });
+                }
+                return JSON.stringify({ success: false, message: `未找到时间线节点: ${parsedArgs.id}` });
+              } else {
+                // 使用 API 进行服务器端筛选，避免重复筛选
+                const filters: { title?: string; content?: string } = {};
+                
+                // 验证并添加筛选条件（仅非空字符串）
+                if (parsedArgs.title && parsedArgs.title.trim()) {
+                  filters.title = parsedArgs.title.trim();
+                }
+                
+                if (parsedArgs.content && parsedArgs.content.trim()) {
+                  filters.content = parsedArgs.content.trim();
+                }
+                
+                // 从 API 获取筛选后的结果
+                const response = await timelineApi.list(projectStore.currentProject.id, filters);
+                const nodes = response.data.map((n: TimelineNode) => ({
+                  id: n.id,
+                  title: n.title,
+                  description: n.content || '',
+                }));
+                
                 return JSON.stringify({
                   success: true,
-                  data: {
-                    id: node.id,
-                    title: node.title,
-                    description: node.content || '',
+                  data: nodes,
+                  count: nodes.length,
+                  filters: {
+                    title: filters.title || null,
+                    content: filters.content || null,
                   },
                 });
               }
-              return JSON.stringify({ success: false, message: `未找到时间线节点: ${parsedArgs.id}` });
-            } else {
-              const nodes = timelineStore.nodes.map(n => ({
-                id: n.id,
-                title: n.title,
-                description: n.content || '',
-              }));
-              return JSON.stringify({
-                success: true,
-                data: nodes,
-                count: nodes.length,
+            } catch (error) {
+              console.error('[get_timeline] Failed to fetch timeline nodes:', error);
+              return JSON.stringify({ 
+                success: false, 
+                message: '获取时间线节点失败，请稍后重试' 
               });
             }
           }
           case 'get_character': {
-            if (parsedArgs.id) {
-              const character = characterStore.characters.find(c => c.id === parsedArgs.id);
-              if (character) {
+            // 检查是否选择了项目
+            if (!projectStore.currentProject) {
+              return JSON.stringify({ 
+                success: false, 
+                message: '未选择项目，请先选择一个项目' 
+              });
+            }
+
+            try {
+              if (parsedArgs.id) {
+                // 使用 API 获取指定 ID 的人物
+                const response = await characterApi.get(parsedArgs.id);
+                const character = response.data;
+                if (character) {
+                  return JSON.stringify({
+                    success: true,
+                    data: {
+                      id: character.id,
+                      name: character.name,
+                      description: character.description || '',
+                      personality: character.personality || '',
+                      background: character.background || '',
+                      relationships: character.relationships || '',
+                    },
+                  });
+                }
+                return JSON.stringify({ success: false, message: `未找到人物: ${parsedArgs.id}` });
+              } else {
+                // 使用 API 进行服务器端筛选，避免重复筛选
+                const filters: { name?: string; description?: string; personality?: string; background?: string } = {};
+                
+                // 验证并添加筛选条件（仅非空字符串）
+                if (parsedArgs.name && parsedArgs.name.trim()) {
+                  filters.name = parsedArgs.name.trim();
+                }
+                
+                if (parsedArgs.description && parsedArgs.description.trim()) {
+                  filters.description = parsedArgs.description.trim();
+                }
+                
+                if (parsedArgs.personality && parsedArgs.personality.trim()) {
+                  filters.personality = parsedArgs.personality.trim();
+                }
+                
+                if (parsedArgs.background && parsedArgs.background.trim()) {
+                  filters.background = parsedArgs.background.trim();
+                }
+                
+                // 从 API 获取筛选后的结果
+                const response = await characterApi.list(projectStore.currentProject.id, filters);
+                const characters = response.data.map((c: Character) => ({
+                  id: c.id,
+                  name: c.name,
+                  description: c.description || '',
+                  personality: c.personality || '',
+                  background: c.background || '',
+                  relationships: c.relationships || '',
+                }));
+                
                 return JSON.stringify({
                   success: true,
-                  data: {
-                    id: character.id,
-                    name: character.name,
-                    description: character.description || '',
-                    personality: character.personality || '',
-                    background: character.background || '',
-                    relationships: character.relationships || '',
+                  data: characters,
+                  count: characters.length,
+                  filters: {
+                    name: filters.name || null,
+                    description: filters.description || null,
+                    personality: filters.personality || null,
+                    background: filters.background || null,
                   },
                 });
               }
-              return JSON.stringify({ success: false, message: `未找到人物: ${parsedArgs.id}` });
-            } else {
-              const characters = characterStore.characters.map(c => ({
-                id: c.id,
-                name: c.name,
-                description: c.description || '',
-                personality: c.personality || '',
-                background: c.background || '',
-                relationships: c.relationships || '',
-              }));
-              return JSON.stringify({
-                success: true,
-                data: characters,
-                count: characters.length,
+            } catch (error) {
+              console.error('[get_character] Failed to fetch characters:', error);
+              return JSON.stringify({ 
+                success: false, 
+                message: '获取人物失败，请稍后重试' 
               });
             }
           }

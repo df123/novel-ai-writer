@@ -112,14 +112,22 @@ export const getTimelineTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'get_timeline',
-    description: '查询时间线节点列表或指定ID的时间线节点详情。如果不提供id参数，返回所有时间线节点列表。',
+    description: '查询时间线节点列表。可以通过 ID、标题或内容进行筛选。如果提供 id 参数，则返回指定 ID 的节点详情；否则返回筛选后的节点列表。',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         id: {
           type: 'string',
-          description: '时间线节点的 ID（可选，不提供则返回所有节点）',
+          description: '时间线节点的 ID（可选，提供则返回指定 ID 的节点详情）',
+        },
+        title: {
+          type: 'string',
+          description: '按标题筛选（可选，模糊匹配）',
+        },
+        content: {
+          type: 'string',
+          description: '按内容筛选（可选，模糊匹配）',
         },
       },
       required: [],
@@ -240,14 +248,30 @@ export const getCharacterTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'get_character',
-    description: '查询人物列表或指定ID的人物详情。如果不提供id参数，返回所有人物列表。',
+    description: '查询人物列表。可以通过 ID、姓名、描述、性格或背景进行筛选。如果提供 id 参数，则返回指定 ID 的人物详情；否则返回筛选后的人物列表。',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         id: {
           type: 'string',
-          description: '人物的 ID（可选，不提供则返回所有人物）',
+          description: '人物的 ID（可选，提供则返回指定 ID 的人物详情）',
+        },
+        name: {
+          type: 'string',
+          description: '按姓名筛选（可选，模糊匹配）',
+        },
+        description: {
+          type: 'string',
+          description: '按描述筛选（可选，模糊匹配）',
+        },
+        personality: {
+          type: 'string',
+          description: '按性格筛选（可选，模糊匹配）',
+        },
+        background: {
+          type: 'string',
+          description: '按背景筛选（可选，模糊匹配）',
         },
       },
       required: [],
