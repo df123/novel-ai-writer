@@ -118,8 +118,8 @@ export const settingsApi = {
 
 // Models
 export const modelsApi = {
-  list: (provider: string, apiKey: string) => 
-    api.post(`/models/${provider}`, { apiKey }),
+  list: (provider: string, apiKey: string) =>
+    api.post(`/llm/models/${provider}`, { apiKey }),
 };
 
 // Prompts

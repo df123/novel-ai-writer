@@ -31,17 +31,17 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-// 注册路由
+// 注册路由（具体路径优先于通用路径）
 app.use('/api/projects', projectsRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/llm', llmRouter);
+app.use('/api/prompts', promptsRouter);
+app.use('/api/db', databaseRouter);
 app.use('/api', chatsRouter);
 app.use('/api', messagesRouter);
 app.use('/api', timelineRouter);
 app.use('/api', charactersRouter);
-app.use('/api/llm', llmRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/prompts', promptsRouter);
 app.use('/api', exportRouter);
-app.use('/api/db', databaseRouter);
 
 // 404 处理
 app.use(notFoundHandler);
