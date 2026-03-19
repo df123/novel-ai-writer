@@ -47,7 +47,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     }
   };
 
-  const updateNode = async (id: string, updates: Partial<TimelineNode>) => {
+  const updateNode = async (id: string, updates: Partial<TimelineNode> & { createVersion?: boolean }) => {
     const node = nodes.value.find(n => n.id === id);
     if (!node) return;
 
@@ -56,6 +56,7 @@ export const useTimelineStore = defineStore('timeline', () => {
         title: updates.title ?? node.title,
         content: updates.content ?? (node.content ?? ''),
         orderIndex: updates.orderIndex ?? node.orderIndex,
+        createVersion: updates.createVersion,
       });
 
       nodes.value = nodes.value.map(n => (n.id === id ? response.data : n));

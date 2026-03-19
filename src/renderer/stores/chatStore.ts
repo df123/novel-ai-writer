@@ -271,6 +271,7 @@ export const useChatStore = defineStore('chat', () => {
             await timelineStore.updateNode(parsedArgs.id, {
               title: parsedArgs.title,
               content: parsedArgs.description,
+              createVersion: true,
             });
             return JSON.stringify({ success: true, message: `已更新时间线节点: ${parsedArgs.title || node.title}` });
           }
@@ -383,6 +384,7 @@ export const useChatStore = defineStore('chat', () => {
               background: parsedArgs.background,
               relationships: parsedArgs.relationships,
               description: parsedArgs.description,
+              createVersion: true,
             });
             return JSON.stringify({ success: true, message: `已更新人物: ${parsedArgs.name || character.name}` });
           }

@@ -41,7 +41,11 @@ export const useCharacterStore = defineStore('character', () => {
 
   const updateCharacter = async (id: string, updates: Partial<Character> & { createVersion?: boolean }) => {
     try {
-      const response = await characterApi.update(id, updates);
+      const { createVersion, ...characterUpdates } = updates;
+      const response = await characterApi.update(id, {
+        ...characterUpdates,
+        createVersion,
+      });
       const updated = response.data;
       characters.value = characters.value.map(c => (c.id === id ? updated : c));
     } catch (error) {

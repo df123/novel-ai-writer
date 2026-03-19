@@ -86,6 +86,7 @@ export const characterApi = {
       description?: string;
       personality?: string;
       background?: string;
+      relationships?: string;
       avatar?: string;
       createVersion?: boolean;
     },

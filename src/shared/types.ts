@@ -188,6 +188,9 @@ export interface CharacterVersion {
   /** 版本的人物背景（可选） */
   background?: string;
   
+  /** 版本的人物关系描述（可选） */
+  relationships?: string;
+  
   /** 版本的头像 URL（可选） */
   avatar?: string;
   
