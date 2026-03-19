@@ -817,21 +817,72 @@ app.put('/api/characters/:id', (req, res) => {
     const { name, description, personality, background, relationships, avatar, createVersion } = req.body;
     const updatedAt = now();
 
-    if (createVersion) {
-      const existingCharacters = query('SELECT * FROM characters WHERE id = ?', [req.params.id]);
-      if (existingCharacters.length > 0) {
-        const existingCharacter = existingCharacters[0];
-        const versionCount = query('SELECT COUNT(*) as count FROM character_versions WHERE character_id = ?', [req.params.id])[0].count;
-        const newVersion = versionCount + 1;
-        const versionId = generateId();
-
-        run('INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [versionId, req.params.id, existingCharacter.name, existingCharacter.description ?? null, existingCharacter.personality ?? null, existingCharacter.background ?? null, existingCharacter.relationships ?? null, existingCharacter.avatar_url ?? null, newVersion, now()]);
-      }
+    // Check if character exists
+    const existingCharacters = query('SELECT * FROM characters WHERE id = ?', [req.params.id]);
+    if (existingCharacters.length === 0) {
+      return res.status(404).json({ error: 'Character not found' });
     }
 
-    run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
-      [name, description ?? null, personality ?? null, background ?? null, relationships ?? null, avatar ?? null, updatedAt, req.params.id]);
+    if (createVersion) {
+      const existingCharacter = existingCharacters[0];
+      const versionCount = query('SELECT COUNT(*) as count FROM character_versions WHERE character_id = ?', [req.params.id])[0].count;
+      const newVersion = versionCount + 1;
+      const versionId = generateId();
+
+      run('INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [versionId, req.params.id, existingCharacter.name, existingCharacter.description ?? null, existingCharacter.personality ?? null, existingCharacter.background ?? null, existingCharacter.relationships ?? null, existingCharacter.avatar_url ?? null, newVersion, now()]);
+    }
+
+    // Build dynamic UPDATE statement - only update fields that are provided (not undefined)
+    const updates = [];
+    const values = [];
+
+    if (name !== undefined) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push('description = ?');
+      values.push(description);
+    }
+    if (personality !== undefined) {
+      updates.push('personality = ?');
+      values.push(personality);
+    }
+    if (background !== undefined) {
+      updates.push('background = ?');
+      values.push(background);
+    }
+    if (relationships !== undefined) {
+      updates.push('relationships = ?');
+      values.push(relationships);
+    }
+    if (avatar !== undefined) {
+      updates.push('avatar_url = ?');
+      values.push(avatar);
+    }
+
+    // Check if there are any fields to update (excluding updated_at)
+    if (updates.length === 0) {
+      // No fields to update, just return the existing character
+      const character = {
+        ...existingCharacters[0],
+        avatar: existingCharacters[0].avatar_url,
+        projectId: existingCharacters[0].project_id,
+        createdAt: existingCharacters[0].created_at
+      };
+      return res.json(character);
+    }
+
+    // Always update updated_at
+    updates.push('updated_at = ?');
+    values.push(updatedAt);
+
+    // Add WHERE clause parameter
+    values.push(req.params.id);
+
+    const updateSQL = `UPDATE characters SET ${updates.join(', ')} WHERE id = ?`;
+    run(updateSQL, values);
 
     saveDB();
 
@@ -844,6 +895,7 @@ app.put('/api/characters/:id', (req, res) => {
     };
     res.json(character);
   } catch (error) {
+    console.error('Error in PUT /api/characters/:id:', error);
     res.status(500).json({ error: error.message });
   }
 });
