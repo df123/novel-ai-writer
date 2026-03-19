@@ -231,24 +231,84 @@ export const useChatStore = defineStore('chat', () => {
               });
             }
             await timelineStore.createNode(parsedArgs.title, parsedArgs.description);
-            return JSON.stringify({ success: true, message: `Created timeline node: ${parsedArgs.title}` });
+            return JSON.stringify({ success: true, message: `已创建时间线节点: ${parsedArgs.title}` });
           }
           case 'update_timeline': {
-            if (parsedArgs.id) {
-              await timelineStore.updateNode(parsedArgs.id, {
-                title: parsedArgs.title,
-                content: parsedArgs.description,
+            if (!parsedArgs.id) {
+              // 自动获取所有时间线节点
+              const nodes = timelineStore.nodes.map(n => ({
+                id: n.id,
+                title: n.title,
+                description: n.content || '',
+              }));
+              return JSON.stringify({ 
+                success: false, 
+                message: '缺少必需的 id 参数',
+                hint: '请先调用 get_timeline() 获取所有时间线节点的 ID 列表，或使用 get_timeline(id="xxx") 获取特定节点',
+                example: 'get_timeline() 或 get_timeline(id="节点ID")',
+                availableNodes: nodes.length > 0 ? nodes : undefined,
+                suggestion: nodes.length > 0 
+                  ? `当前有 ${nodes.length} 个时间线节点，请选择要更新的节点并使用其 ID 调用 update_timeline`
+                  : '当前没有时间线节点，请先使用 create_timeline 创建'
               });
-              return JSON.stringify({ success: true, message: `Updated timeline node: ${parsedArgs.title}` });
             }
-            return JSON.stringify({ success: false, message: 'Missing required id' });
+            
+            // 验证 id 是否存在
+            const node = timelineStore.nodes.find(n => n.id === parsedArgs.id);
+            if (!node) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `未找到时间线节点: ${parsedArgs.id}`,
+                hint: '请先调用 get_timeline() 获取所有时间线节点的 ID 列表',
+                availableNodes: timelineStore.nodes.map(n => ({
+                  id: n.id,
+                  title: n.title,
+                  description: n.content || '',
+                }))
+              });
+            }
+            
+            await timelineStore.updateNode(parsedArgs.id, {
+              title: parsedArgs.title,
+              content: parsedArgs.description,
+            });
+            return JSON.stringify({ success: true, message: `已更新时间线节点: ${parsedArgs.title || node.title}` });
           }
           case 'delete_timeline': {
-            if (parsedArgs.id) {
-              await timelineStore.deleteNode(parsedArgs.id);
-              return JSON.stringify({ success: true, message: `Deleted timeline node` });
+            if (!parsedArgs.id) {
+              const nodes = timelineStore.nodes.map(n => ({
+                id: n.id,
+                title: n.title,
+                description: n.content || '',
+              }));
+              return JSON.stringify({ 
+                success: false, 
+                message: '缺少必需的 id 参数',
+                hint: '请先调用 get_timeline() 获取所有时间线节点的 ID 列表',
+                example: 'get_timeline() 或 get_timeline(id="节点ID")',
+                availableNodes: nodes.length > 0 ? nodes : undefined,
+                suggestion: nodes.length > 0 
+                  ? `当前有 ${nodes.length} 个时间线节点，请选择要删除的节点并使用其 ID 调用 delete_timeline`
+                  : '当前没有时间线节点'
+              });
             }
-            return JSON.stringify({ success: false, message: 'Missing required id' });
+            
+            const node = timelineStore.nodes.find(n => n.id === parsedArgs.id);
+            if (!node) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `未找到时间线节点: ${parsedArgs.id}`,
+                hint: '请先调用 get_timeline() 获取所有时间线节点的 ID 列表',
+                availableNodes: timelineStore.nodes.map(n => ({
+                  id: n.id,
+                  title: n.title,
+                  description: n.content || '',
+                }))
+              });
+            }
+            
+            await timelineStore.deleteNode(parsedArgs.id);
+            return JSON.stringify({ success: true, message: `已删除时间线节点: ${node.title}` });
           }
           case 'create_character': {
             const existingCharacter = characterStore.characters.find(c => c.name === parsedArgs.name);
@@ -274,27 +334,99 @@ export const useChatStore = defineStore('chat', () => {
               relationships: parsedArgs.relationships,
               description: parsedArgs.description,
             });
-            return JSON.stringify({ success: true, message: `Created character: ${parsedArgs.name}` });
+            return JSON.stringify({ success: true, message: `已创建人物: ${parsedArgs.name}` });
           }
           case 'update_character': {
-            if (parsedArgs.id) {
-              await characterStore.updateCharacter(parsedArgs.id, {
-                name: parsedArgs.name,
-                personality: parsedArgs.personality,
-                background: parsedArgs.background,
-                relationships: parsedArgs.relationships,
-                description: parsedArgs.description,
+            if (!parsedArgs.id) {
+              // 自动获取所有人物
+              const characters = characterStore.characters.map(c => ({
+                id: c.id,
+                name: c.name,
+                description: c.description || '',
+                personality: c.personality || '',
+                background: c.background || '',
+                relationships: c.relationships || '',
+              }));
+              return JSON.stringify({ 
+                success: false, 
+                message: '缺少必需的 id 参数',
+                hint: '请先调用 get_character() 获取所有人物的 ID 列表，或使用 get_character(id="xxx") 获取特定人物',
+                example: 'get_character() 或 get_character(id="人物ID")',
+                availableCharacters: characters.length > 0 ? characters : undefined,
+                suggestion: characters.length > 0 
+                  ? `当前有 ${characters.length} 个人物，请选择要更新的人物并使用其 ID 调用 update_character`
+                  : '当前没有人物，请先使用 create_character 创建'
               });
-              return JSON.stringify({ success: true, message: `Updated character: ${parsedArgs.name}` });
             }
-            return JSON.stringify({ success: false, message: 'Missing required id' });
+            
+            // 验证 id 是否存在
+            const character = characterStore.characters.find(c => c.id === parsedArgs.id);
+            if (!character) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `未找到人物: ${parsedArgs.id}`,
+                hint: '请先调用 get_character() 获取所有人物的 ID 列表',
+                availableCharacters: characterStore.characters.map(c => ({
+                  id: c.id,
+                  name: c.name,
+                  description: c.description || '',
+                  personality: c.personality || '',
+                  background: c.background || '',
+                  relationships: c.relationships || '',
+                }))
+              });
+            }
+            
+            await characterStore.updateCharacter(parsedArgs.id, {
+              name: parsedArgs.name,
+              personality: parsedArgs.personality,
+              background: parsedArgs.background,
+              relationships: parsedArgs.relationships,
+              description: parsedArgs.description,
+            });
+            return JSON.stringify({ success: true, message: `已更新人物: ${parsedArgs.name || character.name}` });
           }
           case 'delete_character': {
-            if (parsedArgs.id) {
-              await characterStore.deleteCharacter(parsedArgs.id);
-              return JSON.stringify({ success: true, message: `Deleted character` });
+            if (!parsedArgs.id) {
+              const characters = characterStore.characters.map(c => ({
+                id: c.id,
+                name: c.name,
+                description: c.description || '',
+                personality: c.personality || '',
+                background: c.background || '',
+                relationships: c.relationships || '',
+              }));
+              return JSON.stringify({ 
+                success: false, 
+                message: '缺少必需的 id 参数',
+                hint: '请先调用 get_character() 获取所有人物的 ID 列表',
+                example: 'get_character() 或 get_character(id="人物ID")',
+                availableCharacters: characters.length > 0 ? characters : undefined,
+                suggestion: characters.length > 0 
+                  ? `当前有 ${characters.length} 个人物，请选择要删除的人物并使用其 ID 调用 delete_character`
+                  : '当前没有人物'
+              });
             }
-            return JSON.stringify({ success: false, message: 'Missing required id' });
+            
+            const character = characterStore.characters.find(c => c.id === parsedArgs.id);
+            if (!character) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `未找到人物: ${parsedArgs.id}`,
+                hint: '请先调用 get_character() 获取所有人物的 ID 列表',
+                availableCharacters: characterStore.characters.map(c => ({
+                  id: c.id,
+                  name: c.name,
+                  description: c.description || '',
+                  personality: c.personality || '',
+                  background: c.background || '',
+                  relationships: c.relationships || '',
+                }))
+              });
+            }
+            
+            await characterStore.deleteCharacter(parsedArgs.id);
+            return JSON.stringify({ success: true, message: `已删除人物: ${character.name}` });
           }
           case 'get_timeline': {
             if (parsedArgs.id) {
@@ -309,7 +441,7 @@ export const useChatStore = defineStore('chat', () => {
                   },
                 });
               }
-              return JSON.stringify({ success: false, message: `Timeline node not found: ${parsedArgs.id}` });
+              return JSON.stringify({ success: false, message: `未找到时间线节点: ${parsedArgs.id}` });
             } else {
               const nodes = timelineStore.nodes.map(n => ({
                 id: n.id,
@@ -339,7 +471,7 @@ export const useChatStore = defineStore('chat', () => {
                   },
                 });
               }
-              return JSON.stringify({ success: false, message: `Character not found: ${parsedArgs.id}` });
+              return JSON.stringify({ success: false, message: `未找到人物: ${parsedArgs.id}` });
             } else {
               const characters = characterStore.characters.map(c => ({
                 id: c.id,
