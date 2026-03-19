@@ -12,7 +12,7 @@
 
 ### 代码质量
 - `pnpm typecheck` - 运行 TypeScript 类型检查（noEmit）
-- `pnpm lint` - 在 src/ 目录运行 ESLint（.ts, .tsx 文件）
+- `pnpm lint` - 在 src/ 目录运行 ESLint（.ts, .vue 文件）
 
 ### 测试
 当前未配置测试框架。添加测试时，请先查看 README 或询问合适的测试命令。
@@ -21,28 +21,28 @@
 
 ### 导入顺序
 导入语句应遵循以下顺序：
-1. React 和框架导入
-2. 第三方库（MUI 组件等）
-3. 第三方图标（@mui/icons-material/*）
+1. Vue 和框架导入
+2. 第三方库（Element Plus 组件等）
+3. 第三方图标（@element-plus/icons-vue）
 4. 本地导入（stores, components, utils）
 5. 共享导入（@shared/*）
 
 示例：
 ```typescript
-import React, { useEffect, useState } from 'react';
-import { Box, Button, TextField, Typography } from '@mui/material';
-import HomeIcon from '@mui/icons-material/Home';
+import { ref, computed, onMounted } from 'vue';
+import { ElButton, ElInput, ElMessage } from 'element-plus';
+import { HomeFilled } from '@element-plus/icons-vue';
 import { useChatStore } from '../store/chatStore';
 import { formatTimestamp } from '../../shared/utils';
 ```
 
 ### 命名规范
-- **文件**: camelCase（例如：`chatStore.ts`，组件使用 PascalCase 如 `ChatPanel.tsx`）
-- **组件**: PascalCase，使用默认导出（例如：`export default function ChatPanel()`）
+- **文件**: camelCase（例如：`chatStore.ts`，组件使用 PascalCase 如 `ChatPanel.vue`）
+- **组件**: PascalCase，使用 `<script setup>` 语法（例如：`<script setup lang="ts">`）
 - **函数/变量**: camelCase（例如：`loadMessages`, `isLoading`）
 - **接口/类型**: PascalCase（例如：`Message`, `ChatState`）
 - **常量**: 模块级常量使用 UPPER_SNAKE_CASE
-- **Store**: Zustand hooks 前缀使用 `use`（例如：`useChatStore`, `useProjectStore`）
+- **Store**: Pinia stores 命名为 `use*Store`（例如：`useChatStore`, `useProjectStore`）
 
 ### TypeScript
 - 对象形状使用 `interface`，联合类型/别名使用 `type`
@@ -51,15 +51,16 @@ import { formatTimestamp } from '../../shared/utils';
 - 从 `@shared/types` 导入共享类型
 - 仅在必要时使用 `any`，未类型化数据优先使用 `unknown`
 
-### React 组件
-- 使用函数式组件和 hooks
-- 简单 props 内联定义接口，复杂 props 单独定义
-- 必要时使用显式泛型 `const [state, setState] = useState<T>()`
-- 使用显式类型 `React.useRef<T>()` 定义 refs
+### Vue 组件
+- 使用 `<script setup>` 语法和 Composition API
+- 使用 `ref`、`computed`、`onMounted` 等 Vue 3 组合式 API
+- Props 使用 `defineProps<T>()` 定义
+- Emits 使用 `defineEmits<T>()` 定义
+- 使用 `ref<T>()` 和 `reactive<T>()` 定义响应式数据
 
-### 状态管理（Zustand）
+### 状态管理（Pinia）
 - 在 store 文件顶部定义状态接口
-- Store hooks 命名为 `use*Store`（例如：`useChatStore`）
+- Store hooks 命名为 `use*Store`（例如：`useChatStore`, `useProjectStore`）
 - API 调用使用带 try-catch 块的异步 actions
 - 使用 `get()` 在 actions 内访问状态，`set()` 更新状态
 - 在异步 actions 中使用 `useOtherStore.getState()` 访问其他 stores
@@ -76,11 +77,11 @@ import { formatTimestamp } from '../../shared/utils';
 - 关键失败抛出错误（例如：缺少项目）
 - 适当设置加载状态（之前 `isLoading: true`，之后/错误 `false`）
 
-### 样式（MUI）
-- 使用 `sx` prop 进行组件样式设置
-- 在 `sx` prop 中使用 MUI 间距值（例如：`p: 2`, `mb: 1`）
-- 优先使用简写属性：`flex: 1` 而不是 `flexGrow: 1`
-- 必要时使用 `boxSizing: 'border-box'`
+### 样式（Element Plus）
+- 使用 `class` 和 `style` 进行组件样式设置
+- Element Plus 组件支持多种样式配置方式
+- 优先使用 CSS 类名进行样式管理
+- 必要时使用内联样式进行动态样式设置
 
 ### 服务器代码（src/server/index.js）
 - 服务器当前使用 JavaScript（非 TypeScript）
@@ -96,9 +97,9 @@ import { formatTimestamp } from '../../shared/utils';
 
 ### 文件结构
 - `src/shared/` - 共享工具、类型、常量
-- `src/renderer/` - React 前端
-  - `components/` - React 组件
-  - `store/` - Zustand stores
+- `src/renderer/` - Vue 前端
+  - `components/` - Vue 组件
+  - `stores/` - Pinia stores
   - `utils/` - 前端工具和 API 层
 - `src/server/` - Express 服务器（JavaScript）
 
