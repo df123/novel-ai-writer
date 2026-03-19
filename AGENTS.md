@@ -44,6 +44,12 @@ import { formatTimestamp } from '../../shared/utils';
 - **常量**: 模块级常量使用 UPPER_SNAKE_CASE
 - **Store**: Pinia stores 命名为 `use*Store`（例如：`useChatStore`, `useProjectStore`）
 
+### 代码注释
+- **注释语言**: 所有注释必须使用中文
+- **注释原则**: 非必要不添加注释，代码本身应足够清晰
+- **注释维护**: 当注释与代码逻辑不符合时，必须修改注释使其符合代码逻辑
+- **注释时机**: 仅在代码逻辑复杂、业务逻辑特殊或需要特别说明的情况下添加注释
+
 ### TypeScript
 - 对象形状使用 `interface`，联合类型/别名使用 `type`
 - 可选属性用 `?` 标记（例如：`description?: string`）
