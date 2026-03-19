@@ -102,7 +102,7 @@
     <el-dialog
       v-model="versionsDialogOpen"
       title="版本历史"
-      width="700px"
+      width="800px"
     >
       <div v-if="isLoadingVersions" style="text-align: center; padding: 20px">
         <el-icon class="is-loading" :size="24">
@@ -110,32 +110,57 @@
         </el-icon>
         <div style="margin-top: 8px; color: #999">加载中...</div>
       </div>
-      <div v-else-if="versions.length === 0" style="text-align: center; padding: 40px; color: #999">
+      <div v-else-if="currentVersions.length === 0" style="text-align: center; padding: 40px; color: #999">
         暂无版本记录
       </div>
-      <div v-else style="max-height: 400px; overflow-y: auto">
+      <div v-else style="max-height: 500px; overflow-y: auto; padding: 4px">
         <div
-          v-for="version in versions"
+          v-for="(version, index) in currentVersions"
           :key="version.id"
-          style="padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; margin-bottom: 8px"
+          class="version-item"
+          :class="{ 'version-latest': index === 0 }"
         >
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-            <span style="font-weight: 500">版本 {{ version.version }}</span>
-            <el-button type="primary" size="small" @click="handleRestoreVersion(version.id)">
+          <div class="version-header">
+            <div class="version-badge" :class="{ 'latest-badge': index === 0 }">
+              <span v-if="index === 0" style="font-size: 11px; margin-right: 4px">🔥</span>
+              v{{ version.version }}
+            </div>
+            <el-tag size="small" type="info">
+              {{ formatVersionDate(version.createdAt) }}
+            </el-tag>
+          </div>
+          <div class="version-content">
+            <div class="version-row">
+              <span class="version-label">姓名:</span>
+              <span class="version-value">{{ version.name || '-' }}</span>
+            </div>
+            <div v-if="version.description" class="version-row">
+              <span class="version-label">描述:</span>
+              <span class="version-value">{{ version.description }}</span>
+            </div>
+            <div v-if="version.personality" class="version-row">
+              <span class="version-label">性格:</span>
+              <span class="version-value">{{ version.personality }}</span>
+            </div>
+            <div v-if="version.background" class="version-row">
+              <span class="version-label">背景:</span>
+              <span class="version-value multi-line">{{ version.background }}</span>
+            </div>
+            <div v-if="version.relationships" class="version-row">
+              <span class="version-label">关系:</span>
+              <span class="version-value multi-line">{{ version.relationships }}</span>
+            </div>
+          </div>
+          <div class="version-actions">
+            <el-button
+              type="primary"
+              size="small"
+              plain
+              :disabled="index === 0"
+              @click="handleRestoreVersion(version.id)"
+            >
               恢复此版本
             </el-button>
-          </div>
-          <div style="font-size: 13px; color: #666; margin-bottom: 4px">
-            姓名: {{ version.name }}
-          </div>
-          <div v-if="version.personality" style="font-size: 12px; color: #999">
-            性格: {{ version.personality }}
-          </div>
-          <div v-if="version.background" style="font-size: 12px; color: #999">
-            背景: {{ version.background }}
-          </div>
-          <div style="font-size: 11px; color: #ccc; margin-top: 4px">
-            {{ new Date(version.createdAt * 1000).toLocaleString('zh-CN') }}
           </div>
         </div>
       </div>
@@ -150,7 +175,7 @@ import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading } from 
 import { useCharacterStore } from '../stores/characterStore';
 
 const characterStore = useCharacterStore();
-const { characters, selectedCharacters, versions, isLoadingVersions } = storeToRefs(characterStore);
+const { characters, selectedCharacters, currentVersions, isLoadingVersions } = storeToRefs(characterStore);
 const { createCharacter, updateCharacter, deleteCharacter, toggleCharacterSelection, clearCharacterSelection, loadVersions, restoreVersion } = characterStore;
 
 const dialogOpen = ref(false);
@@ -231,7 +256,10 @@ const handleSubmit = async () => {
 const handleOpenVersionsDialog = async (characterId: string) => {
   versionCharacterId.value = characterId;
   versionsDialogOpen.value = true;
+  console.log('[CharacterPanel] Loading versions for character:', characterId);
   await loadVersions(characterId);
+  console.log('[CharacterPanel] Loaded versions:', currentVersions.value);
+  console.log('[CharacterPanel] Versions array:', currentVersions.value);
 };
 
 const handleRestoreVersion = async (versionId: string) => {
@@ -241,6 +269,41 @@ const handleRestoreVersion = async (versionId: string) => {
     versionsDialogOpen.value = false;
   } catch (error) {
     console.error('Failed to restore version:', error);
+  }
+};
+
+const formatVersionDate = (timestamp: number | undefined): string => {
+  if (timestamp == null || isNaN(timestamp) || timestamp < 1000000) {
+    return '未知时间';
+  }
+  try {
+    const date = new Date(timestamp * 1000);
+    if (isNaN(date.getTime())) {
+      return '时间无效';
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (hours === 0) {
+        const minutes = Math.floor(diffMs / (1000 * 60));
+        return minutes < 1 ? '刚刚' : `${minutes} 分钟前`;
+      }
+      return `${hours} 小时前`;
+    } else if (diffDays === 1) {
+      return '昨天';
+    } else if (diffDays < 7) {
+      return `${diffDays} 天前`;
+    } else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return `${weeks} 周前`;
+    } else {
+      return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  } catch {
+    return '时间解析错误';
   }
 };
 </script>
@@ -270,5 +333,86 @@ const handleRestoreVersion = async (versionId: string) => {
   right: 8px;
   opacity: 0;
   transition: opacity 0.2s;
+}
+
+.version-item {
+  padding: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: #fafafa;
+  transition: all 0.2s;
+}
+
+.version-item:hover {
+  border-color: #409eff;
+  background: #f0f9ff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.version-latest {
+  border-color: #67c23a;
+  background: #f0f9ff;
+}
+
+.version-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #909399;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.latest-badge {
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+}
+
+.version-content {
+  margin-bottom: 12px;
+}
+
+.version-row {
+  display: flex;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.version-label {
+  min-width: 50px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.version-value {
+  flex: 1;
+  color: #303133;
+  word-break: break-all;
+}
+
+.version-value.multi-line {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+}
+
+.version-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px dashed #e4e7ed;
 }
 </style>

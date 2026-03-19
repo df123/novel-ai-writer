@@ -9,6 +9,7 @@ export const useCharacterStore = defineStore('character', () => {
   const selectedCharacters = ref<Set<string>>(new Set());
   const isLoading = ref(false);
   const versions = ref<Map<string, CharacterVersion[]>>(new Map());
+  const currentVersions = ref<CharacterVersion[]>([]);
   const isLoadingVersions = ref(false);
 
   const loadCharacters = async (projectId: string) => {
@@ -75,9 +76,15 @@ export const useCharacterStore = defineStore('character', () => {
 
   const loadVersions = async (characterId: string) => {
     isLoadingVersions.value = true;
+    currentVersions.value = [];
     try {
       const response = await characterApi.getVersions(characterId);
+      console.log('[characterStore] API response:', response);
+      console.log('[characterStore] Response data:', response.data);
+      console.log('[characterStore] Response data type:', typeof response.data);
       versions.value.set(characterId, response.data);
+      currentVersions.value = response.data;
+      console.log('[characterStore] Versions map after setting:', versions.value);
     } catch (error) {
       console.error('Failed to load character versions:', error);
     } finally {
@@ -110,6 +117,7 @@ export const useCharacterStore = defineStore('character', () => {
     selectedCharacters,
     isLoading,
     versions,
+    currentVersions,
     isLoadingVersions,
     loadCharacters,
     createCharacter,

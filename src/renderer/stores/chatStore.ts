@@ -185,7 +185,7 @@ export const useChatStore = defineStore('chat', () => {
       ALL_TOOLS
     );
 
-    const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
+    const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
       .filter(m => m.role !== 'system')
       .filter(m => 
         m.role === 'tool' || 
@@ -197,9 +197,9 @@ export const useChatStore = defineStore('chat', () => {
           return { role: m.role as 'tool', tool_call_id: m.tool_call_id, content: m.content };
         }
         if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
-          return { role: m.role as 'assistant', content: m.content || '', tool_calls: m.tool_calls };
+          return { role: m.role as 'assistant', content: m.content || '', reasoning_content: m.reasoning_content, tool_calls: m.tool_calls };
         }
-        return { role: m.role, content: m.content };
+        return { role: m.role, content: m.content, reasoning_content: m.reasoning_content };
       });
 
     const baseMessagesForLLM: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = [];

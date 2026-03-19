@@ -83,6 +83,7 @@ const initDB = async () => {
       description TEXT,
       personality TEXT,
       background TEXT,
+      relationships TEXT,
       avatar_url TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -119,6 +120,7 @@ const initDB = async () => {
       description TEXT,
       personality TEXT,
       background TEXT,
+      relationships TEXT,
       avatar_url TEXT,
       version INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
@@ -175,6 +177,20 @@ const initDB = async () => {
   // 确保tool_call_id字段存在（用于现有数据库）
   try {
     run('ALTER TABLE messages ADD COLUMN tool_call_id TEXT');
+  } catch (e) {
+    // 字段可能已存在，忽略错误
+  }
+
+  // 确保relationships字段存在（用于现有数据库）
+  try {
+    run('ALTER TABLE characters ADD COLUMN relationships TEXT');
+  } catch (e) {
+    // 字段可能已存在，忽略错误
+  }
+
+  // 确保character_versions的relationships字段存在（用于现有数据库）
+  try {
+    run('ALTER TABLE character_versions ADD COLUMN relationships TEXT');
   } catch (e) {
     // 字段可能已存在，忽略错误
   }
@@ -613,12 +629,12 @@ app.put('/api/timeline/:id', (req, res) => {
         const versionId = generateId();
 
         run('INSERT INTO timeline_versions (id, timeline_node_id, title, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [versionId, req.params.id, existingNode.title, existingNode.content, newVersion, now()]);
+          [versionId, req.params.id, existingNode.title, existingNode.content ?? null, newVersion, now()]);
       }
     }
 
     run('UPDATE timeline_nodes SET title = ?, content = ?, order_index = ?, updated_at = ? WHERE id = ?',
-      [title, content || null, orderIndex || 0, updatedAt, req.params.id]);
+      [title, content ?? null, orderIndex || 0, updatedAt, req.params.id]);
 
     saveDB();
 
@@ -710,13 +726,13 @@ app.get('/api/projects/:projectId/characters', (req, res) => {
 
 app.post('/api/projects/:projectId/characters', (req, res) => {
   try {
-    const { name, description, personality, background, avatar } = req.body;
+    const { name, description, personality, background, relationships, avatar } = req.body;
     const id = generateId();
     const createdAt = now();
     const updatedAt = now();
     
-    run('INSERT INTO characters (id, project_id, name, description, personality, background, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, req.params.projectId, name, description || null, personality || null, background || null, avatar || null, createdAt, updatedAt]);
+    run('INSERT INTO characters (id, project_id, name, description, personality, background, relationships, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.params.projectId, name, description || null, personality || null, background || null, relationships || null, avatar || null, createdAt, updatedAt]);
     
     saveDB();
     
@@ -735,7 +751,7 @@ app.post('/api/projects/:projectId/characters', (req, res) => {
 
 app.put('/api/characters/:id', (req, res) => {
   try {
-    const { name, description, personality, background, avatar, createVersion } = req.body;
+    const { name, description, personality, background, relationships, avatar, createVersion } = req.body;
     const updatedAt = now();
 
     if (createVersion) {
@@ -746,13 +762,13 @@ app.put('/api/characters/:id', (req, res) => {
         const newVersion = versionCount + 1;
         const versionId = generateId();
 
-        run('INSERT INTO character_versions (id, character_id, name, description, personality, background, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [versionId, req.params.id, existingCharacter.name, existingCharacter.description, existingCharacter.personality, existingCharacter.background, existingCharacter.avatar_url, newVersion, now()]);
+        run('INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [versionId, req.params.id, existingCharacter.name, existingCharacter.description ?? null, existingCharacter.personality ?? null, existingCharacter.background ?? null, existingCharacter.relationships ?? null, existingCharacter.avatar_url ?? null, newVersion, now()]);
       }
     }
 
-    run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
-      [name, description || null, personality || null, background || null, avatar || null, updatedAt, req.params.id]);
+    run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
+      [name, description ?? null, personality ?? null, background ?? null, relationships ?? null, avatar ?? null, updatedAt, req.params.id]);
 
     saveDB();
 
@@ -802,8 +818,8 @@ app.post('/api/characters/:characterId/versions/:versionId/restore', (req, res) 
       return res.status(404).json({ error: 'Version not found' });
     }
 
-    run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
-      [version.name, version.description, version.personality, version.background, version.avatar_url, now(), req.params.characterId]);
+    run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
+      [version.name, version.description, version.personality, version.background, version.relationships, version.avatar_url, now(), req.params.characterId]);
 
     saveDB();
 
@@ -867,6 +883,7 @@ app.post('/api/llm/chat', async (req, res) => {
         if (msg.content !== undefined) cleaned.content = msg.content;
         if (msg.tool_calls) cleaned.tool_calls = msg.tool_calls;
         if (msg.tool_call_id) cleaned.tool_call_id = msg.tool_call_id;
+        if (msg.reasoning_content !== undefined) cleaned.reasoning_content = msg.reasoning_content;
         return cleaned;
       });
 

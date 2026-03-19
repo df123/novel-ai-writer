@@ -119,7 +119,11 @@ export const useTimelineStore = defineStore('timeline', () => {
     isLoadingVersions.value = true;
     try {
       const response = await timelineApi.getVersions(nodeId);
+      console.log('[timelineStore] API response:', response);
+      console.log('[timelineStore] Response data:', response.data);
+      console.log('[timelineStore] Response data type:', typeof response.data);
       versions.value.set(nodeId, response.data);
+      console.log('[timelineStore] Versions map after setting:', versions.value);
     } catch (error) {
       console.error('Failed to load timeline node versions:', error);
     } finally {

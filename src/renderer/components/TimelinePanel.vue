@@ -81,7 +81,7 @@
     <el-dialog
       v-model="versionsDialogOpen"
       title="版本历史"
-      width="700px"
+      width="800px"
     >
       <div v-if="isLoadingVersions" style="text-align: center; padding: 20px">
         <el-icon class="is-loading" :size="24">
@@ -92,26 +92,42 @@
       <div v-else-if="versions.length === 0" style="text-align: center; padding: 40px; color: #999">
         暂无版本记录
       </div>
-      <div v-else style="max-height: 400px; overflow-y: auto">
+      <div v-else style="max-height: 500px; overflow-y: auto; padding: 4px">
         <div
-          v-for="version in versions"
+          v-for="(version, index) in versions"
           :key="version.id"
-          style="padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; margin-bottom: 8px"
+          class="version-item"
+          :class="{ 'version-latest': index === 0 }"
         >
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-            <span style="font-weight: 500">版本 {{ version.version }}</span>
-            <el-button type="primary" size="small" @click="handleRestoreVersion(version.id)">
+          <div class="version-header">
+            <div class="version-badge" :class="{ 'latest-badge': index === 0 }">
+              <span v-if="index === 0" style="font-size: 11px; margin-right: 4px">🔥</span>
+              v{{ version.version }}
+            </div>
+            <el-tag size="small" type="info">
+              {{ formatVersionDate(version.createdAt) }}
+            </el-tag>
+          </div>
+          <div class="version-content">
+            <div class="version-row">
+              <span class="version-label">标题:</span>
+              <span class="version-value">{{ version.title || '-' }}</span>
+            </div>
+            <div v-if="version.content" class="version-row">
+              <span class="version-label">内容:</span>
+              <div class="version-value multi-line">{{ parseVersionContent(version.content) }}</div>
+            </div>
+          </div>
+          <div class="version-actions">
+            <el-button
+              type="primary"
+              size="small"
+              plain
+              :disabled="index === 0"
+              @click="handleRestoreVersion(version.id)"
+            >
               恢复此版本
             </el-button>
-          </div>
-          <div style="font-size: 13px; color: #666; margin-bottom: 4px">
-            标题: {{ version.title }}
-          </div>
-          <div v-if="version.content" style="font-size: 12px; color: #999; white-space: pre-wrap">
-            {{ version.content }}
-          </div>
-          <div style="font-size: 11px; color: #ccc; margin-top: 4px">
-            {{ new Date(version.createdAt * 1000).toLocaleString('zh-CN') }}
           </div>
         </div>
       </div>
@@ -195,7 +211,10 @@ const handleSelect = (id: string) => {
 const handleOpenVersionsDialog = async (nodeId: string) => {
   versionNodeId.value = nodeId;
   versionsDialogOpen.value = true;
+  console.log('[TimelinePanel] Loading versions for node:', nodeId);
   await loadVersions(nodeId);
+  console.log('[TimelinePanel] Loaded versions:', versions.value);
+  console.log('[TimelinePanel] Versions array:', Array.from(versions.value.values()).flat());
 };
 
 const handleRestoreVersion = async (versionId: string) => {
@@ -205,6 +224,66 @@ const handleRestoreVersion = async (versionId: string) => {
     versionsDialogOpen.value = false;
   } catch (error) {
     console.error('Failed to restore version:', error);
+  }
+};
+
+const formatVersionDate = (timestamp: number): string => {
+  if (!timestamp || timestamp < 1000000) {
+    return '未知时间';
+  }
+  try {
+    const date = new Date(timestamp * 1000);
+    if (isNaN(date.getTime())) {
+      return '时间无效';
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (hours === 0) {
+        const minutes = Math.floor(diffMs / (1000 * 60));
+        return minutes < 1 ? '刚刚' : `${minutes} 分钟前`;
+      }
+      return `${hours} 小时前`;
+    } else if (diffDays === 1) {
+      return '昨天';
+    } else if (diffDays < 7) {
+      return `${diffDays} 天前`;
+    } else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return `${weeks} 周前`;
+    } else {
+      return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  } catch {
+    return '时间解析错误';
+  }
+};
+
+const parseVersionContent = (content: string): string => {
+  if (!content) return '';
+  try {
+    const lines = content.split('\n');
+    const parsed: Record<string, string> = {};
+    lines.forEach(line => {
+      const match = line.match(/^([^:]+):\s*(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        if (key === 'Date') {
+          parsed[key] = formatDate(value) || value;
+        } else if (key === 'Description') {
+          parsed[key] = value;
+        }
+      }
+    });
+    return Object.entries(parsed)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n');
+  } catch {
+    return content;
   }
 };
 </script>
@@ -238,5 +317,86 @@ const handleRestoreVersion = async (versionId: string) => {
   right: 8px;
   opacity: 0;
   transition: opacity 0.2s;
+}
+
+.version-item {
+  padding: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: #fafafa;
+  transition: all 0.2s;
+}
+
+.version-item:hover {
+  border-color: #409eff;
+  background: #f0f9ff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.version-latest {
+  border-color: #67c23a;
+  background: #f0f9ff;
+}
+
+.version-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #909399;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.latest-badge {
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+}
+
+.version-content {
+  margin-bottom: 12px;
+}
+
+.version-row {
+  display: flex;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.version-label {
+  min-width: 50px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.version-value {
+  flex: 1;
+  color: #303133;
+  word-break: break-all;
+}
+
+.version-value.multi-line {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+}
+
+.version-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px dashed #e4e7ed;
 }
 </style>
