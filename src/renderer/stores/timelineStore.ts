@@ -24,7 +24,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     }
   };
 
-  const createNode = async (title: string, content?: string) => {
+  const createNode = async (title: string, content?: string, options?: { date?: string }) => {
     const projectStore = useProjectStore();
     if (!projectStore.currentProject) throw new Error('No project selected');
 
@@ -32,6 +32,7 @@ export const useTimelineStore = defineStore('timeline', () => {
       const orderIndex = nodes.value.length > 0 ? Math.max(...nodes.value.map(n => n.orderIndex)) + 1 : 0;
       const response = await timelineApi.create(projectStore.currentProject.id, {
         title,
+        date: options?.date,
         content: content ?? '',
         orderIndex,
       });
@@ -54,6 +55,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     try {
       const response = await timelineApi.update(id, {
         title: updates.title ?? node.title,
+        date: updates.date ?? node.date,
         content: updates.content ?? (node.content ?? ''),
         orderIndex: updates.orderIndex ?? node.orderIndex,
         createVersion: updates.createVersion,

@@ -93,20 +93,15 @@ export function formatMessage(message: DbMessage): Message {
 /**
  * 格式化时间线节点数据（数据库格式 -> 前端格式）
  * @param node - 数据库中的时间线节点对象
- * @param parseTimelineContent - 解析时间线内容的函数
  * @returns 格式化后的时间线节点对象
  */
-export function formatTimelineNode(
-  node: DbTimelineNode,
-  parseTimelineContent: (content: string) => { date: string; description: string }
-): TimelineNode {
-  const { date, description } = parseTimelineContent(node.content || '');
+export function formatTimelineNode(node: DbTimelineNode): TimelineNode {
   return {
     id: node.id,
     projectId: node.project_id,
     title: node.title,
-    date,
-    description,
+    date: node.date || '',
+    description: node.content || '',
     content: node.content ?? undefined,
     orderIndex: node.order_index,
     createdAt: node.created_at

@@ -28,7 +28,7 @@
             <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
           </div>
           <div style="font-size: 12px; color: #666; margin-bottom: 2px">
-            {{ formatDate(node.date) }}
+            {{ node.date || '未设置时间' }}
           </div>
            <div v-if="node.content" style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
             {{ node.content }}
@@ -52,14 +52,8 @@
         <el-form-item label="标题">
           <el-input v-model="title" placeholder="请输入标题" />
         </el-form-item>
-        <el-form-item label="日期">
-          <el-date-picker
-            v-model="date"
-            type="date"
-            placeholder="选择日期"
-            style="width: 100%"
-            value-format="YYYY-MM-DD"
-          />
+        <el-form-item label="时间">
+          <el-input v-model="date" placeholder="请输入时间（如：康熙三年、银河纪元305年等）" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input
@@ -89,12 +83,12 @@
         </el-icon>
         <div style="margin-top: 8px; color: #999">加载中...</div>
       </div>
-      <div v-else-if="versions.length === 0" style="text-align: center; padding: 40px; color: #999">
+      <div v-else-if="currentVersions.length === 0" style="text-align: center; padding: 40px; color: #999">
         暂无版本记录
       </div>
       <div v-else style="max-height: 500px; overflow-y: auto; padding: 4px">
         <div
-          v-for="(version, index) in versions"
+          v-for="(version, index) in currentVersions"
           :key="version.id"
           class="version-item"
           :class="{ 'version-latest': index === 0 }"
@@ -135,16 +129,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useTimelineStore } from '../stores/timelineStore';
-import { formatDate } from '../../shared/utils';
 
 const timelineStore = useTimelineStore();
 const { nodes, selectedNode, selectedNodes, versions, isLoadingVersions } = storeToRefs(timelineStore);
 const { createNode, updateNode, deleteNode, selectNode, toggleNodeSelection, toggleAllNodes, loadVersions, restoreVersion } = timelineStore;
+
+// 获取当前节点的版本列表
+const currentVersions = computed(() => {
+  if (!versionNodeId.value) return [];
+  return versions.value.get(versionNodeId.value) || [];
+});
 
 const dialogOpen = ref(false);
 const editMode = ref(false);
@@ -163,7 +162,7 @@ const toggleCollapse = () => {
 const handleOpenCreateDialog = () => {
   editMode.value = false;
   title.value = '';
-  date.value = new Date().toISOString().split('T')[0];
+  date.value = '';
   description.value = '';
   dialogOpen.value = true;
 };
@@ -188,11 +187,10 @@ const handleSubmit = async () => {
   if (!title.value.trim()) return;
 
   try {
-    const content = `Date: ${date.value}\nDescription: ${description.value}`;
     if (editMode.value && editId.value) {
-      await updateNode(editId.value, { title: title.value, content, createVersion: true });
+      await updateNode(editId.value, { title: title.value, date: date.value, content: description.value, createVersion: true });
     } else {
-      await createNode(title.value, content);
+      await createNode(title.value, description.value, { date: date.value });
     }
     handleCloseDialog();
   } catch (error) {
@@ -275,9 +273,7 @@ const parseVersionContent = (content: string): string => {
       if (match) {
         const key = match[1].trim();
         const value = match[2].trim();
-        if (key === 'Date') {
-          parsed[key] = formatDate(value) || value;
-        } else if (key === 'Description') {
+        if (key === 'Date' || key === 'Description') {
           parsed[key] = value;
         }
       }

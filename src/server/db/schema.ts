@@ -40,6 +40,7 @@ export function getCreateTablesSQL(): string {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       title TEXT NOT NULL,
+      date TEXT,
       content TEXT,
       order_index INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
@@ -78,6 +79,7 @@ export function getCreateTablesSQL(): string {
       id TEXT PRIMARY KEY,
       timeline_node_id TEXT NOT NULL,
       title TEXT NOT NULL,
+      date TEXT,
       content TEXT,
       version INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
@@ -115,7 +117,9 @@ export function getMigrationSQLs(): string[] {
     'ALTER TABLE messages ADD COLUMN tool_calls TEXT',
     'ALTER TABLE messages ADD COLUMN tool_call_id TEXT',
     'ALTER TABLE characters ADD COLUMN relationships TEXT',
-    'ALTER TABLE character_versions ADD COLUMN relationships TEXT'
+    'ALTER TABLE character_versions ADD COLUMN relationships TEXT',
+    'ALTER TABLE timeline_nodes ADD COLUMN date TEXT',
+    'ALTER TABLE timeline_versions ADD COLUMN date TEXT'
   ];
 }
 

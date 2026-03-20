@@ -48,9 +48,9 @@ export const timelineApi = {
     return api.get(url);
   },
   get: (id: string) => api.get(`/timeline/${id}`),
-  create: (projectId: string, data: { title: string; content?: string; orderIndex?: number }) =>
+  create: (projectId: string, data: { title: string; date?: string; content?: string; orderIndex?: number }) =>
     api.post(`/projects/${projectId}/timeline`, data),
-  update: (id: string, data: { title: string; content?: string; orderIndex?: number; createVersion?: boolean }) =>
+  update: (id: string, data: { title?: string; date?: string; content?: string; orderIndex?: number; createVersion?: boolean }) =>
     api.put(`/timeline/${id}`, data),
   delete: (id: string) => api.delete(`/timeline/${id}`),
   getVersions: (nodeId: string) => api.get(`/timeline/${nodeId}/versions`),

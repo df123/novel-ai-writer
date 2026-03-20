@@ -1,6 +1,7 @@
 {
   "name": "novel-ai-writer",
   "version": "1.0.0",
+  "type": "module",
   "description": "LLM辅助小说写作工具",
   "scripts": {
     "dev": "concurrently \"pnpm run dev:server\" \"pnpm run dev:renderer\"",

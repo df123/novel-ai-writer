@@ -3,7 +3,7 @@
 // 这是为了保持与现有前端代码的兼容性,避免破坏性变更
 import express, { Router, Request, Response } from 'express';
 import { query, run, saveDB } from '../db';
-import { generateId, now, parseTimelineContent } from '../utils/helpers';
+import { generateId, now } from '../utils/helpers';
 import { formatTimelineNode, formatTimelineVersion } from '../utils/formatters';
 import { asyncHandler } from '../middleware/errorHandler';
 import type { DbTimelineNode, DbTimelineVersion } from '@shared/types';
@@ -15,6 +15,7 @@ const router: Router = express.Router();
  */
 interface CreateTimelineNodeRequestBody {
   title: string;
+  date?: string;
   content?: string;
   orderIndex?: number;
 }
@@ -24,6 +25,7 @@ interface CreateTimelineNodeRequestBody {
  */
 interface UpdateTimelineNodeRequestBody {
   title?: string;
+  date?: string;
   content?: string;
   orderIndex?: number;
   createVersion?: boolean;
@@ -60,7 +62,7 @@ router.get('/projects/:projectId/timeline', asyncHandler(async (req: Request, re
   sql += ' ORDER BY order_index ASC';
 
   const nodes = query<DbTimelineNode>(sql, params);
-  const formattedNodes = nodes.map(n => formatTimelineNode(n, parseTimelineContent));
+  const formattedNodes = nodes.map(n => formatTimelineNode(n));
   res.json(formattedNodes);
 }));
 
@@ -69,21 +71,21 @@ router.get('/projects/:projectId/timeline', asyncHandler(async (req: Request, re
  */
 router.post('/projects/:projectId/timeline', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { title, content, orderIndex } = req.body as CreateTimelineNodeRequestBody;
+  const { title, date, content, orderIndex } = req.body as CreateTimelineNodeRequestBody;
   
   const id = generateId();
   const createdAt = now();
   const updatedAt = now();
 
   run(
-    'INSERT INTO timeline_nodes (id, project_id, title, content, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, projectId, title, content || null, orderIndex || 0, createdAt, updatedAt]
+    'INSERT INTO timeline_nodes (id, project_id, title, date, content, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, projectId, title, date || null, content || null, orderIndex || 0, createdAt, updatedAt]
   );
 
   saveDB();
 
   const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
-  res.status(201).json(formatTimelineNode(nodes[0], parseTimelineContent));
+  res.status(201).json(formatTimelineNode(nodes[0]));
 }));
 
 /**
@@ -91,7 +93,7 @@ router.post('/projects/:projectId/timeline', asyncHandler(async (req: Request, r
  */
 router.put('/timeline/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { title, content, orderIndex, createVersion } = req.body as UpdateTimelineNodeRequestBody;
+  const { title, date, content, orderIndex, createVersion } = req.body as UpdateTimelineNodeRequestBody;
   const updatedAt = now();
 
   if (createVersion) {
@@ -105,21 +107,21 @@ router.put('/timeline/:id', asyncHandler(async (req: Request, res: Response) => 
       const versionId = generateId();
 
       run(
-        'INSERT INTO timeline_versions (id, timeline_node_id, title, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [versionId, id, existingNode.title, existingNode.content ?? null, newVersion, now()]
+        'INSERT INTO timeline_versions (id, timeline_node_id, title, date, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [versionId, id, existingNode.title, existingNode.date, existingNode.content ?? null, newVersion, now()]
       );
     }
   }
 
   run(
-    'UPDATE timeline_nodes SET title = ?, content = ?, order_index = ?, updated_at = ? WHERE id = ?',
-    [title, content ?? null, orderIndex || 0, updatedAt, id]
+    'UPDATE timeline_nodes SET title = ?, date = ?, content = ?, order_index = ?, updated_at = ? WHERE id = ?',
+    [title, date ?? null, content ?? null, orderIndex || 0, updatedAt, id]
   );
 
   saveDB();
 
   const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
-  res.json(formatTimelineNode(nodes[0], parseTimelineContent));
+  res.json(formatTimelineNode(nodes[0]));
 }));
 
 /**
@@ -142,7 +144,7 @@ router.get('/timeline/:id', asyncHandler(async (req: Request, res: Response) => 
     res.status(404).json({ error: '时间线节点未找到' });
     return;
   }
-  res.json(formatTimelineNode(nodes[0], parseTimelineContent));
+  res.json(formatTimelineNode(nodes[0]));
 }));
 
 /**
@@ -179,7 +181,9 @@ router.post('/timeline/:nodeId/versions/:versionId/restore', asyncHandler(async 
 
   // 检查当前状态与要恢复的版本是否不同
   const isDifferent =
-    currentNode[0].title !== version[0].title || currentNode[0].content !== version[0].content;
+    currentNode[0].title !== version[0].title ||
+    currentNode[0].date !== version[0].date ||
+    currentNode[0].content !== version[0].content;
 
   // 如果当前状态与要恢复的版本不同，则创建当前状态的版本快照
   if (isDifferent) {
@@ -192,14 +196,15 @@ router.post('/timeline/:nodeId/versions/:versionId/restore', asyncHandler(async 
     const newVersionId = generateId();
 
     run(
-      'INSERT INTO timeline_versions (id, timeline_node_id, title, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [newVersionId, nodeId, currentNode[0].title, currentNode[0].content ?? null, newVersion, now()]
+      'INSERT INTO timeline_versions (id, timeline_node_id, title, date, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [newVersionId, nodeId, currentNode[0].title, currentNode[0].date, currentNode[0].content ?? null, newVersion, now()]
     );
   }
 
   // 恢复到指定版本
-  run('UPDATE timeline_nodes SET title = ?, content = ?, updated_at = ? WHERE id = ?', [
+  run('UPDATE timeline_nodes SET title = ?, date = ?, content = ?, updated_at = ? WHERE id = ?', [
     version[0].title,
+    version[0].date,
     version[0].content,
     now(),
     nodeId
@@ -208,7 +213,7 @@ router.post('/timeline/:nodeId/versions/:versionId/restore', asyncHandler(async 
   saveDB();
 
   const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [nodeId]);
-  res.json(formatTimelineNode(nodes[0], parseTimelineContent));
+  res.json(formatTimelineNode(nodes[0]));
 }));
 
 export default router;

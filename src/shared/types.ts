@@ -370,6 +370,7 @@ export interface DbTimelineNode {
   id: string;
   project_id: string;
   title: string;
+  date: string | null;
   content: string | null;
   order_index: number;
   created_at: number;
@@ -383,6 +384,7 @@ export interface DbTimelineVersion {
   id: string;
   timeline_node_id: string;
   title: string;
+  date: string | null;
   content: string | null;
   version: number;
   created_at: number;
