@@ -42,7 +42,7 @@ export const createTimelineTool: ToolDefinition = {
         },
         description: {
           type: 'string',
-          description: '时间线节点的描述内容（注意：此参数会被映射到数据库的 content 字段）',
+          description: '时间线节点的描述内容',
         },
         date: {
           type: 'string',
@@ -77,7 +77,7 @@ export const updateTimelineTool: ToolDefinition = {
         },
         description: {
           type: 'string',
-          description: '新描述内容（注意：此参数会被映射到数据库的 content 字段）',
+          description: '新描述内容',
         },
         date: {
           type: 'string',
