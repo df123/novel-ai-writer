@@ -96,7 +96,7 @@ pnpm lint
 novel-ai/
 ├── src/
 │   ├── server/            # Express 后端
-│   │   └── index.js       # 后端入口
+│   │   └── index.ts       # 后端入口
 │   ├── renderer/          # Vue.js 前端
 │   │   ├── components/    # UI组件
 │   │   ├── stores/        # Pinia 状态管理

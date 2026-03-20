@@ -4,9 +4,9 @@
   "description": "LLM辅助小说写作工具",
   "scripts": {
     "dev": "concurrently \"pnpm run dev:server\" \"pnpm run dev:renderer\"",
-    "dev:server": "node src/server/index.js",
+    "dev:server": "tsx watch src/server/index.ts",
     "dev:renderer": "vite",
-    "start:server": "lsof -ti:3002 | xargs kill -9 2>/dev/null; node src/server/index.js",
+    "start:server": "lsof -ti:3002 | xargs kill -9 2>/dev/null; tsx src/server/index.ts",
     "start:renderer": "lsof -ti:3004 | xargs kill -9 2>/dev/null; vite",
     "build:renderer": "vite build",
     "build": "pnpm run build:renderer",
@@ -14,7 +14,6 @@
     "lint": "eslint src --ext .ts,.vue",
     "typecheck": "tsc --noEmit",
     "build:server": "tsc -p tsconfig.server.json",
-    "dev:server:ts": "tsx watch src/server/index.ts",
     "typecheck:server": "tsc --noEmit -p tsconfig.server.json"
   },
   "dependencies": {

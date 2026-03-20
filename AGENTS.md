@@ -89,8 +89,8 @@ import { formatTimestamp } from '../../shared/utils';
 - 优先使用 CSS 类名进行样式管理
 - 必要时使用内联样式进行动态样式设置
 
-### 服务器代码（src/server/index.js）
-- 服务器当前使用 JavaScript（非 TypeScript）
+### 服务器代码（src/server/index.ts）
+- 服务器使用 TypeScript
 - 使用 Express.js 进行 API 路由
 - 数据库操作使用 sql.js 和自定义 `query()`、`run()` 辅助函数
 - 格式化数据库响应以匹配前端命名（例如：`name` → `title`, `created_at` → `createdAt`）
