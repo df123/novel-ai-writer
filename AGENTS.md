@@ -99,7 +99,7 @@ import { formatTimestamp } from '../../shared/utils';
 
 ### 路径别名
 - `@/*` → `src/*`（在 vite.config.ts 中配置）
-- `@shared/*` → `src/shared/*`（在 tsconfig.base.json 中配置）
+- `@shared/*` → `src/shared/*`（在 tsconfig.server.json 和 tsconfig.json 中配置）
 
 ### 文件结构
 - `src/shared/` - 共享工具、类型、常量

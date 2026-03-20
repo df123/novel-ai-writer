@@ -597,7 +597,6 @@ export interface DbCharacterVersion {
 
 ```json
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
@@ -628,23 +627,6 @@ export interface DbCharacterVersion {
     "node_modules",
     "dist"
   ]
-}
-```
-
-### 4.2 更新现有配置文件
-
-#### `tsconfig.base.json`（已存在，确认配置）
-确保包含以下基础配置：
-
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@/*": ["src/*"]
-    }
-  }
 }
 ```
 
