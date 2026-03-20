@@ -156,7 +156,6 @@
               type="primary"
               size="small"
               plain
-              :disabled="index === 0"
               @click="handleRestoreVersion(version.id)"
             >
               恢复此版本
@@ -172,6 +171,7 @@
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { useCharacterStore } from '../stores/characterStore';
 
 const characterStore = useCharacterStore();
@@ -266,9 +266,12 @@ const handleRestoreVersion = async (versionId: string) => {
   if (!versionCharacterId.value) return;
   try {
     await restoreVersion(versionCharacterId.value, versionId);
-    versionsDialogOpen.value = false;
+    // 恢复后重新加载版本列表，确保用户可以看到新创建的版本
+    await loadVersions(versionCharacterId.value);
+    ElMessage.success('版本已恢复');
   } catch (error) {
     console.error('Failed to restore version:', error);
+    ElMessage.error('恢复版本失败，请重试');
   }
 };
 

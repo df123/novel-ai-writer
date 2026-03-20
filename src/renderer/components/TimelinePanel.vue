@@ -123,7 +123,6 @@
               type="primary"
               size="small"
               plain
-              :disabled="index === 0"
               @click="handleRestoreVersion(version.id)"
             >
               恢复此版本
@@ -139,6 +138,7 @@
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { useTimelineStore } from '../stores/timelineStore';
 import { formatDate } from '../../shared/utils';
 
@@ -221,9 +221,12 @@ const handleRestoreVersion = async (versionId: string) => {
   if (!versionNodeId.value) return;
   try {
     await restoreVersion(versionNodeId.value, versionId);
-    versionsDialogOpen.value = false;
+    // 恢复后重新加载版本列表，确保用户可以看到新创建的版本
+    await loadVersions(versionNodeId.value);
+    ElMessage.success('版本已恢复');
   } catch (error) {
     console.error('Failed to restore version:', error);
+    ElMessage.error('恢复版本失败，请重试');
   }
 };
 

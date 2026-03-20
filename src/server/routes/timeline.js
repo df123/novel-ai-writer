@@ -105,6 +105,23 @@ router.post('/timeline/:nodeId/versions/:versionId/restore', asyncHandler(async 
     return res.status(404).json({ error: '版本未找到' });
   }
 
+  // 获取当前节点状态
+  const currentNode = query('SELECT * FROM timeline_nodes WHERE id = ?', [req.params.nodeId])[0];
+
+  // 检查当前状态与要恢复的版本是否不同
+  const isDifferent = currentNode.title !== version.title || currentNode.content !== version.content;
+
+  // 如果当前状态与要恢复的版本不同，则创建当前状态的版本快照
+  if (isDifferent) {
+    const versionCount = query('SELECT COUNT(*) as count FROM timeline_versions WHERE timeline_node_id = ?', [req.params.nodeId])[0].count;
+    const newVersion = versionCount + 1;
+    const versionId = generateId();
+
+    run('INSERT INTO timeline_versions (id, timeline_node_id, title, content, version, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [versionId, req.params.nodeId, currentNode.title, currentNode.content ?? null, newVersion, now()]);
+  }
+
+  // 恢复到指定版本
   run('UPDATE timeline_nodes SET title = ?, content = ?, updated_at = ? WHERE id = ?',
     [version.title, version.content, now(), req.params.nodeId]);
 

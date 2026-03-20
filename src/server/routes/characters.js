@@ -161,6 +161,29 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
     return res.status(404).json({ error: '版本未找到' });
   }
 
+  // 获取当前角色状态
+  const currentCharacter = query('SELECT * FROM characters WHERE id = ?', [req.params.characterId])[0];
+
+  // 检查当前状态与要恢复的版本是否不同
+  const isDifferent =
+    currentCharacter.name !== version.name ||
+    currentCharacter.description !== version.description ||
+    currentCharacter.personality !== version.personality ||
+    currentCharacter.background !== version.background ||
+    currentCharacter.relationships !== version.relationships ||
+    currentCharacter.avatar_url !== version.avatar_url;
+
+  // 如果当前状态与要恢复的版本不同，则创建当前状态的版本快照
+  if (isDifferent) {
+    const versionCount = query('SELECT COUNT(*) as count FROM character_versions WHERE character_id = ?', [req.params.characterId])[0].count;
+    const newVersion = versionCount + 1;
+    const versionId = generateId();
+
+    run('INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [versionId, req.params.characterId, currentCharacter.name, currentCharacter.description ?? null, currentCharacter.personality ?? null, currentCharacter.background ?? null, currentCharacter.relationships ?? null, currentCharacter.avatar_url ?? null, newVersion, now()]);
+  }
+
+  // 恢复到指定版本
   run('UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
     [version.name, version.description, version.personality, version.background, version.relationships, version.avatar_url, now(), req.params.characterId]);
 
