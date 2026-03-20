@@ -116,7 +116,6 @@ export function formatTimelineNode(node: DbTimelineNode): TimelineNode {
 export function formatCharacter(character: DbCharacter): Character {
   return {
     ...character,
-    avatar: character.avatar_url ?? undefined,
     projectId: character.project_id,
     createdAt: character.created_at,
     description: character.description ?? undefined,
@@ -136,6 +135,7 @@ export function formatTimelineVersion(version: DbTimelineVersion): TimelineNodeV
     id: version.id,
     timelineNodeId: version.timeline_node_id,
     title: version.title,
+    date: version.date || '',
     content: version.content || '',
     version: version.version,
     createdAt: version.created_at
@@ -151,7 +151,6 @@ export function formatCharacterVersion(version: DbCharacterVersion): CharacterVe
   return {
     ...version,
     characterId: version.character_id,
-    avatar: version.avatar_url ?? undefined,
     createdAt: version.created_at,
     description: version.description ?? undefined,
     personality: version.personality ?? undefined,

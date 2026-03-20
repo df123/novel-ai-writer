@@ -31,7 +31,7 @@ export const createTimelineTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'create_timeline',
-    description: '创建一个新的时间线节点',
+    description: '创建一个新的时间线节点。日期支持多种格式：相对时间（如：天桥三年、民国十年、唐朝贞观年间等）、绝对时间（如：2026-03-03、1990-01-01等）、其他时间描述（如：春、夏、秋、冬、早春、深秋等）',
     strict: true,
     parameters: {
       type: 'object',
@@ -42,7 +42,11 @@ export const createTimelineTool: ToolDefinition = {
         },
         description: {
           type: 'string',
-          description: '时间线节点的描述内容',
+          description: '时间线节点的描述内容（注意：此参数会被映射到数据库的 content 字段）',
+        },
+        date: {
+          type: 'string',
+          description: '时间线节点的日期。支持多种格式：相对时间（如：天桥三年、民国十年、唐朝贞观年间等）、绝对时间（如：2026-03-03、1990-01-01等）、其他时间描述（如：春、夏、秋、冬、早春、深秋等）',
         },
       },
       required: ['title', 'description'],
@@ -58,7 +62,7 @@ export const updateTimelineTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'update_timeline',
-    description: '更新已存在的时间线节点',
+    description: '更新已存在的时间线节点。日期支持多种格式：相对时间（如：天桥三年、民国十年、唐朝贞观年间等）、绝对时间（如：2026-03-03、1990-01-01等）、其他时间描述（如：春、夏、秋、冬、早春、深秋等）',
     strict: true,
     parameters: {
       type: 'object',
@@ -73,7 +77,11 @@ export const updateTimelineTool: ToolDefinition = {
         },
         description: {
           type: 'string',
-          description: '新描述内容',
+          description: '新描述内容（注意：此参数会被映射到数据库的 content 字段）',
+        },
+        date: {
+          type: 'string',
+          description: '新日期。支持多种格式：相对时间（如：天桥三年、民国十年、唐朝贞观年间等）、绝对时间（如：2026-03-03、1990-01-01等）、其他时间描述（如：春、夏、秋、冬、早春、深秋等）',
         },
       },
       required: ['id'],

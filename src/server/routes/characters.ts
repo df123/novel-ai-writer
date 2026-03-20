@@ -19,7 +19,6 @@ interface CreateCharacterRequestBody {
   personality?: string;
   background?: string;
   relationships?: string;
-  avatar?: string;
 }
 
 /**
@@ -31,7 +30,6 @@ interface UpdateCharacterRequestBody {
   personality?: string;
   background?: string;
   relationships?: string;
-  avatar?: string;
   createVersion?: boolean;
 }
 
@@ -87,7 +85,7 @@ router.get('/projects/:projectId/characters', asyncHandler(async (req: Request, 
  */
 router.post('/projects/:projectId/characters', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { name, description, personality, background, relationships, avatar } =
+  const { name, description, personality, background, relationships } =
     req.body as CreateCharacterRequestBody;
 
   const id = generateId();
@@ -95,7 +93,7 @@ router.post('/projects/:projectId/characters', asyncHandler(async (req: Request,
   const updatedAt = now();
 
   run(
-    'INSERT INTO characters (id, project_id, name, description, personality, background, relationships, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO characters (id, project_id, name, description, personality, background, relationships, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       id,
       projectId,
@@ -104,7 +102,6 @@ router.post('/projects/:projectId/characters', asyncHandler(async (req: Request,
       personality || null,
       background || null,
       relationships || null,
-      avatar || null,
       createdAt,
       updatedAt
     ]
@@ -121,7 +118,7 @@ router.post('/projects/:projectId/characters', asyncHandler(async (req: Request,
  */
 router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, description, personality, background, relationships, avatar, createVersion } =
+  const { name, description, personality, background, relationships, createVersion } =
     req.body as UpdateCharacterRequestBody;
   const updatedAt = now();
 
@@ -143,7 +140,7 @@ router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) =
     const versionId = generateId();
 
     run(
-      'INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         versionId,
         id,
@@ -152,7 +149,6 @@ router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) =
         existingCharacter.personality ?? null,
         existingCharacter.background ?? null,
         existingCharacter.relationships ?? null,
-        existingCharacter.avatar_url ?? null,
         newVersion,
         now()
       ]
@@ -182,10 +178,6 @@ router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) =
   if (relationships !== undefined) {
     updates.push('relationships = ?');
     values.push(relationships);
-  }
-  if (avatar !== undefined) {
-    updates.push('avatar_url = ?');
-    values.push(avatar);
   }
 
   // 检查是否有字段需要更新（不包括 updated_at）
@@ -272,8 +264,7 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
     currentCharacter[0].description !== version[0].description ||
     currentCharacter[0].personality !== version[0].personality ||
     currentCharacter[0].background !== version[0].background ||
-    currentCharacter[0].relationships !== version[0].relationships ||
-    currentCharacter[0].avatar_url !== version[0].avatar_url;
+    currentCharacter[0].relationships !== version[0].relationships;
 
   // 如果当前状态与要恢复的版本不同，则创建当前状态的版本快照
   if (isDifferent) {
@@ -286,7 +277,7 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
     const newVersionId = generateId();
 
     run(
-      'INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, avatar_url, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         newVersionId,
         characterId,
@@ -295,7 +286,6 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
         currentCharacter[0].personality ?? null,
         currentCharacter[0].background ?? null,
         currentCharacter[0].relationships ?? null,
-        currentCharacter[0].avatar_url ?? null,
         newVersion,
         now()
       ]
@@ -304,14 +294,13 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
 
   // 恢复到指定版本
   run(
-    'UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, avatar_url = ?, updated_at = ? WHERE id = ?',
+    'UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, updated_at = ? WHERE id = ?',
     [
       version[0].name,
       version[0].description,
       version[0].personality,
       version[0].background,
       version[0].relationships,
-      version[0].avatar_url,
       now(),
       characterId
     ]

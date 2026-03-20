@@ -122,6 +122,9 @@ export interface TimelineNodeVersion {
   /** 版本的节点标题 */
   title: string;
   
+  /** 版本的节点日期 */
+  date: string;
+  
   /** 版本的节点内容 */
   content: string;
   
@@ -148,9 +151,6 @@ export interface Character {
   
   /** 人物描述（可选） */
   description?: string;
-  
-  /** 头像 URL（可选） */
-  avatar?: string;
   
   /** 人物性格特点（可选） */
   personality?: string;
@@ -190,9 +190,6 @@ export interface CharacterVersion {
   
   /** 版本的人物关系描述（可选） */
   relationships?: string;
-  
-  /** 版本的头像 URL（可选） */
-  avatar?: string;
   
   /** 版本号（从 1 开始递增） */
   version: number;
@@ -401,7 +398,6 @@ export interface DbCharacter {
   personality: string | null;
   background: string | null;
   relationships: string | null;
-  avatar_url: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -417,7 +413,6 @@ export interface DbCharacterVersion {
   personality: string | null;
   background: string | null;
   relationships: string | null;
-  avatar_url: string | null;
   version: number;
   created_at: number;
 }

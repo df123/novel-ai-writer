@@ -77,7 +77,6 @@ export const characterApi = {
       description?: string;
       personality?: string;
       background?: string;
-      avatar?: string;
     },
   ) => api.post(`/projects/${projectId}/characters`, data),
   update: (
@@ -88,7 +87,6 @@ export const characterApi = {
       personality?: string;
       background?: string;
       relationships?: string;
-      avatar?: string;
       createVersion?: boolean;
     },
   ) => api.put(`/characters/${id}`, data),

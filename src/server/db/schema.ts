@@ -56,11 +56,13 @@ export function getCreateTablesSQL(): string {
       personality TEXT,
       background TEXT,
       relationships TEXT,
-      avatar_url TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
+    // 注意：已移除 avatar_url 字段。由于 SQLite 不支持 DROP COLUMN，
+    // 现有数据库中的 avatar_url 字段会保留但不再使用。
+    // 如需清理，请重新创建数据库或使用数据库迁移工具。
 
     CREATE TABLE IF NOT EXISTS prompt_templates (
       id TEXT PRIMARY KEY,
@@ -94,11 +96,13 @@ export function getCreateTablesSQL(): string {
       personality TEXT,
       background TEXT,
       relationships TEXT,
-      avatar_url TEXT,
       version INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
     );
+    // 注意：已移除 avatar_url 字段。由于 SQLite 不支持 DROP COLUMN，
+    // 现有数据库中的 avatar_url 字段会保留但不再使用。
+    // 如需清理，请重新创建数据库或使用数据库迁移工具。
 
     CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
     CREATE INDEX IF NOT EXISTS idx_timeline_project_id ON timeline_nodes(project_id);

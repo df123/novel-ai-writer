@@ -238,7 +238,6 @@ const handleSubmit = async () => {
       personality: personality.value,
       background: background.value,
       relationships: relationships.value,
-      avatar: '',
       createVersion: true,
     };
 
