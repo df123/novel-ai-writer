@@ -1,29 +1,54 @@
 // Database Management API 路由
-const express = require('express');
-const router = express.Router();
-const { query, run, saveDB } = require('../db');
-const { generateId, now } = require('../utils/helpers');
-const { ALLOWED_TABLES } = require('../config');
-const { logError } = require('../utils/logger');
-const { validateAndConvertValue, isValidColumnName, isValidTableName } = require('../utils/validators');
-const { asyncHandler } = require('../middleware/errorHandler');
+import express, { Router, Request, Response } from 'express';
+import { query, run, saveDB } from '../db';
+import { generateId, now } from '../utils/helpers';
+import { ALLOWED_TABLES } from '../config';
+import { validateAndConvertValue, isValidColumnName, isValidTableName } from '../utils/validators';
+import { asyncHandler } from '../middleware/errorHandler';
+import type { TableInfo, ColumnInfo, QueryRequest } from '@shared/types';
 
-// 获取所有表信息
-router.get('/tables', asyncHandler(async (req, res) => {
+const router: Router = express.Router();
+
+/**
+ * PRAGMA table_info 返回的列信息接口
+ */
+interface PragmaColumnInfo {
+  name: string;
+  type: string;
+  notnull: number;
+  pk: number;
+  dflt_value: unknown;
+}
+
+/**
+ * 查询表数据查询参数接口
+ */
+interface GetTableDataQuery {
+  page?: string;
+  pageSize?: string;
+  orderBy?: string;
+  order?: 'asc' | 'desc';
+}
+
+/**
+ * 获取所有表信息
+ */
+router.get('/tables', asyncHandler(async (_req: Request, res: Response) => {
   // 获取所有表
   const tables = query("SELECT * FROM sqlite_master WHERE type='table' ORDER BY name");
 
-  const result = [];
+  const result: TableInfo[] = [];
 
   for (const table of tables) {
     // 跳过 sqlite 系统表
-    if (table.name.startsWith('sqlite_')) {
+    const tableName = table.name as string;
+    if (tableName.startsWith('sqlite_')) {
       continue;
     }
 
     // 获取表的列信息
-    const columns = query(`PRAGMA table_info(${table.name})`);
-    const formattedColumns = columns.map(col => ({
+    const columns = query(`PRAGMA table_info(${tableName})`) as PragmaColumnInfo[];
+    const formattedColumns: ColumnInfo[] = columns.map(col => ({
       name: col.name,
       type: col.type,
       notNull: col.notnull === 1,
@@ -32,11 +57,11 @@ router.get('/tables', asyncHandler(async (req, res) => {
     }));
 
     // 获取表的行数
-    const countResult = query(`SELECT COUNT(*) as count FROM ${table.name}`);
+    const countResult = query(`SELECT COUNT(*) as count FROM ${tableName}`) as { count: number }[];
     const rowCount = countResult[0].count;
 
     result.push({
-      name: table.name,
+      name: tableName,
       columns: formattedColumns,
       rowCount: rowCount
     });
@@ -45,69 +70,82 @@ router.get('/tables', asyncHandler(async (req, res) => {
   res.json({ tables: result });
 }));
 
-// 查询表数据（支持分页和排序）
-router.get('/tables/:tableName', asyncHandler(async (req, res) => {
+/**
+ * 查询表数据（支持分页和排序）
+ */
+router.get('/tables/:tableName', asyncHandler(async (req: Request, res: Response) => {
   const { tableName } = req.params;
-  const page = parseInt(req.query.page) || 1;
-  const pageSize = parseInt(req.query.pageSize) || 20;
+  const { page, pageSize, orderBy, order } = req.query as GetTableDataQuery;
 
   // 验证表名
   if (!isValidTableName(tableName, ALLOWED_TABLES)) {
-    return res.status(400).json({ error: '无效的表名' });
+    res.status(400).json({ error: '无效的表名' });
+    return;
   }
 
   // 获取表的列信息以确定默认排序列
-  const columns = query(`PRAGMA table_info(${tableName})`);
+  const columns = query(`PRAGMA table_info(${tableName})`) as PragmaColumnInfo[];
   const primaryColumn = columns.find(col => col.pk === 1);
   const defaultOrderBy = primaryColumn ? primaryColumn.name : 'id';
   const validColumnNames = columns.map(col => col.name);
 
   // 验证 orderBy 参数是否为有效列名
-  let orderBy = req.query.orderBy || defaultOrderBy;
-  if (!validColumnNames.includes(orderBy) || !isValidColumnName(orderBy)) {
-    orderBy = defaultOrderBy;
+  let orderByColumn = orderBy || defaultOrderBy;
+  if (!validColumnNames.includes(orderByColumn!) || !isValidColumnName(orderByColumn!)) {
+    orderByColumn = defaultOrderBy;
   }
 
-  const order = req.query.order === 'desc' ? 'DESC' : 'ASC';
+  const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
 
   // 验证分页参数
-  if (page < 1 || pageSize < 1 || pageSize > 100) {
-    return res.status(400).json({ error: '无效的分页参数' });
+  const pageNum = page ? parseInt(page) : 1;
+  const pageSizeNum = pageSize ? parseInt(pageSize) : 20;
+
+  if (pageNum < 1 || pageSizeNum < 1 || pageSizeNum > 100) {
+    res.status(400).json({ error: '无效的分页参数' });
+    return;
   }
 
   // 获取总数
-  const countResult = query(`SELECT COUNT(*) as total FROM ${tableName}`);
+  const countResult = query(`SELECT COUNT(*) as total FROM ${tableName}`) as { total: number }[];
   const total = countResult[0].total;
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.ceil(total / pageSizeNum);
 
   // 构建查询
-  const offset = (page - 1) * pageSize;
-  const data = query(`SELECT * FROM ${tableName} ORDER BY ${orderBy} ${order} LIMIT ? OFFSET ?`, [pageSize, offset]);
+  const offset = (pageNum - 1) * pageSizeNum;
+  const data = query(
+    `SELECT * FROM ${tableName} ORDER BY ${orderByColumn} ${sortOrder} LIMIT ? OFFSET ?`,
+    [pageSizeNum, offset]
+  );
 
   res.json({
     data: data,
     pagination: {
-      page: page,
-      pageSize: pageSize,
+      page: pageNum,
+      pageSize: pageSizeNum,
       total: total,
       totalPages: totalPages
     }
   });
 }));
 
-// 执行自定义查询（只读）
-router.post('/query', asyncHandler(async (req, res) => {
-  const { sql, params } = req.body;
+/**
+ * 执行自定义查询（只读）
+ */
+router.post('/query', asyncHandler(async (req: Request, res: Response) => {
+  const { sql, params } = req.body as QueryRequest;
 
   // 验证 SQL 语句
   if (!sql || typeof sql !== 'string') {
-    return res.status(400).json({ error: 'SQL 查询语句是必需的' });
+    res.status(400).json({ error: 'SQL 查询语句是必需的' });
+    return;
   }
 
   // 验证是否为 SELECT 查询
   const trimmedSql = sql.trim().toUpperCase();
   if (!trimmedSql.startsWith('SELECT')) {
-    return res.status(400).json({ error: '只允许 SELECT 查询' });
+    res.status(400).json({ error: '只允许 SELECT 查询' });
+    return;
   }
 
   // 执行查询
@@ -116,28 +154,33 @@ router.post('/query', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-// 插入数据
-router.post('/tables/:tableName', asyncHandler(async (req, res) => {
+/**
+ * 插入数据
+ */
+router.post('/tables/:tableName', asyncHandler(async (req: Request, res: Response) => {
   const { tableName } = req.params;
-  const data = req.body;
+  const data = req.body as Record<string, unknown>;
 
   // 验证表名
-  if (!isValidTableName(tableName, ALLOWED_TABLES)) {
-    return res.status(400).json({ error: '无效的表名' });
+  if (!isValidTableName(tableName, [...ALLOWED_TABLES])) {
+    res.status(400).json({ error: '无效的表名' });
+    return;
   }
 
   if (!data || typeof data !== 'object') {
-    return res.status(400).json({ error: '请求体是必需的' });
+    res.status(400).json({ error: '请求体是必需的' });
+    return;
   }
 
   // 获取表的列信息
-  const columns = query(`PRAGMA table_info(${tableName})`);
+  const columns = query(`PRAGMA table_info(${tableName})`) as PragmaColumnInfo[];
   const columnNames = columns.map(col => col.name);
 
   // 验证数据字段是否有效
   for (const key of Object.keys(data)) {
     if (!columnNames.includes(key)) {
-      return res.status(400).json({ error: `无效的列: ${key}` });
+      res.status(400).json({ error: `无效的列: ${key}` });
+      return;
     }
   }
 
@@ -150,9 +193,11 @@ router.post('/tables/:tableName', asyncHandler(async (req, res) => {
     const columnType = column.type?.toUpperCase();
 
     try {
-      data[key] = validateAndConvertValue(value, columnType, column.notnull);
+      data[key] = validateAndConvertValue(value, columnType as any, column.notnull === 1);
     } catch (error) {
-      return res.status(400).json({ error: `列 ${key}: ${error.message}` });
+      const errorMessage = error instanceof Error ? error.message : '验证失败';
+      res.status(400).json({ error: `列 ${key}: ${errorMessage}` });
+      return;
     }
   }
 
@@ -189,22 +234,26 @@ router.post('/tables/:tableName', asyncHandler(async (req, res) => {
   }
 }));
 
-// 更新数据
-router.put('/tables/:tableName/:id', asyncHandler(async (req, res) => {
+/**
+ * 更新数据
+ */
+router.put('/tables/:tableName/:id', asyncHandler(async (req: Request, res: Response) => {
   const { tableName, id } = req.params;
-  const data = req.body;
+  const data = req.body as Record<string, unknown>;
 
   // 验证表名
-  if (!isValidTableName(tableName, ALLOWED_TABLES)) {
-    return res.status(400).json({ error: '无效的表名' });
+  if (!isValidTableName(tableName, [...ALLOWED_TABLES])) {
+    res.status(400).json({ error: '无效的表名' });
+    return;
   }
 
   if (!data || typeof data !== 'object') {
-    return res.status(400).json({ error: '请求体是必需的' });
+    res.status(400).json({ error: '请求体是必需的' });
+    return;
   }
 
   // 获取表的列信息以确定主键列
-  const columns = query(`PRAGMA table_info(${tableName})`);
+  const columns = query(`PRAGMA table_info(${tableName})`) as PragmaColumnInfo[];
   const primaryColumn = columns.find(col => col.pk === 1);
   const primaryColumnName = primaryColumn ? primaryColumn.name : 'id';
   const columnNames = columns.map(col => col.name);
@@ -212,13 +261,15 @@ router.put('/tables/:tableName/:id', asyncHandler(async (req, res) => {
   // 检查记录是否存在
   const existing = query(`SELECT * FROM ${tableName} WHERE ${primaryColumnName} = ?`, [id]);
   if (existing.length === 0) {
-    return res.status(404).json({ error: '记录未找到' });
+    res.status(404).json({ error: '记录未找到' });
+    return;
   }
 
   // 验证数据字段是否有效
   for (const key of Object.keys(data)) {
     if (!columnNames.includes(key)) {
-      return res.status(400).json({ error: `无效的列: ${key}` });
+      res.status(400).json({ error: `无效的列: ${key}` });
+      return;
     }
   }
 
@@ -231,9 +282,11 @@ router.put('/tables/:tableName/:id', asyncHandler(async (req, res) => {
     const columnType = column.type?.toUpperCase();
 
     try {
-      data[key] = validateAndConvertValue(value, columnType, column.notnull);
+      data[key] = validateAndConvertValue(value, columnType as any, column.notnull === 1);
     } catch (error) {
-      return res.status(400).json({ error: `列 ${key}: ${error.message}` });
+      const errorMessage = error instanceof Error ? error.message : '验证失败';
+      res.status(400).json({ error: `列 ${key}: ${errorMessage}` });
+      return;
     }
   }
 
@@ -258,24 +311,28 @@ router.put('/tables/:tableName/:id', asyncHandler(async (req, res) => {
   res.json(updatedData[0]);
 }));
 
-// 删除数据
-router.delete('/tables/:tableName/:id', asyncHandler(async (req, res) => {
+/**
+ * 删除数据
+ */
+router.delete('/tables/:tableName/:id', asyncHandler(async (req: Request, res: Response) => {
   const { tableName, id } = req.params;
 
   // 验证表名
-  if (!isValidTableName(tableName, ALLOWED_TABLES)) {
-    return res.status(400).json({ error: '无效的表名' });
+  if (!isValidTableName(tableName, [...ALLOWED_TABLES])) {
+    res.status(400).json({ error: '无效的表名' });
+    return;
   }
 
   // 获取表的列信息以确定主键列
-  const columns = query(`PRAGMA table_info(${tableName})`);
+  const columns = query(`PRAGMA table_info(${tableName})`) as PragmaColumnInfo[];
   const primaryColumn = columns.find(col => col.pk === 1);
   const primaryColumnName = primaryColumn ? primaryColumn.name : 'id';
 
   // 检查记录是否存在
   const existing = query(`SELECT * FROM ${tableName} WHERE ${primaryColumnName} = ?`, [id]);
   if (existing.length === 0) {
-    return res.status(404).json({ error: '记录未找到' });
+    res.status(404).json({ error: '记录未找到' });
+    return;
   }
 
   // 删除记录
@@ -287,4 +344,4 @@ router.delete('/tables/:tableName/:id', asyncHandler(async (req, res) => {
   res.status(204).send();
 }));
 
-module.exports = router;
+export default router;

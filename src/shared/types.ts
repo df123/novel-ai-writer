@@ -318,3 +318,123 @@ export interface QueryResponse {
   /** 查询结果列表 */
   results: any[];
 }
+
+/**
+ * 数据库实体类型（数据库格式）
+ * 以下类型使用 snake_case 字段名，表示数据库中的原始数据
+ */
+
+/**
+ * 数据库项目接口
+ */
+export interface DbProject {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * 数据库聊天接口
+ */
+export interface DbChat {
+  id: string;
+  project_id: string;
+  name: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * 数据库消息接口
+ */
+export interface DbMessage {
+  id: string;
+  chat_id: string;
+  role: string;
+  content: string;
+  reasoning_content: string | null;
+  tool_calls: string | null;
+  tool_call_id: string | null;
+  timestamp: number;
+  order_index: number;
+  deleted: number;
+  deleted_at: number | null;
+}
+
+/**
+ * 数据库时间线节点接口
+ */
+export interface DbTimelineNode {
+  id: string;
+  project_id: string;
+  title: string;
+  content: string | null;
+  order_index: number;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * 数据库时间线版本接口
+ */
+export interface DbTimelineVersion {
+  id: string;
+  timeline_node_id: string;
+  title: string;
+  content: string | null;
+  version: number;
+  created_at: number;
+}
+
+/**
+ * 数据库人物接口
+ */
+export interface DbCharacter {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  personality: string | null;
+  background: string | null;
+  relationships: string | null;
+  avatar_url: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * 数据库人物版本接口
+ */
+export interface DbCharacterVersion {
+  id: string;
+  character_id: string;
+  name: string;
+  description: string | null;
+  personality: string | null;
+  background: string | null;
+  relationships: string | null;
+  avatar_url: string | null;
+  version: number;
+  created_at: number;
+}
+
+/**
+ * 数据库提示词模板接口
+ */
+export interface DbPromptTemplate {
+  id: string;
+  name: string;
+  template: string;
+  type: string;
+  created_at: number;
+}
+
+/**
+ * 数据库设置接口
+ */
+export interface DbSetting {
+  key: string;
+  value: string;
+}

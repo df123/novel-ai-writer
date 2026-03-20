@@ -1,22 +1,23 @@
 // 数据库初始化和迁移
-const fs = require('fs');
-const { default: initSqlJs } = require('sql.js');
-const { dbDir, dbPath } = require('../config');
-const { setDatabase, saveDB, query, run } = require('./queries');
-const { getCreateTablesSQL, getMigrationSQLs, getDefaultPromptTemplates } = require('./schema');
-const { generateId, now } = require('../utils/helpers');
+import * as fs from 'fs';
+import initSqlJs, { type SqlJsStatic } from 'sql.js';
+import { dbPath } from '../config';
+import { setDatabase, saveDB, query, run } from './queries';
+import { getCreateTablesSQL, getMigrationSQLs, getDefaultPromptTemplates } from './schema';
+import { generateId, now } from '../utils/helpers';
+import type { DatabaseConnection } from '../types/db.types';
 
-let SQL = null;
+let SQL: SqlJsStatic | null = null;
 
 /**
  * 初始化数据库
  */
-async function initDB() {
+export async function initDB(): Promise<DatabaseConnection> {
   SQL = await initSqlJs();
 
   // 检查数据库文件是否存在
-  let isNewDatabase = !fs.existsSync(dbPath);
-  let dbInstance;
+  const isNewDatabase = !fs.existsSync(dbPath);
+  let dbInstance: DatabaseConnection;
 
   if (fs.existsSync(dbPath)) {
     const fileBuffer = fs.readFileSync(dbPath);
@@ -48,8 +49,8 @@ async function initDB() {
 /**
  * 初始化默认提示词模板
  */
-async function initDefaultTemplates() {
-  const templatesCount = query('SELECT COUNT(*) as count FROM prompt_templates')[0].count;
+async function initDefaultTemplates(): Promise<void> {
+  const templatesCount = query<{ count: number }>('SELECT COUNT(*) as count FROM prompt_templates')[0].count;
   if (templatesCount === 0) {
     const defaultTemplates = getDefaultPromptTemplates(generateId, now);
     for (const t of defaultTemplates) {
@@ -62,14 +63,14 @@ async function initDefaultTemplates() {
 /**
  * 执行数据库迁移
  */
-async function runMigrations() {
+async function runMigrations(): Promise<void> {
   const migrationSQLs = getMigrationSQLs();
   for (const sql of migrationSQLs) {
     try {
       run(sql);
     } catch (e) {
       // 只捕获字段已存在的错误
-      const errorMessage = e.message?.toLowerCase() || '';
+      const errorMessage = (e as Error).message?.toLowerCase() || '';
       if (!errorMessage.includes('duplicate column name') &&
           !errorMessage.includes('duplicate') &&
           !errorMessage.includes('already exists')) {
@@ -82,16 +83,11 @@ async function runMigrations() {
 
 /**
  * 获取 SQL 构造函数
- * @returns {Object} SQL 构造函数
+ * @returns SQL 构造函数
  */
-function getSQL() {
+export function getSQL(): SqlJsStatic | null {
   return SQL;
 }
 
-module.exports = {
-  initDB,
-  getSQL,
-  saveDB,
-  query,
-  run
-};
+// 重新导出查询函数
+export { query, run, saveDB, getDatabase } from './queries';

@@ -1,10 +1,11 @@
 // 数据库表结构定义
+import type { DbPromptTemplate } from '@shared/types';
 
 /**
  * 获取创建所有表的 SQL 语句
- * @returns {string} 创建表的 SQL 语句
+ * @returns 创建表的 SQL 语句
  */
-function getCreateTablesSQL() {
+export function getCreateTablesSQL(): string {
   return `
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
@@ -107,9 +108,9 @@ function getCreateTablesSQL() {
 
 /**
  * 获取数据库迁移 SQL 语句
- * @returns {Array} 迁移 SQL 语句数组
+ * @returns 迁移 SQL 语句数组
  */
-function getMigrationSQLs() {
+export function getMigrationSQLs(): string[] {
   return [
     'ALTER TABLE messages ADD COLUMN tool_calls TEXT',
     'ALTER TABLE messages ADD COLUMN tool_call_id TEXT',
@@ -120,11 +121,14 @@ function getMigrationSQLs() {
 
 /**
  * 获取默认提示词模板
- * @param {Function} generateId - 生成 ID 的函数
- * @param {Function} now - 获取时间戳的函数
- * @returns {Array} 默认提示词模板数组
+ * @param generateId - 生成 ID 的函数
+ * @param now - 获取时间戳的函数
+ * @returns 默认提示词模板数组
  */
-function getDefaultPromptTemplates(generateId, now) {
+export function getDefaultPromptTemplates(
+  generateId: () => string,
+  now: () => number
+): DbPromptTemplate[] {
   return [
     {
       id: generateId(),
@@ -149,9 +153,3 @@ function getDefaultPromptTemplates(generateId, now) {
     }
   ];
 }
-
-module.exports = {
-  getCreateTablesSQL,
-  getMigrationSQLs,
-  getDefaultPromptTemplates
-};
