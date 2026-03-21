@@ -107,9 +107,13 @@
               <span class="version-label">标题:</span>
               <span class="version-value">{{ version.title || '-' }}</span>
             </div>
+            <div class="version-row">
+              <span class="version-label">时间:</span>
+              <span class="version-value">{{ version.date || '-' }}</span>
+            </div>
             <div v-if="version.content" class="version-row">
-              <span class="version-label">内容:</span>
-              <div class="version-value multi-line">{{ parseVersionContent(version.content) }}</div>
+              <span class="version-label">描述:</span>
+              <div class="version-value multi-line">{{ version.content }}</div>
             </div>
           </div>
           <div class="version-actions">
@@ -263,28 +267,7 @@ const formatVersionDate = (timestamp: number): string => {
   }
 };
 
-const parseVersionContent = (content: string): string => {
-  if (!content) return '';
-  try {
-    const lines = content.split('\n');
-    const parsed: Record<string, string> = {};
-    lines.forEach(line => {
-      const match = line.match(/^([^:]+):\s*(.*)$/);
-      if (match) {
-        const key = match[1].trim();
-        const value = match[2].trim();
-        if (key === 'Date' || key === 'Description') {
-          parsed[key] = value;
-        }
-      }
-    });
-    return Object.entries(parsed)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('\n');
-  } catch {
-    return content;
-  }
-};
+
 </script>
 
 <style scoped>
