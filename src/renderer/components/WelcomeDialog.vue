@@ -5,26 +5,26 @@
     width="600px"
     @close="handleClose"
   >
-    <div style="margin-bottom: 24px">
-      <p style="font-size: 14px; line-height: 1.6">
+    <div class="welcome-content">
+      <p class="intro-text">
         NovelAI Writer 是一款利用大语言模型辅助小说写作的桌面应用。
       </p>
-      <p style="font-size: 14px; color: #666; margin: 8px 0">主要功能：</p>
-      <ul style="padding-left: 24px; margin: 8px 0">
-        <li style="font-size: 14px; margin-bottom: 8px">LLM写作区：与AI助手进行对话，获取写作建议和内容生成</li>
-        <li style="font-size: 14px; margin-bottom: 8px">时间线管理：创建和管理小说的时间节点、事件顺序</li>
-        <li style="font-size: 14px; margin-bottom: 8px">人物线管理：创建角色设定、关系网络和发展轨迹</li>
-        <li style="font-size: 14px; margin-bottom: 8px">上下文注入：自动将时间线和人物信息注入到对话中</li>
-        <li style="font-size: 14px; margin-bottom: 8px">导出功能：支持导出为Markdown和文本格式</li>
+      <p class="section-title">主要功能：</p>
+      <ul class="feature-list">
+        <li>LLM写作区：与AI助手进行对话，获取写作建议和内容生成</li>
+        <li>时间线管理：创建和管理小说的时间节点、事件顺序</li>
+        <li>人物线管理：创建角色设定、关系网络和发展轨迹</li>
+        <li>上下文注入：自动将时间线和人物信息注入到对话中</li>
+        <li>导出功能：支持导出为Markdown和文本格式</li>
       </ul>
     </div>
     
     <div
       v-if="projects.length === 0"
-      style="background-color: #f5f7fa; padding: 16px; border-radius: 4px"
+      class="start-box"
     >
-      <p style="font-size: 14px; font-weight: 500; margin-bottom: 8px">开始使用</p>
-      <p style="font-size: 14px; color: #666">
+      <p class="start-title">开始使用</p>
+      <p class="start-text">
         点击下方按钮创建您的第一个项目，然后在设置中配置LLM API密钥。
       </p>
     </div>
@@ -87,3 +87,47 @@ const handleClose = () => {
   emit('close');
 };
 </script>
+
+<style scoped>
+.welcome-content {
+  margin-bottom: 24px;
+}
+
+.intro-text {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.section-title {
+  font-size: 14px;
+  color: #666;
+  margin: 8px 0;
+}
+
+.feature-list {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.feature-list li {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.start-box {
+  background-color: #f5f7fa;
+  padding: 16px;
+  border-radius: 4px;
+}
+
+.start-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.start-text {
+  font-size: 14px;
+  color: #666;
+}
+</style>

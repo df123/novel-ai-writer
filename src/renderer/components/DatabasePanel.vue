@@ -10,7 +10,7 @@
           :data="tables"
           v-loading="loading"
           @row-click="handleTableClick"
-          style="cursor: pointer"
+          class="clickable-table"
         >
           <el-table-column prop="name" label="表名" min-width="200" />
           <el-table-column prop="columns" label="列数" width="100">
@@ -39,7 +39,7 @@
           :data="tableData"
           v-loading="loading"
           @sort-change="handleSortChange"
-          style="width: 100%"
+          class="full-width-table"
         >
           <el-table-column
             v-for="column in selectedTable?.columns || []"
@@ -99,7 +99,7 @@
         </div>
 
         <div v-if="queryResults.length > 0" class="query-results">
-          <el-table :data="queryResults" style="width: 100%">
+          <el-table :data="queryResults" class="full-width-table">
             <el-table-column
               v-for="(column, index) in queryResultColumns"
               :key="index"
@@ -140,7 +140,7 @@
             v-else-if="isNumberType(column.type)"
             v-model="formData[column.name]"
             :placeholder="`请输入${column.name}`"
-            style="width: 100%"
+            class="full-width-input"
           />
           <el-input
             v-else
@@ -429,6 +429,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.clickable-table {
+  cursor: pointer;
+}
+
+.full-width-table {
+  width: 100%;
+}
+
+.full-width-input {
+  width: 100%;
+}
+
 .database-panel {
   height: 100%;
   display: flex;

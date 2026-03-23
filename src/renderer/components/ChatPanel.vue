@@ -1,16 +1,16 @@
 <template>
-  <el-main v-if="currentProject" style="flex: 1; min-width: 400px; display: flex; flex-direction: column; overflow: hidden; padding: 0">
-    <el-header style="border-bottom: 1px solid #e0e0e0; padding: 0; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px">
-      <span style="font-size: 16px; font-weight: 500">写作区</span>
-      <div style="display: flex; align-items: center; gap: 12px">
-        <el-select v-model="selectedProvider" size="small" style="width: 100px" @change="handleProviderChange">
+  <el-main v-if="currentProject" class="chat-main">
+    <el-header class="chat-header">
+      <span class="panel-title">写作区</span>
+      <div class="header-controls">
+        <el-select v-model="selectedProvider" size="small" class="provider-select" @change="handleProviderChange">
           <el-option label="DeepSeek" value="deepseek" />
           <el-option label="OpenRouter" value="openrouter" />
         </el-select>
-        <el-select v-model="selectedModel" size="small" style="width: 260px" filterable :loading="isLoadingModels" @change="handleModelChange" placeholder="选择模型">
+        <el-select v-model="selectedModel" size="small" class="model-select" filterable :loading="isLoadingModels" @change="handleModelChange" placeholder="选择模型">
           <el-option v-for="model in models" :key="model.id" :label="model.name" :value="model.id">
             <span>{{ model.name }}</span>
-            <span v-if="model.price" style="float: right; color: #909399; font-size: 12px">{{ model.price }}</span>
+            <span v-if="model.price" class="model-price">{{ model.price }}</span>
           </el-option>
         </el-select>
         <el-tag size="small" type="info">
@@ -19,22 +19,22 @@
       </div>
     </el-header>
 
-    <div v-if="!currentChat" style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px">
-      <div style="text-align: center; color: #999">
-        <p style="margin-bottom: 12px">暂无对话记录</p>
+    <div v-if="!currentChat" class="empty-chat">
+      <div class="empty-chat-content">
+        <p class="empty-text">暂无对话记录</p>
         <el-button type="primary" @click="handleCreateChat">创建新对话</el-button>
       </div>
     </div>
 
-    <div v-else style="flex: 1; overflow: auto; padding: 16px">
-      <div style="display: flex; flex-direction: column; gap: 16px">
+    <div v-else class="messages-container">
+      <div class="messages-list">
         <div
           v-for="(message, index) in messages"
           :key="message.id + index"
-          style="width: 100%"
+          class="message-item"
         >
-          <div style="display: flex; align-items: center; width: 100%; margin-bottom: 8px">
-            <span style="margin-left: 16px; font-size: 10px; color: #ccc;">
+          <div class="message-header">
+            <span class="message-role">
               Role: {{ message.role }}
             </span>
             <el-tag
@@ -43,15 +43,15 @@
             >
               {{ message.role === 'user' ? '作者' : 'AI助手' }}
             </el-tag>
-            <span style="margin-left: 8px; font-size: 12px; color: #666">
+            <span class="message-time">
               {{ formatTimestamp(message.timestamp) }}
             </span>
-            <span style="margin-left: 8px; font-size: 12px; color: #999">
+            <span class="message-tokens">
               ~{{ estimateMessageTokens(message) }} tokens
             </span>
             <el-dropdown
               trigger="click"
-              style="margin-left: auto"
+              class="message-dropdown"
               @command="(cmd: string) => handleMessageCommand(cmd, message.id)"
             >
               <el-button :icon="MoreFilled" circle size="small" text />
@@ -69,47 +69,47 @@
             }"
             shadow="never"
           >
-            <div v-if="message.role === 'user'" style="white-space: pre-wrap; line-height: 1.6;">
+            <div v-if="message.role === 'user'" class="user-message">
               {{ message.content }}
             </div>
             <div v-if="message.role === 'tool'">
-              <div style="padding: 8px; background: #f0f9eb; border-left: 3px solid #67c23a; border-radius: 4px; font-size: 12px;">
-                <div style="font-weight: 600; color: #67c23a; margin-bottom: 4px;">📋 工具结果</div>
-                <pre style="margin: 0; white-space: pre-wrap; color: #555;">{{ formatToolArguments(message.content) }}</pre>
+              <div class="tool-result">
+                <div class="tool-result-title">📋 工具结果</div>
+                <pre class="tool-result-content">{{ formatToolArguments(message.content) }}</pre>
               </div>
             </div>
             <div v-if="message.role === 'assistant' && displayReasoning(message)">
-              <div style="margin-bottom: 8px; padding: 8px; background: #fff; border-left: 3px solid #409eff; border-radius: 4px;">
-                <div style="font-size: 13px; font-weight: 600; color: #409eff; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <div class="reasoning-box">
+                <div class="reasoning-header">
                   <span>💭 思考过程</span>
-                  <el-button link size="small" style="padding: 0; min-height: auto;" @click="toggleCollapse('reasoning-' + message.id)">
-                    <span style="font-size: 12px;">{{ collapsedReasoning[message.id] ? '展开' : '收起' }}</span>
+                  <el-button link size="small" class="collapse-btn" @click="toggleCollapse('reasoning-' + message.id)">
+                    <span class="collapse-text">{{ collapsedReasoning[message.id] ? '展开' : '收起' }}</span>
                   </el-button>
                 </div>
-                <div v-if="!collapsedReasoning[message.id]" class="markdown-content" style="color: #666; font-size: 13px; line-height: 1.6;" v-html="renderMarkdown(displayReasoning(message))"></div>
+                <div v-if="!collapsedReasoning[message.id]" class="markdown-content reasoning-content" v-html="renderMarkdown(displayReasoning(message))"></div>
               </div>
             </div>
 
             <div v-if="message.role === 'assistant' && message.tool_calls && message.tool_calls.length > 0">
-              <div style="margin-bottom: 12px;">
-                <div style="font-size: 13px; font-weight: 600; color: #67c23a; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
+              <div class="tool-calls-section">
+                <div class="tool-calls-header">
                   <span>🔧 工具调用 ({{ message.tool_calls.length }})</span>
-                  <el-button link size="small" style="padding: 0; min-height: auto;" @click="toggleCollapse('tools-' + message.id)">
-                    <span style="font-size: 12px;">{{ collapsedTools[message.id] ? '展开' : '收起' }}</span>
+                  <el-button link size="small" class="collapse-btn" @click="toggleCollapse('tools-' + message.id)">
+                    <span class="collapse-text">{{ collapsedTools[message.id] ? '展开' : '收起' }}</span>
                   </el-button>
                 </div>
                 <div v-if="!collapsedTools[message.id]">
-                  <div v-for="(toolCall, i) in message.tool_calls" :key="i" style="margin-bottom: 8px; padding: 8px; background: #fff; border-left: 3px solid #67c23a; border-radius: 4px;">
-                    <div style="font-weight: 600; margin-bottom: 4px; color: #67c23a;">{{ toolCall.function.name }}</div>
-                    <pre style="margin: 0; white-space: pre-wrap; font-size: 12px; color: #666; background: #f9f9f9; padding: 8px; border-radius: 4px;">{{ formatToolArguments(toolCall.function.arguments) }}</pre>
+                  <div v-for="(toolCall, i) in message.tool_calls" :key="i" class="tool-call-item">
+                    <div class="tool-call-name">{{ toolCall.function.name }}</div>
+                    <pre class="tool-call-arguments">{{ formatToolArguments(toolCall.function.arguments) }}</pre>
                   </div>
                 </div>
               </div>
             </div>
 
             <div v-if="message.role === 'assistant' && displayContent(message)">
-              <div style="padding: 8px; background: #fff; border-left: 3px solid #909399; border-radius: 4px;">
-                <div style="font-size: 13px; font-weight: 600; color: #909399; margin-bottom: 4px;">✍️ 回答</div>
+              <div class="answer-box">
+                <div class="answer-title">✍️ 回答</div>
                 <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1" class="markdown-content" v-html="renderMarkdown(displayContent(message))"></div>
                 <div v-else class="markdown-content" v-html="renderMarkdown(displayContent(message))"></div>
               </div>
@@ -120,7 +120,7 @@
       </div>
     </div>
 
-    <el-footer style="border-top: 1px solid #e0e0e0; padding: 12px; height: auto; flex-shrink: 0">
+    <el-footer class="chat-footer">
       <el-input
         v-model="inputText"
         type="textarea"
@@ -139,7 +139,7 @@
       </el-input>
     </el-footer>
   </el-main>
-  <el-empty v-else description="请先选择或创建一个项目" style="flex: 1" />
+  <el-empty v-else description="请先选择或创建一个项目" class="empty-project" />
 </template>
 
 <script setup lang="ts">
@@ -294,6 +294,233 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.chat-main {
+  flex: 1;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.chat-header {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0 16px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.provider-select {
+  width: 100px;
+}
+
+.model-select {
+  width: 260px;
+}
+
+.model-price {
+  float: right;
+  color: #909399;
+  font-size: 12px;
+}
+
+.empty-chat {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.empty-chat-content {
+  text-align: center;
+  color: #999;
+}
+
+.empty-text {
+  margin-bottom: 12px;
+}
+
+.messages-container {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message-item {
+  width: 100%;
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.message-role {
+  margin-left: 16px;
+  font-size: 10px;
+  color: #ccc;
+}
+
+.message-time {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.message-tokens {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #999;
+}
+
+.message-dropdown {
+  margin-left: auto;
+}
+
+.user-message {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.tool-result {
+  padding: 8px;
+  background: #f0f9eb;
+  border-left: 3px solid #67c23a;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.tool-result-title {
+  font-weight: 600;
+  color: #67c23a;
+  margin-bottom: 4px;
+}
+
+.tool-result-content {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #555;
+}
+
+.reasoning-box {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #fff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+}
+
+.reasoning-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.collapse-btn {
+  padding: 0;
+  min-height: auto;
+}
+
+.collapse-text {
+  font-size: 12px;
+}
+
+.reasoning-content {
+  color: #666;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tool-calls-section {
+  margin-bottom: 12px;
+}
+
+.tool-calls-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #67c23a;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-call-item {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #fff;
+  border-left: 3px solid #67c23a;
+  border-radius: 4px;
+}
+
+.tool-call-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #67c23a;
+}
+
+.tool-call-arguments {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: #666;
+  background: #f9f9f9;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.answer-box {
+  padding: 8px;
+  background: #fff;
+  border-left: 3px solid #909399;
+  border-radius: 4px;
+}
+
+.answer-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.chat-footer {
+  border-top: 1px solid #e0e0e0;
+  padding: 12px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.empty-project {
+  flex: 1;
+}
+
 .markdown-content {
   line-height: 1.6;
 }

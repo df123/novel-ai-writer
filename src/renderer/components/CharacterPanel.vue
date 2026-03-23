@@ -1,15 +1,15 @@
 <template>
   <el-aside :style="{ width: isCollapsed ? '50px' : '320px', borderLeft: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }">
     <div :style="{ padding: isCollapsed ? '12px 8px' : '12px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }">
-      <span v-if="!isCollapsed" style="font-size: 16px; font-weight: 500">人物</span>
+      <span v-if="!isCollapsed" class="panel-title">人物</span>
       <div :style="{ display: 'flex', gap: '4px', margin: isCollapsed ? '0 auto' : '' }">
         <el-button v-if="!isCollapsed" :icon="Plus" circle size="small" @click="handleOpenCreateDialog" />
         <el-button :icon="isCollapsed ? ArrowRight : ArrowLeft" circle size="small" @click="toggleCollapse" />
       </div>
     </div>
 
-    <el-scrollbar v-if="!isCollapsed" style="flex: 1">
-      <div style="padding: 8px">
+    <el-scrollbar v-if="!isCollapsed" class="scrollbar-container">
+      <div class="tab-content">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
           <el-tab-pane label="人物" name="characters">
             <div
@@ -17,18 +17,18 @@
               :key="character.id"
               :class="['character-item', { 'is-deleted': character.deleted }]"
             >
-              <el-avatar :size="32" style="background-color: #67c23a; margin-right: 12px">
+              <el-avatar :size="32" class="avatar-green">
                 <el-icon><User /></el-icon>
               </el-avatar>
-              <div style="flex: 1; min-width: 0">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-                  <span style="font-size: 14px; font-weight: 500">{{ character.name }}</span>
+              <div class="character-info">
+                <div class="character-header">
+                  <span class="character-name">{{ character.name }}</span>
                   <el-tag v-if="character.deleted" type="info" size="small">已删除</el-tag>
                 </div>
-                <div v-if="character.personality" style="font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+                <div v-if="character.personality" class="personality-text">
                   {{ character.personality }}
                 </div>
-                <div v-if="character.deleted && character.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+                <div v-if="character.deleted && character.deletedAt" class="deleted-time">
                   删除于 {{ formatDeletedAt(character.deletedAt) }}
                 </div>
               </div>
@@ -43,16 +43,16 @@
             <el-empty v-if="characters.length === 0" description="暂无人物，点击右上角添加" :image-size="60" />
           </el-tab-pane>
           <el-tab-pane label="回收站" name="trash">
-            <div style="display: flex; gap: 8px; margin-bottom: 8px">
-              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+            <div class="trash-header">
+              <span class="trash-count">
                 共 {{ trashCharacters.length }} 个已删除人物
               </span>
             </div>
-            <div v-if="isLoadingTrash" style="text-align: center; padding: 20px">
+            <div v-if="isLoadingTrash" class="loading-container">
               <el-icon class="is-loading" :size="24">
                 <Loading />
               </el-icon>
-              <div style="margin-top: 8px; color: #999">加载中...</div>
+              <div class="loading-text">加载中...</div>
             </div>
             <div
               v-else
@@ -60,18 +60,18 @@
               :key="character.id"
               class="character-item is-deleted"
             >
-              <el-avatar :size="32" style="background-color: #909399; margin-right: 12px">
+              <el-avatar :size="32" class="avatar-gray">
                 <el-icon><User /></el-icon>
               </el-avatar>
-              <div style="flex: 1; min-width: 0">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-                  <span style="font-size: 14px; font-weight: 500">{{ character.name }}</span>
+              <div class="character-info">
+                <div class="character-header">
+                  <span class="character-name">{{ character.name }}</span>
                   <el-tag type="info" size="small">已删除</el-tag>
                 </div>
-                <div v-if="character.personality" style="font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+                <div v-if="character.personality" class="personality-text">
                   {{ character.personality }}
                 </div>
-                <div v-if="character.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+                <div v-if="character.deletedAt" class="deleted-time">
                   删除于 {{ formatDeletedAt(character.deletedAt) }}
                 </div>
               </div>
@@ -119,7 +119,7 @@
             placeholder='{"张三": "朋友", "李四": "同事"}'
           />
           <template #footer>
-            <span style="font-size: 12px; color: #999">例如: {"张三": "朋友", "李四": "同事"}</span>
+            <span class="form-hint">例如: {"张三": "朋友", "李四": "同事"}</span>
           </template>
         </el-form-item>
       </el-form>
@@ -136,16 +136,16 @@
       title="版本历史"
       width="800px"
     >
-      <div v-if="isLoadingVersions" style="text-align: center; padding: 20px">
+      <div v-if="isLoadingVersions" class="loading-container">
         <el-icon class="is-loading" :size="24">
           <Loading />
         </el-icon>
-        <div style="margin-top: 8px; color: #999">加载中...</div>
+        <div class="loading-text">加载中...</div>
       </div>
-      <div v-else-if="currentVersions.length === 0" style="text-align: center; padding: 40px; color: #999">
+      <div v-else-if="currentVersions.length === 0" class="empty-state">
         暂无版本记录
       </div>
-      <div v-else style="max-height: 500px; overflow-y: auto; padding: 4px">
+      <div v-else class="versions-container">
         <div
           v-for="(version, index) in currentVersions"
           :key="version.id"
@@ -154,7 +154,7 @@
         >
           <div class="version-header">
             <div class="version-badge" :class="{ 'latest-badge': index === 0 }">
-              <span v-if="index === 0" style="font-size: 11px; margin-right: 4px">🔥</span>
+              <span v-if="index === 0" class="badge-icon">🔥</span>
               v{{ version.version }}
             </div>
             <el-tag size="small" type="info">
@@ -398,6 +398,105 @@ const handlePermanentDelete = async (id: string) => {
 </script>
 
 <style scoped>
+.panel-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.scrollbar-container {
+  flex: 1;
+}
+
+.tab-content {
+  padding: 8px;
+}
+
+.avatar-green {
+  background-color: #67c23a;
+  margin-right: 12px;
+}
+
+.character-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.character-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.character-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.personality-text {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deleted-time {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.trash-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trash-count {
+  font-size: 12px;
+  color: #999;
+  margin-left: auto;
+  align-self: center;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 20px;
+}
+
+.loading-text {
+  margin-top: 8px;
+  color: #999;
+}
+
+.avatar-gray {
+  background-color: #909399;
+  margin-right: 12px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.versions-container {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.badge-icon {
+  font-size: 11px;
+  margin-right: 4px;
+}
+
 .character-item {
   position: relative;
   display: flex;

@@ -1,15 +1,15 @@
 <template>
   <el-aside :style="{ width: isCollapsed ? '50px' : '300px', borderRight: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }">
     <div :style="{ padding: isCollapsed ? '12px 8px' : '12px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }">
-      <span v-if="!isCollapsed" style="font-size: 16px; font-weight: 500">时间线</span>
+      <span v-if="!isCollapsed" class="panel-title">时间线</span>
       <div :style="{ display: 'flex', gap: '4px', margin: isCollapsed ? '0 auto' : '' }">
         <el-button v-if="!isCollapsed" :icon="Plus" circle size="small" @click="handleOpenCreateDialog" />
         <el-button :icon="isCollapsed ? ArrowLeft : ArrowRight" circle size="small" @click="toggleCollapse" />
       </div>
     </div>
 
-    <el-scrollbar v-if="!isCollapsed" style="flex: 1">
-      <div style="padding: 8px">
+    <el-scrollbar v-if="!isCollapsed" class="scrollbar-container">
+      <div class="tab-content">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
           <el-tab-pane label="时间线" name="timeline">
             <div
@@ -18,17 +18,17 @@
               :class="['node-item', { 'node-selected': selectedNode?.id === node.id, 'is-deleted': node.deleted }]"
               @click="handleSelect(node.id)"
             >
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-                <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
+              <div class="node-header">
+                <span class="node-title">{{ node.title }}</span>
                 <el-tag v-if="node.deleted" type="info" size="small">已删除</el-tag>
               </div>
-              <div style="font-size: 12px; color: #666; margin-bottom: 2px">
+              <div class="node-date">
                 {{ node.date || '未设置时间' }}
               </div>
-              <div v-if="node.content" style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+              <div v-if="node.content" class="node-content">
                 {{ node.content }}
               </div>
-              <div v-if="node.deleted && node.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+              <div v-if="node.deleted && node.deletedAt" class="deleted-time">
                 删除于 {{ formatDeletedAt(node.deletedAt) }}
               </div>
               <div class="node-actions">
@@ -42,16 +42,16 @@
             <el-empty v-if="nodes.length === 0" description="暂无时间节点，点击右上角添加" :image-size="60" />
           </el-tab-pane>
           <el-tab-pane label="回收站" name="trash">
-            <div style="display: flex; gap: 8px; margin-bottom: 8px">
-              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+            <div class="trash-header">
+              <span class="trash-count">
                 共 {{ trashNodes.length }} 个已删除节点
               </span>
             </div>
-            <div v-if="isLoadingTrash" style="text-align: center; padding: 20px">
+            <div v-if="isLoadingTrash" class="loading-container">
               <el-icon class="is-loading" :size="24">
                 <Loading />
               </el-icon>
-              <div style="margin-top: 8px; color: #999">加载中...</div>
+              <div class="loading-text">加载中...</div>
             </div>
             <div
               v-else
@@ -59,17 +59,17 @@
               :key="node.id"
               :class="['node-item', 'is-deleted']"
             >
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-                <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
+              <div class="node-header">
+                <span class="node-title">{{ node.title }}</span>
                 <el-tag type="info" size="small">已删除</el-tag>
               </div>
-              <div style="font-size: 12px; color: #666; margin-bottom: 2px">
+              <div class="node-date">
                 {{ node.date || '未设置时间' }}
               </div>
-              <div v-if="node.content" style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+              <div v-if="node.content" class="node-content">
                 {{ node.content }}
               </div>
-              <div v-if="node.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+              <div v-if="node.deletedAt" class="deleted-time">
                 删除于 {{ formatDeletedAt(node.deletedAt) }}
               </div>
               <div class="node-actions">
@@ -117,16 +117,16 @@
       title="版本历史"
       width="800px"
     >
-      <div v-if="isLoadingVersions" style="text-align: center; padding: 20px">
+      <div v-if="isLoadingVersions" class="loading-container">
         <el-icon class="is-loading" :size="24">
           <Loading />
         </el-icon>
-        <div style="margin-top: 8px; color: #999">加载中...</div>
+        <div class="loading-text">加载中...</div>
       </div>
-      <div v-else-if="currentVersions.length === 0" style="text-align: center; padding: 40px; color: #999">
+      <div v-else-if="currentVersions.length === 0" class="empty-state">
         暂无版本记录
       </div>
-      <div v-else style="max-height: 500px; overflow-y: auto; padding: 4px">
+      <div v-else class="versions-container">
         <div
           v-for="(version, index) in currentVersions"
           :key="version.id"
@@ -135,7 +135,7 @@
         >
           <div class="version-header">
             <div class="version-badge" :class="{ 'latest-badge': index === 0 }">
-              <span v-if="index === 0" style="font-size: 11px; margin-right: 4px">🔥</span>
+              <span v-if="index === 0" class="badge-icon">🔥</span>
               v{{ version.version }}
             </div>
             <el-tag size="small" type="info">
@@ -379,6 +379,91 @@ const handlePermanentDelete = async (id: string) => {
 </script>
 
 <style scoped>
+.panel-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.scrollbar-container {
+  flex: 1;
+}
+
+.tab-content {
+  padding: 8px;
+}
+
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.node-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.node-date {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.node-content {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deleted-time {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.trash-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trash-count {
+  font-size: 12px;
+  color: #999;
+  margin-left: auto;
+  align-self: center;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 20px;
+}
+
+.loading-text {
+  margin-top: 8px;
+  color: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.versions-container {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.badge-icon {
+  font-size: 11px;
+  margin-right: 4px;
+}
+
 .node-item {
   position: relative;
   padding: 12px;

@@ -1,10 +1,10 @@
 <template>
-  <div v-if="projects.length > 0" style="min-width: 200px; margin-left: 8px" v-bind="$attrs">
+  <div v-if="projects.length > 0" class="project-selector" v-bind="$attrs">
     <el-select
       v-model="selectedProjectId"
       placeholder="选择项目"
       size="small"
-      style="width: 100%"
+      class="full-width-select"
     >
       <el-option
         v-for="project in projects"
@@ -13,14 +13,14 @@
         :value="project.id"
       >
         <template #default>
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
-            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+          <div class="option-content">
+            <span class="option-title">
               {{ project.title }}
             </span>
             <el-icon
               :size="14"
               @click.stop="handleDeleteProject(project.id)"
-              style="margin-left: 8px; cursor: pointer"
+              class="delete-icon"
             >
               <Delete />
             </el-icon>
@@ -98,3 +98,33 @@ const handleDeleteConfirm = async () => {
   }
 };
 </script>
+
+<style scoped>
+.project-selector {
+  min-width: 200px;
+  margin-left: 8px;
+}
+
+.full-width-select {
+  width: 100%;
+}
+
+.option-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.option-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-icon {
+  margin-left: 8px;
+  cursor: pointer;
+}
+</style>

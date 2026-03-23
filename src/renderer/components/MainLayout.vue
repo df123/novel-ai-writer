@@ -1,16 +1,16 @@
 <template>
-  <el-container style="height: 100vh; display: flex; flex-direction: column">
-    <el-header style="background-color: #1976d2; color: white; padding: 0 16px; flex-shrink: 0; height: 60px">
-      <el-row align="middle" style="height: 100%">
-        <el-icon :size="24" style="margin-right: 12px">
+  <el-container class="main-container">
+    <el-header class="app-header">
+      <el-row align="middle" class="header-row">
+        <el-icon :size="24" class="logo-icon">
           <HomeFilled />
         </el-icon>
-        <span style="font-size: 18px; font-weight: 500; flex: 1">NovelAI Writer</span>
-        <ProjectSelector style="margin: 0 8px" />
+        <span class="app-title">NovelAI Writer</span>
+        <ProjectSelector class="project-selector" />
         <el-button
           :icon="Setting"
           circle
-          style="margin-left: 8px"
+          class="settings-button"
           @click="showSettings = true"
         />
         <el-dropdown trigger="click" @command="handleMenuCommand">
@@ -26,7 +26,7 @@
       </el-row>
     </el-header>
 
-    <el-container style="flex: 1; overflow: hidden; display: flex; flex-direction: row">
+    <el-container class="content-container">
       <TimelinePanel />
       <ChatPanel />
       <CharacterPanel />
@@ -99,3 +99,48 @@ const handleMenuCommand = (command: string) => {
   }
 };
 </script>
+
+<style scoped>
+.main-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background-color: #1976d2;
+  color: white;
+  padding: 0 16px;
+  flex-shrink: 0;
+  height: 60px;
+}
+
+.header-row {
+  height: 100%;
+}
+
+.logo-icon {
+  margin-right: 12px;
+}
+
+.app-title {
+  font-size: 18px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.project-selector {
+  margin: 0 8px;
+}
+
+.settings-button {
+  margin-left: 8px;
+}
+
+.content-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+}
+</style>
