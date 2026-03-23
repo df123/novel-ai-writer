@@ -55,6 +55,9 @@ export const timelineApi = {
   delete: (id: string) => api.delete(`/timeline/${id}`),
   getVersions: (nodeId: string) => api.get(`/timeline/${nodeId}/versions`),
   restoreVersion: (nodeId: string, versionId: string) => api.post(`/timeline/${nodeId}/versions/${versionId}/restore`),
+  restore: (id: string) => api.post(`/timeline/${id}/restore`),
+  permanentDelete: (id: string) => api.delete(`/timeline/${id}/permanent`),
+  getTrash: (projectId: string) => api.get(`/projects/${projectId}/timeline/trash`),
 };
 
 // Characters
@@ -91,6 +94,9 @@ export const characterApi = {
   delete: (id: string) => api.delete(`/characters/${id}`),
   getVersions: (characterId: string) => api.get(`/characters/${characterId}/versions`),
   restoreVersion: (characterId: string, versionId: string) => api.post(`/characters/${characterId}/versions/${versionId}/restore`),
+  restore: (id: string) => api.post(`/characters/${id}/restore`),
+  permanentDelete: (id: string) => api.delete(`/characters/${id}/permanent`),
+  getTrash: (projectId: string) => api.get(`/projects/${projectId}/characters/trash`),
 };
 
 // LLM

@@ -104,7 +104,9 @@ export function formatTimelineNode(node: DbTimelineNode): TimelineNode {
     description: node.content || '',
     content: node.content ?? undefined,
     orderIndex: node.order_index,
-    createdAt: node.created_at
+    createdAt: node.created_at,
+    deleted: node.deleted === 1,
+    deletedAt: node.deleted_at ?? undefined
   };
 }
 
@@ -120,7 +122,9 @@ export function formatCharacter(character: DbCharacter): Character {
     createdAt: character.created_at,
     personality: character.personality ?? undefined,
     background: character.background ?? undefined,
-    relationships: character.relationships ?? undefined
+    relationships: character.relationships ?? undefined,
+    deleted: character.deleted === 1,
+    deletedAt: character.deleted_at ?? undefined
   };
 }
 

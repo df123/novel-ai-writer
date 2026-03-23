@@ -106,6 +106,12 @@ export interface TimelineNode {
 
   /** 节点创建时间戳（秒） */
   createdAt: number;
+
+  /** 是否已删除（软删除标记） */
+  deleted?: boolean;
+
+  /** 删除时间戳（秒，可选） */
+  deletedAt?: number;
 }
 
 /**
@@ -160,6 +166,12 @@ export interface Character {
   
   /** 人物创建时间戳（秒） */
   createdAt: number;
+
+  /** 是否已删除（软删除标记） */
+  deleted?: boolean;
+
+  /** 删除时间戳（秒，可选） */
+  deletedAt?: number;
 }
 
 /**
@@ -366,6 +378,10 @@ export interface DbTimelineNode {
   order_index: number;
   created_at: number;
   updated_at: number;
+  /** 是否已删除（0: 未删除, 1: 已删除） */
+  deleted: number;
+  /** 删除时间戳（秒，可选） */
+  deleted_at: number | null;
 }
 
 /**
@@ -393,6 +409,10 @@ export interface DbCharacter {
   relationships: string | null;
   created_at: number;
   updated_at: number;
+  /** 是否已删除（0: 未删除, 1: 已删除） */
+  deleted: number;
+  /** 删除时间戳（秒，可选） */
+  deleted_at: number | null;
 }
 
 /**

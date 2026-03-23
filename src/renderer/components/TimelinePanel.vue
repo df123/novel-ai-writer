@@ -10,36 +10,84 @@
 
     <el-scrollbar v-if="!isCollapsed" style="flex: 1">
       <div style="padding: 8px">
-        <div style="display: flex; gap: 8px; margin-bottom: 8px">
-          <el-button size="small" @click="toggleAllNodes(true)">全选</el-button>
-          <el-button size="small" @click="toggleAllNodes(false)">取消全选</el-button>
-          <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
-            已选 {{ selectedNodes.size }} / {{ nodes.length }}
-          </span>
-        </div>
-        <div
-          v-for="node in nodes"
-          :key="node.id"
-          :class="['node-item', { 'node-selected': selectedNode?.id === node.id }]"
-          @click="handleSelect(node.id)"
-        >
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-            <el-checkbox :model-value="selectedNodes.has(node.id)" @change="(val: any) => toggleNodeSelection(node.id)" @click.stop />
-            <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
-          </div>
-          <div style="font-size: 12px; color: #666; margin-bottom: 2px">
-            {{ node.date || '未设置时间' }}
-          </div>
-           <div v-if="node.content" style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
-            {{ node.content }}
-          </div>
-          <div class="node-actions">
-            <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(node)" />
-            <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(node.id)" title="查看版本" />
-            <el-button :icon="Delete" circle size="small" text @click.stop="deleteNode(node.id)" />
-          </div>
-        </div>
-        <el-empty v-if="nodes.length === 0" description="暂无时间节点，点击右上角添加" :image-size="60" />
+        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+          <el-tab-pane label="时间线" name="timeline">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px">
+              <el-button size="small" @click="toggleAllNodes(true)">全选</el-button>
+              <el-button size="small" @click="toggleAllNodes(false)">取消全选</el-button>
+              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+                已选 {{ selectedNodes.size }} / {{ nodes.length }}
+              </span>
+            </div>
+            <div
+              v-for="node in nodes"
+              :key="node.id"
+              :class="['node-item', { 'node-selected': selectedNode?.id === node.id, 'is-deleted': node.deleted }]"
+              @click="handleSelect(node.id)"
+            >
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+                <el-checkbox :model-value="selectedNodes.has(node.id)" @change="(val: any) => toggleNodeSelection(node.id)" @click.stop />
+                <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
+                <el-tag v-if="node.deleted" type="info" size="small">已删除</el-tag>
+              </div>
+              <div style="font-size: 12px; color: #666; margin-bottom: 2px">
+                {{ node.date || '未设置时间' }}
+              </div>
+              <div v-if="node.content" style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+                {{ node.content }}
+              </div>
+              <div v-if="node.deleted && node.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+                删除于 {{ formatDeletedAt(node.deletedAt) }}
+              </div>
+              <div class="node-actions">
+                <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(node)" :disabled="node.deleted" />
+                <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(node.id)" title="查看版本" :disabled="node.deleted" />
+                <el-button v-if="node.deleted" :icon="RefreshLeft" circle size="small" text @click.stop="handleRestore(node.id)" title="恢复" />
+                <el-button v-if="node.deleted" :icon="Delete" circle size="small" text type="danger" @click.stop="handlePermanentDelete(node.id)" title="永久删除" />
+                <el-button v-else :icon="Delete" circle size="small" text @click.stop="deleteNode(node.id)" title="移至回收站" />
+              </div>
+            </div>
+            <el-empty v-if="nodes.length === 0" description="暂无时间节点，点击右上角添加" :image-size="60" />
+          </el-tab-pane>
+          <el-tab-pane label="回收站" name="trash">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px">
+              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+                共 {{ trashNodes.length }} 个已删除节点
+              </span>
+            </div>
+            <div v-if="isLoadingTrash" style="text-align: center; padding: 20px">
+              <el-icon class="is-loading" :size="24">
+                <Loading />
+              </el-icon>
+              <div style="margin-top: 8px; color: #999">加载中...</div>
+            </div>
+            <div
+              v-else
+              v-for="node in trashNodes"
+              :key="node.id"
+              :class="['node-item', 'is-deleted']"
+            >
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+                <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
+                <el-tag type="info" size="small">已删除</el-tag>
+              </div>
+              <div style="font-size: 12px; color: #666; margin-bottom: 2px">
+                {{ node.date || '未设置时间' }}
+              </div>
+              <div v-if="node.content" style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+                {{ node.content }}
+              </div>
+              <div v-if="node.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+                删除于 {{ formatDeletedAt(node.deletedAt) }}
+              </div>
+              <div class="node-actions">
+                <el-button :icon="RefreshLeft" circle size="small" text type="primary" @click.stop="handleRestore(node.id)" title="恢复" />
+                <el-button :icon="Delete" circle size="small" text type="danger" @click.stop="handlePermanentDelete(node.id)" title="永久删除" />
+              </div>
+            </div>
+            <el-empty v-if="trashNodes.length === 0 && !isLoadingTrash" description="回收站为空" :image-size="60" />
+          </el-tab-pane>
+        </el-tabs>
       </div>
     </el-scrollbar>
 
@@ -135,11 +183,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
-import { ElMessage } from 'element-plus';
+import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useProjectStore } from '../stores/projectStore';
+import { timelineApi } from '../utils/api';
+import { formatDeletedAt } from '@shared/utils';
 
 const timelineStore = useTimelineStore();
+const projectStore = useProjectStore();
 const { nodes, selectedNode, selectedNodes, versions, isLoadingVersions } = storeToRefs(timelineStore);
 const { createNode, updateNode, deleteNode, selectNode, toggleNodeSelection, toggleAllNodes, loadVersions, restoreVersion } = timelineStore;
 
@@ -158,6 +210,9 @@ const description = ref('');
 const isCollapsed = ref(false);
 const versionsDialogOpen = ref(false);
 const versionNodeId = ref<string | null>(null);
+const activeTab = ref('timeline');
+const trashNodes = ref<any[]>([]);
+const isLoadingTrash = ref(false);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -197,8 +252,10 @@ const handleSubmit = async () => {
       await createNode(title.value, description.value, { date: date.value });
     }
     handleCloseDialog();
+    ElMessage.success(editMode.value ? '保存成功' : '创建成功');
   } catch (error) {
     console.error('Failed to save timeline node:', error);
+    ElMessage.error('保存失败，请重试');
   }
 };
 
@@ -244,7 +301,7 @@ const formatVersionDate = (timestamp: number): string => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       if (hours === 0) {
@@ -264,6 +321,68 @@ const formatVersionDate = (timestamp: number): string => {
     }
   } catch {
     return '时间解析错误';
+  }
+};
+
+const handleTabChange = async (tabName: string) => {
+  if (tabName === 'trash' && projectStore.currentProject) {
+    await loadTrash();
+  }
+};
+
+const loadTrash = async () => {
+  if (!projectStore.currentProject) return;
+  isLoadingTrash.value = true;
+  try {
+    const response = await timelineApi.getTrash(projectStore.currentProject.id);
+    trashNodes.value = response.data;
+  } catch (error) {
+    console.error('Failed to load trash:', error);
+    ElMessage.error('加载回收站失败');
+  } finally {
+    isLoadingTrash.value = false;
+  }
+};
+
+const handleRestore = async (id: string) => {
+  try {
+    await timelineApi.restore(id);
+    ElMessage.success('恢复成功');
+    // 刷新列表
+    if (activeTab.value === 'trash') {
+      await loadTrash();
+    }
+    if (projectStore.currentProject) {
+      await timelineStore.loadNodes(projectStore.currentProject.id);
+    }
+  } catch (error) {
+    console.error('Failed to restore node:', error);
+    ElMessage.error('恢复失败');
+  }
+};
+
+const handlePermanentDelete = async (id: string) => {
+  try {
+    await ElMessageBox.confirm(
+      '永久删除后无法恢复，确定要删除吗？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    await timelineApi.permanentDelete(id);
+    ElMessage.success('永久删除成功');
+    // 刷新列表
+    if (activeTab.value === 'trash') {
+      await loadTrash();
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Failed to permanent delete node:', error);
+      ElMessage.error('永久删除失败');
+    }
   }
 };
 
@@ -291,6 +410,15 @@ const formatVersionDate = (timestamp: number): string => {
 .node-selected {
   background-color: #ecf5ff;
   border-color: #409eff;
+}
+
+.is-deleted {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+}
+
+.is-deleted .node-actions {
+  opacity: 1;
 }
 
 .node-actions {

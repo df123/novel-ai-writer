@@ -14,43 +14,93 @@
 
     <el-scrollbar v-if="!isCollapsed" style="flex: 1">
       <div style="padding: 8px">
-        <div style="display: flex; gap: 8px; margin-bottom: 8px">
-          <el-button size="small" @click="toggleAllCharacters(true)">全选</el-button>
-          <el-button size="small" @click="toggleAllCharacters(false)">取消全选</el-button>
-          <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
-            已选 {{ selectedCharacters.size }} / {{ characters.length }}
-          </span>
-        </div>
-        <div
-          v-for="character in characters"
-          :key="character.id"
-          class="character-item"
-          @click="toggleCharacterSelection(character.id)"
-        >
-          <el-checkbox
-            :model-value="selectedCharacters.has(character.id)"
-            @change="toggleCharacterSelection(character.id)"
-            style="margin-right: 12px"
-          />
-          <el-avatar :size="32" style="background-color: #67c23a; margin-right: 12px">
-            <el-icon><User /></el-icon>
-          </el-avatar>
-          <div style="flex: 1; min-width: 0">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-              <span style="font-size: 14px; font-weight: 500">{{ character.name }}</span>
-              <el-tag v-if="selectedCharacters.has(character.id)" size="small" type="primary">已选中</el-tag>
+        <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+          <el-tab-pane label="人物" name="characters">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px">
+              <el-button size="small" @click="toggleAllCharacters(true)">全选</el-button>
+              <el-button size="small" @click="toggleAllCharacters(false)">取消全选</el-button>
+              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+                已选 {{ selectedCharacters.size }} / {{ characters.length }}
+              </span>
             </div>
-            <div v-if="character.personality" style="font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
-              {{ character.personality }}
+            <div
+              v-for="character in characters"
+              :key="character.id"
+              :class="['character-item', { 'is-deleted': character.deleted }]"
+              @click="toggleCharacterSelection(character.id)"
+            >
+              <el-checkbox
+                :model-value="selectedCharacters.has(character.id)"
+                @change="toggleCharacterSelection(character.id)"
+                style="margin-right: 12px"
+              />
+              <el-avatar :size="32" style="background-color: #67c23a; margin-right: 12px">
+                <el-icon><User /></el-icon>
+              </el-avatar>
+              <div style="flex: 1; min-width: 0">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+                  <span style="font-size: 14px; font-weight: 500">{{ character.name }}</span>
+                  <el-tag v-if="character.deleted" type="info" size="small">已删除</el-tag>
+                  <el-tag v-if="selectedCharacters.has(character.id)" size="small" type="primary">已选中</el-tag>
+                </div>
+                <div v-if="character.personality" style="font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+                  {{ character.personality }}
+                </div>
+                <div v-if="character.deleted && character.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+                  删除于 {{ formatDeletedAt(character.deletedAt) }}
+                </div>
+              </div>
+              <div class="character-actions">
+                <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(character)" :disabled="character.deleted" />
+                <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(character.id)" title="查看版本" :disabled="character.deleted" />
+                <el-button v-if="character.deleted" :icon="RefreshLeft" circle size="small" text @click.stop="handleRestore(character.id)" title="恢复" />
+                <el-button v-if="character.deleted" :icon="Delete" circle size="small" text type="danger" @click.stop="handlePermanentDelete(character.id)" title="永久删除" />
+                <el-button v-else :icon="Delete" circle size="small" text @click.stop="deleteCharacter(character.id)" title="移至回收站" />
+              </div>
             </div>
-          </div>
-          <div class="character-actions">
-            <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(character)" />
-            <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(character.id)" title="查看版本" />
-            <el-button :icon="Delete" circle size="small" text @click.stop="deleteCharacter(character.id)" />
-          </div>
-        </div>
-        <el-empty v-if="characters.length === 0" description="暂无人物，点击右上角添加" :image-size="60" />
+            <el-empty v-if="characters.length === 0" description="暂无人物，点击右上角添加" :image-size="60" />
+          </el-tab-pane>
+          <el-tab-pane label="回收站" name="trash">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px">
+              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
+                共 {{ trashCharacters.length }} 个已删除人物
+              </span>
+            </div>
+            <div v-if="isLoadingTrash" style="text-align: center; padding: 20px">
+              <el-icon class="is-loading" :size="24">
+                <Loading />
+              </el-icon>
+              <div style="margin-top: 8px; color: #999">加载中...</div>
+            </div>
+            <div
+              v-else
+              v-for="character in trashCharacters"
+              :key="character.id"
+              class="character-item is-deleted"
+            >
+              <el-avatar :size="32" style="background-color: #909399; margin-right: 12px">
+                <el-icon><User /></el-icon>
+              </el-avatar>
+              <div style="flex: 1; min-width: 0">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
+                  <span style="font-size: 14px; font-weight: 500">{{ character.name }}</span>
+                  <el-tag type="info" size="small">已删除</el-tag>
+                </div>
+                <div v-if="character.personality" style="font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+                  {{ character.personality }}
+                </div>
+                <div v-if="character.deletedAt" style="font-size: 11px; color: #999; margin-top: 4px">
+                  删除于 {{ formatDeletedAt(character.deletedAt) }}
+                </div>
+              </div>
+              <div class="character-actions">
+                <el-button :icon="RefreshLeft" circle size="small" text type="primary" @click.stop="handleRestore(character.id)" title="恢复" />
+                <el-button :icon="Delete" circle size="small" text type="danger" @click.stop="handlePermanentDelete(character.id)" title="永久删除" />
+              </div>
+            </div>
+            <el-empty v-if="trashCharacters.length === 0 && !isLoadingTrash" description="回收站为空" :image-size="60" />
+          </el-tab-pane>
+        </el-tabs>
       </div>
     </el-scrollbar>
 
@@ -166,11 +216,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading } from '@element-plus/icons-vue';
-import { ElMessage } from 'element-plus';
+import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useCharacterStore } from '../stores/characterStore';
+import { useProjectStore } from '../stores/projectStore';
+import { characterApi } from '../utils/api';
+import { formatDeletedAt } from '@shared/utils';
 
 const characterStore = useCharacterStore();
+const projectStore = useProjectStore();
 const { characters, selectedCharacters, currentVersions, isLoadingVersions } = storeToRefs(characterStore);
 const { createCharacter, updateCharacter, deleteCharacter, toggleCharacterSelection, clearCharacterSelection, loadVersions, restoreVersion } = characterStore;
 
@@ -184,6 +238,9 @@ const relationships = ref('');
 const isCollapsed = ref(false);
 const versionsDialogOpen = ref(false);
 const versionCharacterId = ref<string | null>(null);
+const activeTab = ref('characters');
+const trashCharacters = ref<any[]>([]);
+const isLoadingTrash = ref(false);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -243,8 +300,10 @@ const handleSubmit = async () => {
       await createCharacter(characterData);
     }
     handleCloseDialog();
+    ElMessage.success(editMode.value ? '保存成功' : '创建成功');
   } catch (error) {
     console.error('Failed to save character:', error);
+    ElMessage.error('保存失败，请重试');
   }
 };
 
@@ -282,7 +341,7 @@ const formatVersionDate = (timestamp: number | undefined): string => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       if (hours === 0) {
@@ -304,6 +363,68 @@ const formatVersionDate = (timestamp: number | undefined): string => {
     return '时间解析错误';
   }
 };
+
+const handleTabChange = async (tabName: string) => {
+  if (tabName === 'trash' && projectStore.currentProject) {
+    await loadTrash();
+  }
+};
+
+const loadTrash = async () => {
+  if (!projectStore.currentProject) return;
+  isLoadingTrash.value = true;
+  try {
+    const response = await characterApi.getTrash(projectStore.currentProject.id);
+    trashCharacters.value = response.data;
+  } catch (error) {
+    console.error('Failed to load trash:', error);
+    ElMessage.error('加载回收站失败');
+  } finally {
+    isLoadingTrash.value = false;
+  }
+};
+
+const handleRestore = async (id: string) => {
+  try {
+    await characterApi.restore(id);
+    ElMessage.success('恢复成功');
+    // 刷新列表
+    if (activeTab.value === 'trash') {
+      await loadTrash();
+    }
+    if (projectStore.currentProject) {
+      await characterStore.loadCharacters(projectStore.currentProject.id);
+    }
+  } catch (error) {
+    console.error('Failed to restore character:', error);
+    ElMessage.error('恢复失败');
+  }
+};
+
+const handlePermanentDelete = async (id: string) => {
+  try {
+    await ElMessageBox.confirm(
+      '永久删除后无法恢复，确定要删除吗？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    await characterApi.permanentDelete(id);
+    ElMessage.success('永久删除成功');
+    // 刷新列表
+    if (activeTab.value === 'trash') {
+      await loadTrash();
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Failed to permanent delete character:', error);
+      ElMessage.error('永久删除失败');
+    }
+  }
+};
 </script>
 
 <style scoped>
@@ -322,6 +443,15 @@ const formatVersionDate = (timestamp: number | undefined): string => {
 }
 
 .character-item:hover .character-actions {
+  opacity: 1;
+}
+
+.is-deleted {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+}
+
+.is-deleted .character-actions {
   opacity: 1;
 }
 

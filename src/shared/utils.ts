@@ -142,12 +142,12 @@ export function estimateMessageTokens(message: { role?: string; content?: string
 
 /**
  * 估算整个对话的 token 数量
- * 
+ *
  * 包含所有消息的 token 估算总和
- * 
+ *
  * @param messages - 消息数组
  * @returns 估算的总 token 数量
- * 
+ *
  * @example
  * ```typescript
  * estimateConversationTokens([
@@ -159,10 +159,37 @@ export function estimateMessageTokens(message: { role?: string; content?: string
 export function estimateConversationTokens(messages: { role?: string; content?: string }[]): number {
   // 对话基础开销（JSON 数组格式等）
   let totalTokens = 3;
-  
+
   for (const message of messages) {
     totalTokens += estimateMessageTokens(message);
   }
-  
+
   return Math.ceil(totalTokens);
+}
+
+/**
+ * 格式化删除时间戳为本地化日期时间字符串
+ *
+ * @param timestamp - 删除时间戳（秒）
+ * @returns 格式化的日期时间字符串，例如 "2024/03/16 12:00"
+ *
+ * @example
+ * ```typescript
+ * formatDeletedAt(1710576000); // "2024/03/16 12:00"
+ * formatDeletedAt(undefined); // "未知时间"
+ * ```
+ */
+export function formatDeletedAt(timestamp: number | undefined): string {
+  if (!timestamp || timestamp < 1000000) {
+    return '未知时间';
+  }
+  try {
+    const date = new Date(timestamp * 1000);
+    if (isNaN(date.getTime())) {
+      return '时间无效';
+    }
+    return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '时间解析错误';
+  }
 }

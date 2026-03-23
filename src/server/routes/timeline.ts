@@ -46,7 +46,7 @@ router.get('/projects/:projectId/timeline', asyncHandler(async (req: Request, re
   const { projectId } = req.params;
   const { title, content } = req.query as GetTimelineNodesQuery;
   
-  let sql = 'SELECT * FROM timeline_nodes WHERE project_id = ?';
+  let sql = 'SELECT * FROM timeline_nodes WHERE project_id = ? AND deleted = 0';
   const params: (string | number)[] = [projectId];
   
   if (title) {
@@ -125,13 +125,62 @@ router.put('/timeline/:id', asyncHandler(async (req: Request, res: Response) => 
 }));
 
 /**
- * 删除时间线节点
+ * 删除时间线节点（软删除）
  */
 router.delete('/timeline/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  const deletedAt = now();
+  run('UPDATE timeline_nodes SET deleted = 1, deleted_at = ? WHERE id = ?', [deletedAt, id]);
+  saveDB();
+  res.status(204).send();
+}));
+
+/**
+ * 恢复时间线节点
+ */
+router.post('/timeline/:id/restore', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
+  if (nodes.length === 0) {
+    res.status(404).json({ error: '时间线节点未找到' });
+    return;
+  }
+  run('UPDATE timeline_nodes SET deleted = 0, deleted_at = NULL WHERE id = ?', [id]);
+  saveDB();
+  const restoredNodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
+  res.json(formatTimelineNode(restoredNodes[0]));
+}));
+
+/**
+ * 永久删除时间线节点
+ */
+router.delete('/timeline/:id/permanent', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
+  if (nodes.length === 0) {
+    res.status(404).json({ error: '时间线节点未找到' });
+    return;
+  }
+  if (nodes[0].deleted === 0) {
+    res.status(400).json({ error: '只能永久删除已软删除的时间线节点' });
+    return;
+  }
   run('DELETE FROM timeline_nodes WHERE id = ?', [id]);
   saveDB();
   res.status(204).send();
+}));
+
+/**
+ * 获取项目的时间线节点回收站
+ */
+router.get('/projects/:projectId/timeline/trash', asyncHandler(async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const nodes = query<DbTimelineNode>(
+    'SELECT * FROM timeline_nodes WHERE project_id = ? AND deleted = 1 ORDER BY deleted_at DESC',
+    [projectId]
+  );
+  const formattedNodes = nodes.map(n => formatTimelineNode(n));
+  res.json(formattedNodes);
 }));
 
 /**
@@ -139,7 +188,7 @@ router.delete('/timeline/:id', asyncHandler(async (req: Request, res: Response) 
  */
 router.get('/timeline/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ?', [id]);
+  const nodes = query<DbTimelineNode>('SELECT * FROM timeline_nodes WHERE id = ? AND deleted = 0', [id]);
   if (nodes.length === 0) {
     res.status(404).json({ error: '时间线节点未找到' });
     return;

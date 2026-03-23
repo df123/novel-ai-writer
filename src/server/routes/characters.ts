@@ -47,7 +47,7 @@ router.get('/projects/:projectId/characters', asyncHandler(async (req: Request, 
   const { projectId } = req.params;
   const { name, personality, background } = req.query as GetCharactersQuery;
 
-  let sql = 'SELECT * FROM characters WHERE project_id = ?';
+  let sql = 'SELECT * FROM characters WHERE project_id = ? AND deleted = 0';
   const params: (string | number)[] = [projectId];
 
   if (name) {
@@ -190,13 +190,62 @@ router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) =
 }));
 
 /**
- * 删除角色
+ * 删除角色（软删除）
  */
 router.delete('/characters/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  const deletedAt = now();
+  run('UPDATE characters SET deleted = 1, deleted_at = ? WHERE id = ?', [deletedAt, id]);
+  saveDB();
+  res.status(204).send();
+}));
+
+/**
+ * 恢复角色
+ */
+router.post('/characters/:id/restore', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const characters = query<DbCharacter>('SELECT * FROM characters WHERE id = ?', [id]);
+  if (characters.length === 0) {
+    res.status(404).json({ error: '角色未找到' });
+    return;
+  }
+  run('UPDATE characters SET deleted = 0, deleted_at = NULL WHERE id = ?', [id]);
+  saveDB();
+  const restoredCharacters = query<DbCharacter>('SELECT * FROM characters WHERE id = ?', [id]);
+  res.json(formatCharacter(restoredCharacters[0]));
+}));
+
+/**
+ * 永久删除角色
+ */
+router.delete('/characters/:id/permanent', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const characters = query<DbCharacter>('SELECT * FROM characters WHERE id = ?', [id]);
+  if (characters.length === 0) {
+    res.status(404).json({ error: '角色未找到' });
+    return;
+  }
+  if (characters[0].deleted === 0) {
+    res.status(400).json({ error: '只能永久删除已软删除的角色' });
+    return;
+  }
   run('DELETE FROM characters WHERE id = ?', [id]);
   saveDB();
   res.status(204).send();
+}));
+
+/**
+ * 获取项目的角色回收站
+ */
+router.get('/projects/:projectId/characters/trash', asyncHandler(async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const characters = query<DbCharacter>(
+    'SELECT * FROM characters WHERE project_id = ? AND deleted = 1 ORDER BY deleted_at DESC',
+    [projectId]
+  );
+  const formattedCharacters = characters.map(formatCharacter);
+  res.json(formattedCharacters);
 }));
 
 /**
@@ -204,7 +253,7 @@ router.delete('/characters/:id', asyncHandler(async (req: Request, res: Response
  */
 router.get('/characters/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const characters = query<DbCharacter>('SELECT * FROM characters WHERE id = ?', [id]);
+  const characters = query<DbCharacter>('SELECT * FROM characters WHERE id = ? AND deleted = 0', [id]);
   if (characters.length === 0) {
     res.status(404).json({ error: '角色未找到' });
     return;
