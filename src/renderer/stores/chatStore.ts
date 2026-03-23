@@ -214,10 +214,8 @@ export const useChatStore = defineStore('chat', () => {
       try {
         switch (name) {
           case 'create_timeline': {
-            console.log('[chatStore] create_timeline called with:', parsedArgs);
             const existingTimeline = timelineStore.nodes.find(n => n.title === parsedArgs.title);
             if (existingTimeline) {
-              console.log('[chatStore] Timeline node already exists:', existingTimeline.title);
               return JSON.stringify({
                 success: false,
                 message: `时间线节点"${parsedArgs.title}"已存在，请使用update_timeline工具更新它`,
@@ -229,14 +227,7 @@ export const useChatStore = defineStore('chat', () => {
                 suggestion: '使用 update_timeline 工具，传入上述 id 来更新此时间线节点'
               });
             }
-            console.log('[chatStore] Creating timeline node with:', {
-              title: parsedArgs.title,
-              description: parsedArgs.description,
-              date: parsedArgs.date
-            });
             await timelineStore.createNode(parsedArgs.title, parsedArgs.description, { date: parsedArgs.date });
-            console.log('[chatStore] Timeline node created. Current nodes count:', timelineStore.nodes.length);
-            console.log('[chatStore] Timeline nodes:', timelineStore.nodes);
             return JSON.stringify({ success: true, message: `已创建时间线节点: ${parsedArgs.title}` });
           }
           case 'update_timeline': {

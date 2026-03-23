@@ -262,10 +262,7 @@ const handleSelect = (id: string) => {
 const handleOpenVersionsDialog = async (nodeId: string) => {
   versionNodeId.value = nodeId;
   versionsDialogOpen.value = true;
-  console.log('[TimelinePanel] Loading versions for node:', nodeId);
   await loadVersions(nodeId);
-  console.log('[TimelinePanel] Loaded versions:', versions.value);
-  console.log('[TimelinePanel] Versions array:', Array.from(versions.value.values()).flat());
 };
 
 const handleRestoreVersion = async (versionId: string) => {

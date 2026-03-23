@@ -283,10 +283,7 @@ const handleSubmit = async () => {
 const handleOpenVersionsDialog = async (characterId: string) => {
   versionCharacterId.value = characterId;
   versionsDialogOpen.value = true;
-  console.log('[CharacterPanel] Loading versions for character:', characterId);
   await loadVersions(characterId);
-  console.log('[CharacterPanel] Loaded versions:', currentVersions.value);
-  console.log('[CharacterPanel] Versions array:', currentVersions.value);
 };
 
 const handleRestoreVersion = async (versionId: string) => {

@@ -69,12 +69,8 @@ export const useCharacterStore = defineStore('character', () => {
     currentVersions.value = [];
     try {
       const response = await characterApi.getVersions(characterId);
-      console.log('[characterStore] API response:', response);
-      console.log('[characterStore] Response data:', response.data);
-      console.log('[characterStore] Response data type:', typeof response.data);
       versions.value.set(characterId, response.data);
       currentVersions.value = response.data;
-      console.log('[characterStore] Versions map after setting:', versions.value);
     } catch (error) {
       console.error('Failed to load character versions:', error);
     } finally {
