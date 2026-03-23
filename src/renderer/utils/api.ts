@@ -59,10 +59,9 @@ export const timelineApi = {
 
 // Characters
 export const characterApi = {
-  list: (projectId: string, filters?: { name?: string; description?: string; personality?: string; background?: string }) => {
+  list: (projectId: string, filters?: { name?: string; personality?: string; background?: string }) => {
     const params = new URLSearchParams();
     if (filters?.name) params.append('name', filters.name);
-    if (filters?.description) params.append('description', filters.description);
     if (filters?.personality) params.append('personality', filters.personality);
     if (filters?.background) params.append('background', filters.background);
     const queryString = params.toString();
@@ -74,16 +73,15 @@ export const characterApi = {
     projectId: string,
     data: {
       name: string;
-      description?: string;
       personality?: string;
       background?: string;
+      relationships?: string;
     },
   ) => api.post(`/projects/${projectId}/characters`, data),
   update: (
     id: string,
     data: {
       name?: string;
-      description?: string;
       personality?: string;
       background?: string;
       relationships?: string;

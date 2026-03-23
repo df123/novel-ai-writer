@@ -15,7 +15,7 @@ import { ToolDefinition } from './tools';
 export const buildSystemPrompt = (
   customPrompt: string = '',
   selectedTimelineNodes: { id: string; title: string; description: string }[] = [],
-  selectedCharacters: { id: string; name: string; description?: string; personality?: string }[] = [],
+  selectedCharacters: { id: string; name: string; personality?: string }[] = [],
   tools?: ToolDefinition[]
 ): string => {
   let systemPrompt = customPrompt || '你是一个专业的小说创作助手。';
@@ -41,7 +41,7 @@ export const buildSystemPrompt = (
 
   if (selectedCharacters.length > 0) {
     const characterSummary = selectedCharacters
-      .map(char => `[ID: ${char.id}] ${char.name}: ${char.description || '无描述'}; 性格: ${char.personality || '未知'}`)
+      .map(char => `[ID: ${char.id}] ${char.name}: 性格: ${char.personality || '未知'}`)
       .join('\n');
     systemPrompt += `\n\n涉及角色：\n${characterSummary}`;
   }

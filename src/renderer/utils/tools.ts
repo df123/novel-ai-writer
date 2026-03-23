@@ -160,10 +160,6 @@ export const createCharacterTool: ToolDefinition = {
           type: 'string',
           description: '人物姓名',
         },
-        description: {
-          type: 'string',
-          description: '人物描述',
-        },
         personality: {
           type: 'string',
           description: '人物性格特点',
@@ -202,10 +198,6 @@ export const updateCharacterTool: ToolDefinition = {
         name: {
           type: 'string',
           description: '新姓名',
-        },
-        description: {
-          type: 'string',
-          description: '新描述',
         },
         personality: {
           type: 'string',

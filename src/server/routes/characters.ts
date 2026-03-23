@@ -15,7 +15,6 @@ const router: Router = express.Router();
  */
 interface CreateCharacterRequestBody {
   name: string;
-  description?: string;
   personality?: string;
   background?: string;
   relationships?: string;
@@ -26,7 +25,6 @@ interface CreateCharacterRequestBody {
  */
 interface UpdateCharacterRequestBody {
   name?: string;
-  description?: string;
   personality?: string;
   background?: string;
   relationships?: string;
@@ -38,7 +36,6 @@ interface UpdateCharacterRequestBody {
  */
 interface GetCharactersQuery {
   name?: string;
-  description?: string;
   personality?: string;
   background?: string;
 }
@@ -48,7 +45,7 @@ interface GetCharactersQuery {
  */
 router.get('/projects/:projectId/characters', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { name, description, personality, background } = req.query as GetCharactersQuery;
+  const { name, personality, background } = req.query as GetCharactersQuery;
 
   let sql = 'SELECT * FROM characters WHERE project_id = ?';
   const params: (string | number)[] = [projectId];
@@ -56,11 +53,6 @@ router.get('/projects/:projectId/characters', asyncHandler(async (req: Request, 
   if (name) {
     sql += ' AND name LIKE ?';
     params.push(`%${name}%`);
-  }
-
-  if (description) {
-    sql += ' AND description LIKE ?';
-    params.push(`%${description}%`);
   }
 
   if (personality) {
@@ -85,7 +77,7 @@ router.get('/projects/:projectId/characters', asyncHandler(async (req: Request, 
  */
 router.post('/projects/:projectId/characters', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { name, description, personality, background, relationships } =
+  const { name, personality, background, relationships } =
     req.body as CreateCharacterRequestBody;
 
   const id = generateId();
@@ -93,12 +85,11 @@ router.post('/projects/:projectId/characters', asyncHandler(async (req: Request,
   const updatedAt = now();
 
   run(
-    'INSERT INTO characters (id, project_id, name, description, personality, background, relationships, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO characters (id, project_id, name, personality, background, relationships, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [
       id,
       projectId,
       name,
-      description || null,
       personality || null,
       background || null,
       relationships || null,
@@ -118,7 +109,7 @@ router.post('/projects/:projectId/characters', asyncHandler(async (req: Request,
  */
 router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, description, personality, background, relationships, createVersion } =
+  const { name, personality, background, relationships, createVersion } =
     req.body as UpdateCharacterRequestBody;
   const updatedAt = now();
 
@@ -140,12 +131,11 @@ router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) =
     const versionId = generateId();
 
     run(
-      'INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO character_versions (id, character_id, name, personality, background, relationships, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         versionId,
         id,
         existingCharacter.name,
-        existingCharacter.description ?? null,
         existingCharacter.personality ?? null,
         existingCharacter.background ?? null,
         existingCharacter.relationships ?? null,
@@ -162,10 +152,6 @@ router.put('/characters/:id', asyncHandler(async (req: Request, res: Response) =
   if (name !== undefined) {
     updates.push('name = ?');
     values.push(name);
-  }
-  if (description !== undefined) {
-    updates.push('description = ?');
-    values.push(description);
   }
   if (personality !== undefined) {
     updates.push('personality = ?');
@@ -261,7 +247,6 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
   // 检查当前状态与要恢复的版本是否不同
   const isDifferent =
     currentCharacter[0].name !== version[0].name ||
-    currentCharacter[0].description !== version[0].description ||
     currentCharacter[0].personality !== version[0].personality ||
     currentCharacter[0].background !== version[0].background ||
     currentCharacter[0].relationships !== version[0].relationships;
@@ -277,12 +262,11 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
     const newVersionId = generateId();
 
     run(
-      'INSERT INTO character_versions (id, character_id, name, description, personality, background, relationships, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO character_versions (id, character_id, name, personality, background, relationships, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         newVersionId,
         characterId,
         currentCharacter[0].name,
-        currentCharacter[0].description ?? null,
         currentCharacter[0].personality ?? null,
         currentCharacter[0].background ?? null,
         currentCharacter[0].relationships ?? null,
@@ -294,10 +278,9 @@ router.post('/characters/:characterId/versions/:versionId/restore', asyncHandler
 
   // 恢复到指定版本
   run(
-    'UPDATE characters SET name = ?, description = ?, personality = ?, background = ?, relationships = ?, updated_at = ? WHERE id = ?',
+    'UPDATE characters SET name = ?, personality = ?, background = ?, relationships = ?, updated_at = ? WHERE id = ?',
     [
       version[0].name,
-      version[0].description,
       version[0].personality,
       version[0].background,
       version[0].relationships,

@@ -181,7 +181,7 @@ export const useChatStore = defineStore('chat', () => {
     const systemPrompt = buildSystemPrompt(
       options.systemPrompt,
       selectedTimelineNodes.map(n => ({ id: n.id, title: n.title, description: n.description })),
-      selectedCharacters.map(c => ({ id: c.id, name: c.name, description: c.description, personality: c.personality })),
+      selectedCharacters.map(c => ({ id: c.id, name: c.name, personality: c.personality })),
       ALL_TOOLS
     );
 
@@ -329,7 +329,6 @@ export const useChatStore = defineStore('chat', () => {
                 existingData: {
                   id: existingCharacter.id,
                   name: existingCharacter.name,
-                  description: existingCharacter.description || '',
                   personality: existingCharacter.personality || '',
                   background: existingCharacter.background || '',
                   relationships: existingCharacter.relationships || '',
@@ -342,7 +341,6 @@ export const useChatStore = defineStore('chat', () => {
               personality: parsedArgs.personality,
               background: parsedArgs.background,
               relationships: parsedArgs.relationships,
-              description: parsedArgs.description,
             });
             return JSON.stringify({ success: true, message: `已创建人物: ${parsedArgs.name}` });
           }
@@ -352,7 +350,6 @@ export const useChatStore = defineStore('chat', () => {
               const characters = characterStore.characters.map(c => ({
                 id: c.id,
                 name: c.name,
-                description: c.description || '',
                 personality: c.personality || '',
                 background: c.background || '',
                 relationships: c.relationships || '',
@@ -379,7 +376,6 @@ export const useChatStore = defineStore('chat', () => {
                 availableCharacters: characterStore.characters.map(c => ({
                   id: c.id,
                   name: c.name,
-                  description: c.description || '',
                   personality: c.personality || '',
                   background: c.background || '',
                   relationships: c.relationships || '',
@@ -392,7 +388,6 @@ export const useChatStore = defineStore('chat', () => {
               personality: parsedArgs.personality,
               background: parsedArgs.background,
               relationships: parsedArgs.relationships,
-              description: parsedArgs.description,
               createVersion: true,
             });
             return JSON.stringify({ success: true, message: `已更新人物: ${parsedArgs.name || character.name}` });
@@ -402,7 +397,6 @@ export const useChatStore = defineStore('chat', () => {
               const characters = characterStore.characters.map(c => ({
                 id: c.id,
                 name: c.name,
-                description: c.description || '',
                 personality: c.personality || '',
                 background: c.background || '',
                 relationships: c.relationships || '',
@@ -428,7 +422,6 @@ export const useChatStore = defineStore('chat', () => {
                 availableCharacters: characterStore.characters.map(c => ({
                   id: c.id,
                   name: c.name,
-                  description: c.description || '',
                   personality: c.personality || '',
                   background: c.background || '',
                   relationships: c.relationships || '',
@@ -557,7 +550,6 @@ export const useChatStore = defineStore('chat', () => {
                 const characters = response.data.map((c: Character) => ({
                   id: c.id,
                   name: c.name,
-                  description: c.description || '',
                   personality: c.personality || '',
                   background: c.background || '',
                   relationships: c.relationships || '',

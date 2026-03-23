@@ -118,7 +118,6 @@ export function formatCharacter(character: DbCharacter): Character {
     ...character,
     projectId: character.project_id,
     createdAt: character.created_at,
-    description: character.description ?? undefined,
     personality: character.personality ?? undefined,
     background: character.background ?? undefined,
     relationships: character.relationships ?? undefined
@@ -152,7 +151,6 @@ export function formatCharacterVersion(version: DbCharacterVersion): CharacterVe
     ...version,
     characterId: version.character_id,
     createdAt: version.created_at,
-    description: version.description ?? undefined,
     personality: version.personality ?? undefined,
     background: version.background ?? undefined,
     relationships: version.relationships ?? undefined

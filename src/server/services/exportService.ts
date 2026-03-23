@@ -93,9 +93,6 @@ function exportMarkdown(
   content += `## 角色\n\n`;
   for (const char of characters) {
     content += `### ${char.name}\n\n`;
-    if (char.description) {
-      content += `简介：${char.description}\n\n`;
-    }
     if (char.personality) {
       content += `性格：${char.personality}\n\n`;
     }
@@ -151,9 +148,6 @@ function exportText(
   content += `角色\n${'-'.repeat(20)}\n\n`;
   for (const char of characters) {
     content += `${char.name}\n${'.'.repeat(char.name.length)}\n`;
-    if (char.description) {
-      content += `简介：${char.description}\n`;
-    }
     if (char.personality) {
       content += `性格：${char.personality}\n`;
     }

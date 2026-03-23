@@ -149,9 +149,6 @@ export interface Character {
   /** 人物姓名 */
   name: string;
   
-  /** 人物描述（可选） */
-  description?: string;
-  
   /** 人物性格特点（可选） */
   personality?: string;
   
@@ -178,9 +175,6 @@ export interface CharacterVersion {
   
   /** 版本的人物姓名 */
   name: string;
-  
-  /** 版本的人物描述（可选） */
-  description?: string;
   
   /** 版本的人物性格（可选） */
   personality?: string;
@@ -394,7 +388,6 @@ export interface DbCharacter {
   id: string;
   project_id: string;
   name: string;
-  description: string | null;
   personality: string | null;
   background: string | null;
   relationships: string | null;
@@ -409,7 +402,6 @@ export interface DbCharacterVersion {
   id: string;
   character_id: string;
   name: string;
-  description: string | null;
   personality: string | null;
   background: string | null;
   relationships: string | null;

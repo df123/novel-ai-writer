@@ -134,10 +134,6 @@
               <span class="version-label">姓名:</span>
               <span class="version-value">{{ version.name || '-' }}</span>
             </div>
-            <div v-if="version.description" class="version-row">
-              <span class="version-label">描述:</span>
-              <span class="version-value">{{ version.description }}</span>
-            </div>
             <div v-if="version.personality" class="version-row">
               <span class="version-label">性格:</span>
               <span class="version-value">{{ version.personality }}</span>
