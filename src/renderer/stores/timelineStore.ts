@@ -7,7 +7,6 @@ import { useProjectStore } from './projectStore';
 export const useTimelineStore = defineStore('timeline', () => {
   const nodes = ref<TimelineNode[]>([]);
   const selectedNode = ref<TimelineNode | null>(null);
-  const selectedNodes = ref<Set<string>>(new Set());
   const isLoading = ref(false);
   const versions = ref<Map<string, TimelineNodeVersion[]>>(new Map());
   const isLoadingVersions = ref(false);
@@ -75,7 +74,6 @@ export const useTimelineStore = defineStore('timeline', () => {
     try {
       await timelineApi.delete(id);
       nodes.value = nodes.value.filter(n => n.id !== id);
-      selectedNodes.value.delete(id);
       versions.value.delete(id);
       if (selectedNode.value?.id === id) {
         selectedNode.value = null;
@@ -96,26 +94,6 @@ export const useTimelineStore = defineStore('timeline', () => {
     if (node) {
       selectedNode.value = node;
     }
-  };
-
-  const toggleNodeSelection = (id: string) => {
-    if (selectedNodes.value.has(id)) {
-      selectedNodes.value.delete(id);
-    } else {
-      selectedNodes.value.add(id);
-    }
-  };
-
-  const toggleAllNodes = (selectAll: boolean) => {
-    if (selectAll) {
-      nodes.value.forEach(n => selectedNodes.value.add(n.id));
-    } else {
-      selectedNodes.value.clear();
-    }
-  };
-
-  const clearNodeSelection = () => {
-    selectedNodes.value.clear();
   };
 
   const loadVersions = async (nodeId: string) => {
@@ -160,7 +138,6 @@ export const useTimelineStore = defineStore('timeline', () => {
   return {
     nodes,
     selectedNode,
-    selectedNodes,
     isLoading,
     versions,
     isLoadingVersions,
@@ -169,9 +146,6 @@ export const useTimelineStore = defineStore('timeline', () => {
     updateNode,
     deleteNode,
     selectNode,
-    toggleNodeSelection,
-    toggleAllNodes,
-    clearNodeSelection,
     loadVersions,
     getVersions,
     restoreVersion,

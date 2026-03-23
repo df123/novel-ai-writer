@@ -8,32 +8,15 @@
       </div>
     </div>
 
-    <div v-if="!isCollapsed && selectedCharacters.size > 0" style="padding: 8px; background-color: #ecf5ff">
-      <span style="font-size: 12px">已选择 {{ selectedCharacters.size }} 个人物</span>
-    </div>
-
     <el-scrollbar v-if="!isCollapsed" style="flex: 1">
       <div style="padding: 8px">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
           <el-tab-pane label="人物" name="characters">
-            <div style="display: flex; gap: 8px; margin-bottom: 8px">
-              <el-button size="small" @click="toggleAllCharacters(true)">全选</el-button>
-              <el-button size="small" @click="toggleAllCharacters(false)">取消全选</el-button>
-              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
-                已选 {{ selectedCharacters.size }} / {{ characters.length }}
-              </span>
-            </div>
             <div
               v-for="character in characters"
               :key="character.id"
               :class="['character-item', { 'is-deleted': character.deleted }]"
-              @click="toggleCharacterSelection(character.id)"
             >
-              <el-checkbox
-                :model-value="selectedCharacters.has(character.id)"
-                @change="toggleCharacterSelection(character.id)"
-                style="margin-right: 12px"
-              />
               <el-avatar :size="32" style="background-color: #67c23a; margin-right: 12px">
                 <el-icon><User /></el-icon>
               </el-avatar>
@@ -41,7 +24,6 @@
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
                   <span style="font-size: 14px; font-weight: 500">{{ character.name }}</span>
                   <el-tag v-if="character.deleted" type="info" size="small">已删除</el-tag>
-                  <el-tag v-if="selectedCharacters.has(character.id)" size="small" type="primary">已选中</el-tag>
                 </div>
                 <div v-if="character.personality" style="font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
                   {{ character.personality }}
@@ -225,8 +207,8 @@ import { formatDeletedAt } from '@shared/utils';
 
 const characterStore = useCharacterStore();
 const projectStore = useProjectStore();
-const { characters, selectedCharacters, currentVersions, isLoadingVersions } = storeToRefs(characterStore);
-const { createCharacter, updateCharacter, deleteCharacter, toggleCharacterSelection, clearCharacterSelection, loadVersions, restoreVersion } = characterStore;
+const { characters, currentVersions, isLoadingVersions } = storeToRefs(characterStore);
+const { createCharacter, updateCharacter, deleteCharacter, loadVersions, restoreVersion } = characterStore;
 
 const dialogOpen = ref(false);
 const editMode = ref(false);
@@ -244,15 +226,6 @@ const isLoadingTrash = ref(false);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
-};
-
-const toggleAllCharacters = (selectAll: boolean) => {
-  if (selectAll) {
-    const allCharacterIds = new Set(characters.value.map(c => c.id));
-    selectedCharacters.value = allCharacterIds;
-  } else {
-    clearCharacterSelection();
-  }
 };
 
 const handleOpenCreateDialog = () => {

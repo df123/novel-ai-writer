@@ -12,13 +12,6 @@
       <div style="padding: 8px">
         <el-tabs v-model="activeTab" @tab-change="handleTabChange">
           <el-tab-pane label="时间线" name="timeline">
-            <div style="display: flex; gap: 8px; margin-bottom: 8px">
-              <el-button size="small" @click="toggleAllNodes(true)">全选</el-button>
-              <el-button size="small" @click="toggleAllNodes(false)">取消全选</el-button>
-              <span style="font-size: 12px; color: #999; margin-left: auto; align-self: center">
-                已选 {{ selectedNodes.size }} / {{ nodes.length }}
-              </span>
-            </div>
             <div
               v-for="node in nodes"
               :key="node.id"
@@ -26,7 +19,6 @@
               @click="handleSelect(node.id)"
             >
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px">
-                <el-checkbox :model-value="selectedNodes.has(node.id)" @change="(val: any) => toggleNodeSelection(node.id)" @click.stop />
                 <span style="font-size: 14px; font-weight: 500">{{ node.title }}</span>
                 <el-tag v-if="node.deleted" type="info" size="small">已删除</el-tag>
               </div>
@@ -192,8 +184,8 @@ import { formatDeletedAt } from '@shared/utils';
 
 const timelineStore = useTimelineStore();
 const projectStore = useProjectStore();
-const { nodes, selectedNode, selectedNodes, versions, isLoadingVersions } = storeToRefs(timelineStore);
-const { createNode, updateNode, deleteNode, selectNode, toggleNodeSelection, toggleAllNodes, loadVersions, restoreVersion } = timelineStore;
+const { nodes, selectedNode, versions, isLoadingVersions } = storeToRefs(timelineStore);
+const { createNode, updateNode, deleteNode, selectNode, loadVersions, restoreVersion } = timelineStore;
 
 // 获取当前节点的版本列表
 const currentVersions = computed(() => {

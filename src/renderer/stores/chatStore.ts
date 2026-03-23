@@ -175,13 +175,10 @@ export const useChatStore = defineStore('chat', () => {
       );
     }
 
-    const selectedTimelineNodes = timelineStore.nodes.filter(n => timelineStore.selectedNodes.has(n.id));
-    const selectedCharacters = characterStore.characters.filter(c => characterStore.selectedCharacters.has(c.id));
-
     const systemPrompt = buildSystemPrompt(
       options.systemPrompt,
-      selectedTimelineNodes.map(n => ({ id: n.id, title: n.title, description: n.description })),
-      selectedCharacters.map(c => ({ id: c.id, name: c.name, personality: c.personality })),
+      [],
+      [],
       ALL_TOOLS
     );
 

@@ -6,7 +6,6 @@ import { useProjectStore } from './projectStore';
 
 export const useCharacterStore = defineStore('character', () => {
   const characters = ref<Character[]>([]);
-  const selectedCharacters = ref<Set<string>>(new Set());
   const isLoading = ref(false);
   const versions = ref<Map<string, CharacterVersion[]>>(new Map());
   const currentVersions = ref<CharacterVersion[]>([]);
@@ -58,24 +57,11 @@ export const useCharacterStore = defineStore('character', () => {
     try {
       await characterApi.delete(id);
       characters.value = characters.value.filter(c => c.id !== id);
-      selectedCharacters.value.delete(id);
       versions.value.delete(id);
     } catch (error) {
       console.error('Failed to delete character:', error);
       throw error;
     }
-  };
-
-  const toggleCharacterSelection = (id: string) => {
-    if (selectedCharacters.value.has(id)) {
-      selectedCharacters.value.delete(id);
-    } else {
-      selectedCharacters.value.add(id);
-    }
-  };
-
-  const clearCharacterSelection = () => {
-    selectedCharacters.value.clear();
   };
 
   const loadVersions = async (characterId: string) => {
@@ -118,7 +104,6 @@ export const useCharacterStore = defineStore('character', () => {
 
   return {
     characters,
-    selectedCharacters,
     isLoading,
     versions,
     currentVersions,
@@ -127,8 +112,6 @@ export const useCharacterStore = defineStore('character', () => {
     createCharacter,
     updateCharacter,
     deleteCharacter,
-    toggleCharacterSelection,
-    clearCharacterSelection,
     loadVersions,
     getVersions,
     restoreVersion,
