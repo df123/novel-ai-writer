@@ -131,6 +131,56 @@ export const promptApi = {
   delete: (id: string) => api.delete(`/prompts/${id}`),
 };
 
+// 章节管理 API
+export const chapterApi = {
+  // 获取章节列表
+  list: (projectId: string) => 
+    api.get(`/projects/${projectId}/chapters`),
+  
+  // 获取单个章节
+  get: (projectId: string, chapterId: string) => 
+    api.get(`/projects/${projectId}/chapters/${chapterId}`),
+  
+  // 创建章节
+  create: (projectId: string, data: { chapterNumber: number; title: string; content: string; sourceMessageId?: string }) => 
+    api.post(`/projects/${projectId}/chapters`, data),
+  
+  // 更新章节
+  update: (projectId: string, chapterId: string, data: { title?: string; chapterNumber?: number }) => 
+    api.put(`/projects/${projectId}/chapters/${chapterId}`, data),
+  
+  // 软删除章节
+  delete: (projectId: string, chapterId: string) => 
+    api.delete(`/projects/${projectId}/chapters/${chapterId}`),
+  
+  // 恢复章节
+  restore: (projectId: string, chapterId: string) => 
+    api.put(`/projects/${projectId}/chapters/${chapterId}/restore`),
+  
+  // 永久删除章节
+  permanentDelete: (projectId: string, chapterId: string) => 
+    api.delete(`/projects/${projectId}/chapters/${chapterId}/permanent`),
+  
+  // 批量更新排序
+  updateOrder: (projectId: string, data: { chapters: Array<{ id: string; chapterNumber: number }> }) => 
+    api.put(`/projects/${projectId}/chapters/order`, data),
+  
+  // 导出章节
+  export: (projectId: string, format: 'txt' | 'md' = 'txt') => 
+    api.get(`/projects/${projectId}/chapters/export`, { 
+      params: { format },
+      responseType: 'blob'
+    }),
+  
+  // 获取回收站章节
+  getTrash: (projectId: string) => 
+    api.get(`/projects/${projectId}/chapters/trash`),
+  
+  // 清空回收站
+  emptyTrash: (projectId: string) => 
+    api.delete(`/projects/${projectId}/chapters/trash/empty`)
+};
+
 // 数据库管理 API
 export const dbApi = {
   // 获取所有表信息

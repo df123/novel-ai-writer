@@ -14,6 +14,8 @@ import type {
   Character,
   DbCharacterVersion,
   CharacterVersion,
+  DbChapter,
+  Chapter,
   ToolCall
 } from '@shared/types';
 
@@ -158,5 +160,25 @@ export function formatCharacterVersion(version: DbCharacterVersion): CharacterVe
     personality: version.personality ?? undefined,
     background: version.background ?? undefined,
     relationships: version.relationships ?? undefined
+  };
+}
+
+/**
+ * 格式化章节数据（数据库格式 -> 前端格式）
+ * @param chapter - 数据库中的章节对象
+ * @returns 格式化后的章节对象
+ */
+export function formatChapter(chapter: DbChapter): Chapter {
+  return {
+    id: chapter.id,
+    projectId: chapter.project_id,
+    chapterNumber: chapter.chapter_number,
+    title: chapter.title,
+    content: chapter.content,
+    sourceMessageId: chapter.source_message_id ?? undefined,
+    createdAt: chapter.created_at,
+    updatedAt: chapter.updated_at,
+    deleted: chapter.deleted === 1,
+    deletedAt: chapter.deleted_at ?? undefined
   };
 }

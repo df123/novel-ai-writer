@@ -1,6 +1,6 @@
 // 导出服务
 import { query } from '../db';
-import type { DbProject, DbChat, DbTimelineNode, DbCharacter, DbMessage } from '../../shared/types';
+import type { DbProject, DbChat, DbTimelineNode, DbCharacter, DbMessage, Chapter, ExportChaptersResponse } from '../../shared/types';
 import type { ExportResult } from '../types/service.types';
 
 /**
@@ -167,4 +167,32 @@ function exportText(
   }
 
   return content;
+}
+
+/**
+ * 导出章节
+ * @param chapters - 章节数组
+ * @param format - 导出格式（md 或 txt）
+ * @returns 导出结果对象
+ */
+export function exportChapters(chapters: Chapter[], format: 'md' | 'txt' = 'txt'): ExportChaptersResponse {
+  // 按章节编号排序
+  const sortedChapters = [...chapters].sort((a, b) => a.chapterNumber - b.chapterNumber);
+
+  let content = '';
+  let filename = '';
+
+  if (format === 'txt') {
+    content = sortedChapters.map(chapter =>
+      `第${chapter.chapterNumber}章 ${chapter.title}\n\n${chapter.content}\n\n${'='.repeat(50)}\n\n`
+    ).join('');
+    filename = 'novel_chapters.txt';
+  } else {
+    content = sortedChapters.map(chapter =>
+      `# 第${chapter.chapterNumber}章 ${chapter.title}\n\n${chapter.content}\n\n---\n\n`
+    ).join('');
+    filename = 'novel_chapters.md';
+  }
+
+  return { content, format, filename };
 }

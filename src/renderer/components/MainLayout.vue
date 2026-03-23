@@ -8,6 +8,14 @@
         <span class="app-title">NovelAI Writer</span>
         <ProjectSelector class="project-selector" />
         <el-button
+          :icon="Reading"
+          type="primary"
+          class="chapter-button"
+          @click="showChapterDialog = true"
+        >
+          章节管理
+        </el-button>
+        <el-button
           :icon="Setting"
           circle
           class="settings-button"
@@ -50,16 +58,26 @@
     >
       <DatabasePanel />
     </el-dialog>
+
+    <el-dialog
+      v-model="showChapterDialog"
+      title="章节管理"
+      width="80%"
+    >
+      <ChapterPanel />
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { HomeFilled, Setting, MoreFilled } from '@element-plus/icons-vue';
+import { HomeFilled, Setting, MoreFilled, Reading } from '@element-plus/icons-vue';
 import { useProjectStore } from '../stores/projectStore';
 import { useChatStore } from '../stores/chatStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
+import { useChapterStore } from '../stores/chapterStore';
+import ChapterPanel from './ChapterPanel.vue';
 import TimelinePanel from './TimelinePanel.vue';
 import ChatPanel from './ChatPanel.vue';
 import CharacterPanel from './CharacterPanel.vue';
@@ -72,10 +90,12 @@ const projectStore = useProjectStore();
 const chatStore = useChatStore();
 const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
+const chapterStore = useChapterStore();
 
 const showSettings = ref(false);
 const showCreateProject = ref(false);
 const showDatabase = ref(false);
+const showChapterDialog = ref(false);
 
 watch(
   () => projectStore.currentProject,
@@ -84,6 +104,7 @@ watch(
       await chatStore.loadChats(currentProject.id);
       await timelineStore.loadNodes(currentProject.id);
       await characterStore.loadCharacters(currentProject.id);
+      await chapterStore.loadChapters(currentProject.id);
     }
   },
   { immediate: true }
@@ -131,6 +152,10 @@ const handleMenuCommand = (command: string) => {
 
 .project-selector {
   margin: 0 8px;
+}
+
+.chapter-button {
+  margin-left: 8px;
 }
 
 .settings-button {

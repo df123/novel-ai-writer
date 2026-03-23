@@ -52,11 +52,12 @@
             <el-dropdown
               trigger="click"
               class="message-dropdown"
-              @command="(cmd: string) => handleMessageCommand(cmd, message.id)"
+              @command="(cmd: string) => handleMessageCommand(cmd, message)"
             >
               <el-button :icon="MoreFilled" circle size="small" text />
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item v-if="message.role === 'assistant'" command="saveChapter">保存为章节</el-dropdown-item>
                   <el-dropdown-item command="delete">删除</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -138,6 +139,27 @@
         </template>
       </el-input>
     </el-footer>
+
+    <el-dialog
+      v-model="saveChapterDialogVisible"
+      title="保存为章节"
+      width="500px"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="章节编号">
+          <el-input-number v-model="saveChapterNumber" :min="1" />
+        </el-form-item>
+        <el-form-item label="章节标题">
+          <el-input v-model="saveChapterTitle" placeholder="请输入章节标题" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="saveChapterDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!saveChapterTitle.trim()" @click="handleSaveChapter">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </el-main>
   <el-empty v-else description="请先选择或创建一个项目" class="empty-project" />
 </template>
@@ -147,11 +169,13 @@ import { ref, watch, nextTick, onMounted, computed } from 'vue';
 import type { Message } from '../../shared/types';
 import { storeToRefs } from 'pinia';
 import { Promotion, MoreFilled } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useChapterStore } from '../stores/chapterStore';
 import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
 import { marked } from 'marked';
 
@@ -165,11 +189,12 @@ const projectStore = useProjectStore();
 const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
 const settingsStore = useSettingsStore();
+const chapterStore = useChapterStore();
 
 const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning, totalTokens } = storeToRefs(chatStore);
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
-const { characters, selectedCharacters } = storeToRefs(characterStore);
+const { characters } = storeToRefs(characterStore);
 const { selectedProvider, selectedModel, models, isLoadingModels } = storeToRefs(settingsStore);
 const { loadModels, updateSettings } = settingsStore;
 
@@ -181,6 +206,10 @@ const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
 const collapsedReasoning = ref<Record<string, boolean>>({});
 const collapsedTools = ref<Record<string, boolean>>({});
+const saveChapterDialogVisible = ref(false);
+const saveChapterMessage = ref<Message | null>(null);
+const saveChapterTitle = ref('');
+const saveChapterNumber = ref(1);
 
 watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning]) => {
   nextTick(() => {
@@ -224,16 +253,16 @@ const displayContent = (message: Message) => {
   return message.content;
 };
 
-const displayReasoning = (message: Message) => {
-  const isLastAssistantMessage = isStreaming.value && 
-    message.role === 'assistant' && 
-    messages.value.length > 0 && 
+const displayReasoning = (message: Message): string => {
+  const isLastAssistantMessage = isStreaming.value &&
+    message.role === 'assistant' &&
+    messages.value.length > 0 &&
     messages.value[messages.value.length - 1].id === message.id;
   
   if (isLastAssistantMessage && currentStreamReasoning.value) {
     return currentStreamReasoning.value;
   }
-  return message.reasoning_content;
+  return message.reasoning_content || '';
 };
 
 const renderMarkdown = (content: string) => {
@@ -254,10 +283,8 @@ const handleSend = async () => {
     }
     await sendMessage(inputText.value, {
       systemPrompt: '你是一个专业的小说写作助手。',
-      providerName: selectedProvider.value,
+      providerName: selectedProvider.value as 'deepseek' | 'openrouter',
       modelName: currentModel.value,
-      timelineId: selectedNode.value?.id,
-      characterIds: Array.from(selectedCharacters.value),
     });
     inputText.value = '';
   } catch (error) {
@@ -273,9 +300,19 @@ const handleCreateChat = async () => {
   }
 };
 
-const handleMessageCommand = async (command: string, messageId: string) => {
-  if (command === 'delete' && messageId) {
-    await deleteMessage(messageId);
+const handleMessageCommand = async (command: string, message: Message) => {
+  if (command === 'delete' && message.id) {
+    await deleteMessage(message.id);
+  } else if (command === 'saveChapter' && message.role === 'assistant') {
+    saveChapterMessage.value = message;
+    // 计算下一个章节编号，避免与现有章节冲突
+    const maxChapterNumber = chapterStore.chapters.length > 0
+      ? Math.max(...chapterStore.chapters.map(c => c.chapterNumber))
+      : 0;
+    const nextChapterNumber = maxChapterNumber + 1;
+    saveChapterTitle.value = `第 ${nextChapterNumber} 章`;
+    saveChapterNumber.value = nextChapterNumber;
+    saveChapterDialogVisible.value = true;
   }
 };
 
@@ -286,6 +323,27 @@ const handleProviderChange = async () => {
 
 const handleModelChange = async () => {
   await updateSettings({ selectedModel: selectedModel.value });
+};
+
+const handleSaveChapter = async () => {
+  if (!saveChapterMessage.value || !projectStore.currentProject) return;
+
+  try {
+    await chapterStore.createChapter(projectStore.currentProject.id, {
+      chapterNumber: saveChapterNumber.value,
+      title: saveChapterTitle.value,
+      content: saveChapterMessage.value.content,
+      sourceMessageId: saveChapterMessage.value.id
+    });
+    saveChapterDialogVisible.value = false;
+    saveChapterMessage.value = null;
+    saveChapterTitle.value = '';
+    saveChapterNumber.value = 1;
+    ElMessage.success('章节保存成功');
+  } catch (error) {
+    console.error('Failed to save chapter:', error);
+    ElMessage.error('保存章节失败，请重试');
+  }
 };
 
 onMounted(async () => {

@@ -12,6 +12,7 @@ export function getCreateTablesSQL(): string[] {
     'CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, reasoning_content TEXT, tool_calls TEXT, tool_call_id TEXT, timestamp INTEGER NOT NULL, FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS timeline_nodes (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, date TEXT, content TEXT, order_index INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER DEFAULT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS characters (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, personality TEXT, background TEXT, relationships TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER DEFAULT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE)',
+    'CREATE TABLE IF NOT EXISTS chapters (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, chapter_number INTEGER NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, source_message_id TEXT, deleted INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER DEFAULT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY (source_message_id) REFERENCES messages(id) ON DELETE SET NULL)',
     'CREATE TABLE IF NOT EXISTS prompt_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, template TEXT NOT NULL, type TEXT NOT NULL, created_at INTEGER NOT NULL)',
     'CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS timeline_versions (id TEXT PRIMARY KEY, timeline_node_id TEXT NOT NULL, title TEXT NOT NULL, date TEXT, content TEXT, version INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (timeline_node_id) REFERENCES timeline_nodes(id) ON DELETE CASCADE)',
@@ -19,6 +20,10 @@ export function getCreateTablesSQL(): string[] {
     'CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_project_id ON timeline_nodes(project_id)',
     'CREATE INDEX IF NOT EXISTS idx_characters_project_id ON characters(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_chapters_project_id ON chapters(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_chapters_deleted ON chapters(deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_chapters_project_deleted ON chapters(project_id, deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_chapters_chapter_number ON chapters(chapter_number)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_versions_node_id ON timeline_versions(timeline_node_id)',
     'CREATE INDEX IF NOT EXISTS idx_character_versions_character_id ON character_versions(character_id)'
   ];
@@ -32,8 +37,10 @@ export function getSoftDeleteIndexesSQL(): string[] {
   return [
     'CREATE INDEX IF NOT EXISTS idx_characters_deleted ON characters(deleted)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_deleted ON timeline_nodes(deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_chapters_deleted ON chapters(deleted)',
     'CREATE INDEX IF NOT EXISTS idx_characters_deleted_at ON characters(deleted_at)',
-    'CREATE INDEX IF NOT EXISTS idx_timeline_deleted_at ON timeline_nodes(deleted_at)'
+    'CREATE INDEX IF NOT EXISTS idx_timeline_deleted_at ON timeline_nodes(deleted_at)',
+    'CREATE INDEX IF NOT EXISTS idx_chapters_deleted_at ON chapters(deleted_at)'
   ];
 }
 

@@ -12,6 +12,7 @@ import chatsRouter from './routes/chats';
 import messagesRouter from './routes/messages';
 import timelineRouter from './routes/timeline';
 import charactersRouter from './routes/characters';
+import chaptersRouter from './routes/chapters';
 import llmRouter from './routes/llm';
 import settingsRouter from './routes/settings';
 import promptsRouter from './routes/prompts';
@@ -40,6 +41,7 @@ app.use('/api', chatsRouter);
 app.use('/api', messagesRouter);
 app.use('/api', timelineRouter);
 app.use('/api', charactersRouter);
+app.use('/api', chaptersRouter);
 app.use('/api', exportRouter);
 
 // 404 处理

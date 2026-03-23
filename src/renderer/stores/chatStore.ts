@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { Message, Chat, TimelineNode, Character } from '../../shared/types';
+import { Message, Chat, TimelineNode, Character, Chapter } from '../../shared/types';
 import { chatApi, messageApi, llmApi, timelineApi, characterApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
@@ -47,6 +47,7 @@ export const useChatStore = defineStore('chat', () => {
   const currentStreamContent = ref('');
   const currentStreamReasoning = ref('');
   const totalTokens = ref(0);
+  const chapterContext = ref<Chapter | null>(null);
 
   const loadChats = async (projectId: string) => {
     try {
@@ -175,12 +176,18 @@ export const useChatStore = defineStore('chat', () => {
       );
     }
 
-    const systemPrompt = buildSystemPrompt(
+    let systemPrompt = buildSystemPrompt(
       options.systemPrompt,
       [],
       [],
       ALL_TOOLS
     );
+
+    // 如果有章节上下文，将章节内容添加到系统提示中
+    if (chapterContext.value) {
+      const chapterPrompt = `\n\n【章节上下文】\n第 ${chapterContext.value.chapterNumber} 章：${chapterContext.value.title}\n\n${chapterContext.value.content}\n\n请基于以上章节内容进行回复。`;
+      systemPrompt += chapterPrompt;
+    }
 
     const validMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content?: string; reasoning_content?: string; tool_calls?: ToolCall[]; tool_call_id?: string }> = messages.value
       .filter(m => m.role !== 'system')
@@ -806,6 +813,14 @@ export const useChatStore = defineStore('chat', () => {
     }
   };
 
+  function setChapterContext(chapter: Chapter | null) {
+    chapterContext.value = chapter;
+  }
+
+  function clearChapterContext() {
+    chapterContext.value = null;
+  }
+
   return {
     chats,
     currentChat,
@@ -815,6 +830,7 @@ export const useChatStore = defineStore('chat', () => {
     currentStreamContent,
     currentStreamReasoning,
     totalTokens,
+    chapterContext,
     loadChats,
     loadMessages,
     createChat,
@@ -822,5 +838,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     deleteMessage,
     clearHistory,
+    setChapterContext,
+    clearChapterContext,
   };
 });

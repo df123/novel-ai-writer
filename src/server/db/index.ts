@@ -13,7 +13,7 @@ import type { DatabaseConnection } from '../types/db.types';
  * @returns 是否发生了迁移
  */
 async function migrateToSoftDelete(): Promise<boolean> {
-  const tables = ['characters', 'timeline_nodes'];
+  const tables = ['characters', 'timeline_nodes', 'chapters'];
   let migrated = false;
 
   for (const table of tables) {

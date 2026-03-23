@@ -447,3 +447,108 @@ export interface DbSetting {
   key: string;
   value: string;
 }
+
+/**
+ * 章节接口（前端格式）
+ * 表示小说中的一个章节
+ */
+export interface Chapter {
+  /** 章节唯一标识符（UUID） */
+  id: string;
+  
+  /** 所属项目的 ID */
+  projectId: string;
+  
+  /** 章节编号 */
+  chapterNumber: number;
+  
+  /** 章节标题 */
+  title: string;
+  
+  /** 章节内容 */
+  content: string;
+  
+  /** 来源消息 ID（可选，表示从哪条聊天消息生成） */
+  sourceMessageId?: string;
+  
+  /** 章节创建时间戳（秒） */
+  createdAt: number;
+  
+  /** 章节最后更新时间戳（秒） */
+  updatedAt: number;
+  
+  /** 是否已删除（软删除标记） */
+  deleted?: boolean;
+  
+  /** 删除时间戳（秒，可选） */
+  deletedAt?: number;
+}
+
+/**
+ * 数据库章节接口（数据库格式）
+ */
+export interface DbChapter {
+  id: string;
+  project_id: string;
+  chapter_number: number;
+  title: string;
+  content: string;
+  source_message_id: string | null;
+  deleted: number;
+  deleted_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * 创建章节请求接口
+ */
+export interface CreateChapterRequest {
+  /** 章节编号 */
+  chapterNumber: number;
+  
+  /** 章节标题 */
+  title: string;
+  
+  /** 章节内容 */
+  content: string;
+  
+  /** 来源消息 ID（可选） */
+  sourceMessageId?: string;
+}
+
+/**
+ * 更新章节请求接口
+ */
+export interface UpdateChapterRequest {
+  /** 章节标题（可选） */
+  title?: string;
+  
+  /** 章节编号（可选） */
+  chapterNumber?: number;
+}
+
+/**
+ * 批量更新章节排序请求接口
+ */
+export interface UpdateChapterOrderRequest {
+  /** 章节列表，包含 ID 和新的章节编号 */
+  chapters: Array<{
+    id: string;
+    chapterNumber: number;
+  }>;
+}
+
+/**
+ * 导出章节响应接口
+ */
+export interface ExportChaptersResponse {
+  /** 导出内容 */
+  content: string;
+  
+  /** 导出格式 */
+  format: 'txt' | 'md';
+  
+  /** 文件名 */
+  filename: string;
+}
