@@ -97,7 +97,7 @@ export const deleteTimelineTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'delete_timeline',
-    description: '删除指定的时间线节点（软删除，数据会被移至回收站，用户可以在回收站中恢复或永久删除）',
+    description: '删除指定的时间线节点',
     strict: true,
     parameters: {
       type: 'object',
@@ -120,7 +120,7 @@ export const getTimelineTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'get_timeline',
-    description: '查询时间线节点列表（仅返回未删除的节点，已删除的节点不会返回）。可以通过 ID、标题或内容进行筛选。如果提供 id 参数，则返回指定 ID 的节点详情；否则返回筛选后的节点列表。',
+    description: '查询时间线节点列表。可以通过 ID、标题或内容进行筛选。如果提供 id 参数，则返回指定 ID 的节点详情；否则返回筛选后的节点列表。',
     strict: true,
     parameters: {
       type: 'object',
@@ -225,7 +225,7 @@ export const deleteCharacterTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'delete_character',
-    description: '删除指定的人物角色（软删除，数据会被移至回收站，用户可以在回收站中恢复或永久删除）',
+    description: '删除指定的人物角色',
     strict: true,
     parameters: {
       type: 'object',
@@ -248,7 +248,7 @@ export const getCharacterTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'get_character',
-    description: '查询人物列表（仅返回未删除的人物，已删除的人物不会返回）。可以通过 ID、姓名、描述、性格或背景进行筛选。如果提供 id 参数，则返回指定 ID 的人物详情；否则返回筛选后的人物列表。',
+    description: '查询人物列表。可以通过 ID、姓名、描述、性格或背景进行筛选。如果提供 id 参数，则返回指定 ID 的人物详情；否则返回筛选后的人物列表。',
     strict: true,
     parameters: {
       type: 'object',
