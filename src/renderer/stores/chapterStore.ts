@@ -62,7 +62,7 @@ export const useChapterStore = defineStore('chapter', () => {
     }
   }
 
-  async function updateChapter(projectId: string, chapterId: string, data: { title?: string; chapterNumber?: number }) {
+  async function updateChapter(projectId: string, chapterId: string, data: { title?: string; chapterNumber?: number; content?: string }) {
     try {
       const response = await chapterApi.update(projectId, chapterId, data);
       const index = chapters.value.findIndex(ch => ch.id === chapterId);

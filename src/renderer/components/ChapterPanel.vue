@@ -77,7 +77,7 @@
     <el-dialog
       v-model="editDialogOpen"
       title="编辑章节"
-      width="600px"
+      width="800px"
     >
       <el-form label-width="80px">
         <el-form-item label="章节编号">
@@ -86,10 +86,18 @@
         <el-form-item label="章节标题">
           <el-input v-model="editTitle" placeholder="请输入章节标题" />
         </el-form-item>
+        <el-form-item label="章节内容">
+          <el-input
+            v-model="editContent"
+            type="textarea"
+            :rows="15"
+            placeholder="请输入章节内容"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDialogOpen = false">取消</el-button>
-        <el-button type="primary" :disabled="!editTitle.trim()" @click="handleSaveEdit">
+        <el-button type="primary" :disabled="!editTitle.trim() || !editContent.trim()" @click="handleSaveEdit">
           保存
         </el-button>
       </template>
@@ -120,6 +128,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { useChapterStore } from '../stores/chapterStore';
 import { useProjectStore } from '../stores/projectStore';
 import { formatDeletedAt } from '@shared/utils';
+import { type Chapter } from '@shared/types';
 import ChapterReader from './ChapterReader.vue';
 
 const chapterStore = useChapterStore();
@@ -135,9 +144,14 @@ const readerDialogOpen = ref(false);
 const editChapterId = ref<string | null>(null);
 const editChapterNumber = ref(1);
 const editTitle = ref('');
+const editContent = ref('');
 
 const sortedChapters = computed(() => {
-  return [...chapters.value].sort((a, b) => a.chapterNumber - b.chapterNumber);
+  // 过滤掉已删除的章节，只显示正常章节
+  const sorted = [...chapters.value]
+    .filter(ch => !ch.deleted)
+    .sort((a, b) => a.chapterNumber - b.chapterNumber);
+  return sorted;
 });
 
 const toggleCollapse = () => {
@@ -163,15 +177,16 @@ const loadTrash = async () => {
   }
 };
 
-const handleChapterClick = (chapter: any) => {
+const handleChapterClick = (chapter: Chapter) => {
   setCurrentChapter(chapter);
   readerDialogOpen.value = true;
 };
 
-const handleEdit = (chapter: any) => {
+const handleEdit = (chapter: Chapter) => {
   editChapterId.value = chapter.id;
   editChapterNumber.value = chapter.chapterNumber;
   editTitle.value = chapter.title;
+  editContent.value = chapter.content || '';
   editDialogOpen.value = true;
 };
 
@@ -181,7 +196,8 @@ const handleSaveEdit = async () => {
   try {
     await updateChapter(projectStore.currentProject.id, editChapterId.value, {
       chapterNumber: editChapterNumber.value,
-      title: editTitle.value
+      title: editTitle.value,
+      content: editContent.value
     });
     editDialogOpen.value = false;
     ElMessage.success('保存成功');
@@ -191,7 +207,7 @@ const handleSaveEdit = async () => {
   }
 };
 
-const handleDelete = async (chapter: any) => {
+const handleDelete = async (chapter: Chapter) => {
   if (!projectStore.currentProject) return;
 
   try {
@@ -214,7 +230,7 @@ const handleDelete = async (chapter: any) => {
   }
 };
 
-const handleRestore = async (chapter: any) => {
+const handleRestore = async (chapter: Chapter) => {
   if (!projectStore.currentProject) return;
 
   try {
@@ -229,7 +245,7 @@ const handleRestore = async (chapter: any) => {
   }
 };
 
-const handlePermanentDelete = async (chapter: any) => {
+const handlePermanentDelete = async (chapter: Chapter) => {
   if (!projectStore.currentProject) return;
 
   try {

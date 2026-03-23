@@ -15,8 +15,8 @@ router.get('/', asyncHandler(async (_req: Request, res: Response) => {
   res.json(formattedProjects);
 }));
 
-// 获取单个项目
-router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
+// 获取单个项目（使用正则表达式限制 :id 只能是 UUID 格式）
+router.get('/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', asyncHandler(async (req: Request, res: Response) => {
   const projects = query<DbProject>('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (projects.length === 0) {
     res.status(404).json({ error: '项目未找到' });
@@ -41,8 +41,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(formatProject(projects[0]));
 }));
 
-// 更新项目
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+// 更新项目（使用正则表达式限制 :id 只能是 UUID 格式）
+router.put('/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', asyncHandler(async (req: Request, res: Response) => {
   const { title, description } = req.body;
   const updatedAt = now();
 
@@ -55,8 +55,8 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.json(formatProject(projects[0]));
 }));
 
-// 删除项目
-router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+// 删除项目（使用正则表达式限制 :id 只能是 UUID 格式）
+router.delete('/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', asyncHandler(async (req: Request, res: Response) => {
   run('DELETE FROM projects WHERE id = ?', [req.params.id]);
   saveDB();
   res.status(204).send();

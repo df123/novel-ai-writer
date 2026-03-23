@@ -526,6 +526,9 @@ export interface UpdateChapterRequest {
   
   /** 章节编号（可选） */
   chapterNumber?: number;
+  
+  /** 章节内容（可选） */
+  content?: string;
 }
 
 /**
