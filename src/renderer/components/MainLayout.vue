@@ -9,31 +9,34 @@
         <ProjectSelector class="project-selector" />
         <el-button
           :icon="Reading"
-          type="primary"
-          class="chapter-button"
+          circle
+          class="action-button chapter-button"
           @click="showChapterDialog = true"
-        >
-          章节管理
-        </el-button>
+          title="章节管理"
+        />
         <el-button
           :icon="Document"
-          type="primary"
-          class="theme-button"
-          @click="showThemeDialog = true"
-        >
-          主旨管理
-        </el-button>
-        <el-button
-          :icon="Setting"
           circle
-          class="settings-button"
-          @click="showSettings = true"
+          class="action-button theme-button"
+          @click="showThemeDialog = true"
+          title="主旨管理"
+        />
+        <el-button
+          :icon="Plus"
+          circle
+          class="action-button create-project-button"
+          @click="showCreateProject = true"
+          title="新建项目"
         />
         <el-dropdown trigger="click" @command="handleMenuCommand">
-          <el-button :icon="MoreFilled" circle />
+          <el-button
+            :icon="MoreFilled"
+            circle
+            class="action-button more-button"
+            title="更多"
+          />
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="createProject">新建项目</el-dropdown-item>
               <el-dropdown-item command="settings">LLM设置</el-dropdown-item>
               <el-dropdown-item command="database">数据库管理</el-dropdown-item>
             </el-dropdown-menu>
@@ -87,7 +90,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { HomeFilled, Setting, MoreFilled, Reading, Document } from '@element-plus/icons-vue';
+import { HomeFilled, Setting, MoreFilled, Reading, Document, Plus } from '@element-plus/icons-vue';
 import { useProjectStore } from '../stores/projectStore';
 import { useChatStore } from '../stores/chatStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -134,9 +137,7 @@ watch(
 );
 
 const handleMenuCommand = (command: string) => {
-  if (command === 'createProject') {
-    showCreateProject.value = true;
-  } else if (command === 'settings') {
+  if (command === 'settings') {
     showSettings.value = true;
   } else if (command === 'database') {
     showDatabase.value = true;
@@ -177,6 +178,21 @@ const handleMenuCommand = (command: string) => {
   margin: 0 8px;
 }
 
+.action-button {
+  margin-left: 8px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.action-button:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
 .chapter-button {
   margin-left: 8px;
 }
@@ -185,7 +201,11 @@ const handleMenuCommand = (command: string) => {
   margin-left: 8px;
 }
 
-.settings-button {
+.create-project-button {
+  margin-left: 8px;
+}
+
+.more-button {
   margin-left: 8px;
 }
 
