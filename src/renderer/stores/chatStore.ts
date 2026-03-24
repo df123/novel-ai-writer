@@ -180,7 +180,7 @@ export const useChatStore = defineStore('chat', () => {
 
     let systemPrompt = buildSystemPrompt(
       options.systemPrompt,
-      themeStore.currentTheme,
+      themeStore.theme,
       [],
       [],
       ALL_TOOLS
@@ -586,7 +586,7 @@ export const useChatStore = defineStore('chat', () => {
               // 尝试获取当前主旨
               let currentTheme;
               try {
-                const response = await themeApi.getCurrent(projectStore.currentProject.id);
+                const response = await themeApi.list(projectStore.currentProject.id);
                 currentTheme = response.data;
               } catch (error: any) {
                 // 仅在404时创建新主旨，其他错误继续抛出
@@ -598,7 +598,7 @@ export const useChatStore = defineStore('chat', () => {
                   });
                   const newTheme = createResponse.data;
                   // 重新加载当前主旨到store
-                  await themeStore.loadCurrentTheme(projectStore.currentProject.id);
+                  await themeStore.loadTheme(projectStore.currentProject.id);
                   return JSON.stringify({
                     success: true,
                     message: `已创建新主旨: ${parsedArgs.title}`,
@@ -622,7 +622,7 @@ export const useChatStore = defineStore('chat', () => {
               const updatedTheme = updateResponse.data;
               
               // 重新加载当前主旨到store
-              await themeStore.loadCurrentTheme(projectStore.currentProject.id);
+              await themeStore.loadTheme(projectStore.currentProject.id);
               
               return JSON.stringify({
                 success: true,

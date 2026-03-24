@@ -37,7 +37,7 @@ function validateProjectExists(projectId: string): boolean {
 }
 
 /**
- * 获取项目的主旨列表
+ * 获取项目的主旨（每个项目只有一个主旨）
  */
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
@@ -49,27 +49,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   }
 
   const themes = query<DbTheme>(
-    'SELECT * FROM themes WHERE project_id = ? AND deleted = 0 ORDER BY created_at DESC',
-    [projectId]
-  );
-  const formattedThemes = themes.map(formatTheme);
-  res.json(formattedThemes);
-}));
-
-/**
- * 获取当前主旨（最新版本）
- */
-router.get('/current', asyncHandler(async (req: Request, res: Response) => {
-  const { projectId } = req.params;
-
-  // 验证项目是否存在
-  if (!validateProjectExists(projectId)) {
-    res.status(404).json({ error: '项目不存在' });
-    return;
-  }
-
-  const themes = query<DbTheme>(
-    'SELECT * FROM themes WHERE project_id = ? AND deleted = 0 ORDER BY version DESC LIMIT 1',
+    'SELECT * FROM themes WHERE project_id = ? AND deleted = 0 ORDER BY updated_at DESC LIMIT 1',
     [projectId]
   );
 
@@ -82,7 +62,7 @@ router.get('/current', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 /**
- * 创建新主旨
+ * 创建或更新项目主旨（每个项目只有一个主旨）
  */
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
@@ -106,40 +86,54 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const id = generateId();
-  const createdAt = now();
-  const updatedAt = now();
   const createdBy = created_by || 'user'; // 默认由用户创建
 
-  run(
-    'INSERT INTO themes (id, project_id, title, content, version, created_by, deleted, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, 0, NULL, ?, ?)',
-    [id, projectId, title, content, createdBy, createdAt, updatedAt]
-  );
-
-  saveDB();
-
-  const themes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [id]);
-  res.status(201).json(formatTheme(themes[0]));
-}));
-
-/**
- * 获取回收站主旨列表
- */
-router.get('/trash', asyncHandler(async (req: Request, res: Response) => {
-  const { projectId } = req.params;
-
-  // 验证项目是否存在
-  if (!validateProjectExists(projectId)) {
-    res.status(404).json({ error: '项目不存在' });
-    return;
-  }
-
-  const themes = query<DbTheme>(
-    'SELECT * FROM themes WHERE project_id = ? AND deleted = 1 ORDER BY deleted_at DESC',
+  // 检查项目是否已有主旨
+  const existingThemes = query<DbTheme>(
+    'SELECT * FROM themes WHERE project_id = ? AND deleted = 0',
     [projectId]
   );
-  const formattedThemes = themes.map(formatTheme);
-  res.json(formattedThemes);
+
+  if (existingThemes.length > 0) {
+    // 已有主旨，更新现有主旨
+    const existingTheme = existingThemes[0];
+    const historyId = generateId();
+    const historyCreatedAt = now();
+    const newVersion = existingTheme.version + 1;
+
+    // 创建历史记录
+    run(
+      'INSERT INTO theme_history (id, theme_id, content, version, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [historyId, existingTheme.id, existingTheme.content, existingTheme.version, existingTheme.created_by, historyCreatedAt]
+    );
+
+    // 更新主旨
+    const updatedAt = now();
+    run(
+      'UPDATE themes SET title = ?, content = ?, version = ?, created_by = ?, updated_at = ? WHERE id = ?',
+      [title, content, newVersion, createdBy, updatedAt, existingTheme.id]
+    );
+
+    saveDB();
+
+    const updatedThemes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [existingTheme.id]);
+    res.json(formatTheme(updatedThemes[0]));
+  } else {
+    // 创建新主旨
+    const id = generateId();
+    const createdAt = now();
+    const updatedAt = now();
+
+    run(
+      'INSERT INTO themes (id, project_id, title, content, version, created_by, deleted, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, 0, NULL, ?, ?)',
+      [id, projectId, title, content, createdBy, createdAt, updatedAt]
+    );
+
+    saveDB();
+
+    const themes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [id]);
+    res.status(201).json(formatTheme(themes[0]));
+  }
 }));
 
 /**
@@ -234,7 +228,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 /**
- * 软删除主旨
+ * 删除主旨
  */
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -249,52 +243,6 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 
   const deletedAt = now();
   run('UPDATE themes SET deleted = 1, deleted_at = ? WHERE id = ?', [deletedAt, id]);
-  saveDB();
-  res.status(204).send();
-}));
-
-/**
- * 恢复主旨
- */
-router.post('/:id/restore', asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  // 检查主旨是否存在
-  const themes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [id]);
-
-  if (themes.length === 0) {
-    res.status(404).json({ error: '主旨未找到' });
-    return;
-  }
-
-  run('UPDATE themes SET deleted = 0, deleted_at = NULL WHERE id = ?', [id]);
-  saveDB();
-
-  const restoredThemes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [id]);
-  res.json(formatTheme(restoredThemes[0]));
-}));
-
-/**
- * 永久删除主旨
- */
-router.delete('/:id/permanent', asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  // 检查主旨是否存在
-  const themes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [id]);
-
-  if (themes.length === 0) {
-    res.status(404).json({ error: '主旨未找到' });
-    return;
-  }
-
-  // 检查主旨是否已软删除
-  if (themes[0].deleted === 0) {
-    res.status(400).json({ error: '只能永久删除已软删除的主旨' });
-    return;
-  }
-
-  run('DELETE FROM themes WHERE id = ?', [id]);
   saveDB();
   res.status(204).send();
 }));

@@ -137,12 +137,12 @@ const handleSubmit = async () => {
       });
       ElMessage.success('保存成功');
     } else {
-      // 创建新主旨
-      await themeStore.createTheme(projectStore.currentProject.id, {
+      // 创建或更新项目主旨（每个项目只有一个主旨）
+      await themeStore.saveTheme(projectStore.currentProject.id, {
         title: title.value,
         content: content.value,
       });
-      ElMessage.success('创建成功');
+      ElMessage.success('保存成功');
     }
     dialogVisible.value = false;
     emit('success');

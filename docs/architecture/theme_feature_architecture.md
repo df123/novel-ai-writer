@@ -2,7 +2,7 @@
 
 ## 1. 功能概述
 
-主旨注入功能允许用户为小说项目定义和管理主旨信息，包括故事概述、小说类型、世界背景等。这些主旨信息将被注入到system prompt中，为LLM提供更准确的上下文指导。
+主旨注入功能允许用户为小说项目定义和管理主旨信息，包括故事概述、小说类型、世界背景等。每个项目只支持一个主旨，主旨信息将被注入到system prompt中，为LLM提供更准确的上下文指导。
 
 ## 2. 数据库设计
 
@@ -75,52 +75,21 @@ CREATE INDEX IF NOT EXISTS idx_theme_history_theme_id ON theme_history(theme_id)
 
 ### 2.4 设计决策
 
-1. **软删除机制**：采用与chapters、timeline_nodes和characters表一致的软删除机制，支持恢复和永久删除
-2. **版本管理**：使用version字段记录主旨版本，每次更新自动创建历史记录
-3. **创建者追踪**：created_by字段记录主旨是由用户创建还是由LLM生成
-4. **外键约束**：project_id使用CASCADE删除，theme_history使用CASCADE删除，确保数据一致性
-5. **索引优化**：为常用查询字段添加索引，提高查询性能
+1. **单主旨设计**：每个项目只支持一个主旨，简化主旨管理逻辑
+2. **软删除机制**：采用与chapters、timeline_nodes和characters表一致的软删除机制
+3. **版本管理**：使用version字段记录主旨版本，每次更新自动创建历史记录
+4. **创建者追踪**：created_by字段记录主旨是由用户创建还是由LLM生成
+5. **外键约束**：project_id使用CASCADE删除，theme_history使用CASCADE删除，确保数据一致性
+6. **索引优化**：为常用查询字段添加索引，提高查询性能
 
 ## 3. API接口设计
 
 ### 3.1 主旨管理API
 
-#### 获取项目的主旨列表
+#### 获取项目的主旨（每个项目只有一个主旨）
 
 ```
 GET /api/projects/:projectId/themes
-```
-
-**路径参数**：
-- `projectId` (必填): 项目ID（UUID格式）
-
-**查询参数**：
-- `deleted` (可选): "true" | "false" - 是否只返回已删除的主旨
-
-**响应格式**：
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "projectId": "uuid",
-      "title": "主旨标题",
-      "content": "主旨内容...",
-      "version": 1,
-      "createdBy": "user",
-      "createdAt": 1234567890,
-      "updatedAt": 1234567890,
-      "deleted": false,
-      "deletedAt": null
-    }
-  ]
-}
-```
-
-#### 获取当前主旨（最新版本）
-
-```
-GET /api/projects/:projectId/themes/current
 ```
 
 **路径参数**：
@@ -151,7 +120,7 @@ GET /api/projects/:projectId/themes/current
 }
 ```
 
-#### 创建新主旨
+#### 创建或更新项目主旨（每个项目只有一个主旨）
 
 ```
 POST /api/projects/:projectId/themes
@@ -185,6 +154,11 @@ POST /api/projects/:projectId/themes
   }
 }
 ```
+
+**说明**：
+- 如果项目已有主旨，则更新现有主旨（自动创建历史记录）
+- 如果项目没有主旨，则创建新主旨
+- 版本号自动递增
 
 #### 更新主旨（自动创建历史记录）
 
@@ -226,7 +200,7 @@ PUT /api/themes/:id
 - version字段自动递增
 - updated_at字段更新为当前时间
 
-#### 删除主旨（软删除）
+#### 删除主旨
 
 ```
 DELETE /api/themes/:id
@@ -304,71 +278,6 @@ GET /api/themes/:id/history/:version
 ```json
 {
   "error": "未找到指定版本的主旨"
-}
-```
-
-### 3.2 回收站API
-
-#### 获取回收站主旨列表
-
-```
-GET /api/projects/:projectId/themes/trash
-```
-
-**路径参数**：
-- `projectId` (必填): 项目ID（UUID格式）
-
-**响应格式**：
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "projectId": "uuid",
-      "title": "已删除的主旨",
-      "content": "主旨内容...",
-      "version": 1,
-      "createdBy": "user",
-      "createdAt": 1234567890,
-      "updatedAt": 1234567890,
-      "deleted": true,
-      "deletedAt": 1234567900
-    }
-  ]
-}
-```
-
-#### 恢复主旨
-
-```
-POST /api/themes/:id/restore
-```
-
-**路径参数**：
-- `id` (必填): 主旨ID（UUID格式）
-
-**响应格式**：
-```json
-{
-  "success": true,
-  "message": "主旨已恢复"
-}
-```
-
-#### 永久删除主旨
-
-```
-DELETE /api/themes/:id/permanent
-```
-
-**路径参数**：
-- `id` (必填): 主旨ID（UUID格式）
-
-**响应格式**：
-```json
-{
-  "success": true,
-  "message": "主旨已永久删除"
 }
 ```
 
@@ -608,18 +517,22 @@ flowchart TD
 
 ## 7. 数据流图
 
-### 7.1 创建主旨数据流
+### 7.1 创建或更新主旨数据流
 
 ```mermaid
 flowchart LR
-    A[用户创建主旨] --> B[ThemePanel]
-    B --> C[themeStore.createTheme]
+    A[用户创建或更新主旨] --> B[ThemePanel]
+    B --> C[themeStore.saveTheme]
     C --> D[themeApi.create]
     D --> E[Server POST /api/projects/:projectId/themes]
-    E --> F[Database INSERT themes]
-    F --> G[返回主旨数据]
-    G --> H[更新themeStore状态]
-    H --> I[更新UI显示]
+    E --> F{检查项目是否已有主旨}
+    F -->|没有| G[Database INSERT themes]
+    F -->|已有| H[Database INSERT theme_history]
+    H --> I[Database UPDATE themes]
+    G --> J[返回主旨数据]
+    I --> J
+    J --> K[更新themeStore状态]
+    K --> L[更新UI显示]
 ```
 
 ### 7.2 更新主旨数据流
@@ -705,10 +618,11 @@ flowchart LR
 
 本架构设计方案为"主旨注入功能"提供了完整的技术实现路径，包括：
 
-1. **数据库设计**：采用软删除机制，支持版本管理和历史记录
-2. **API设计**：RESTful风格，支持完整的CRUD操作和历史记录查询
-3. **类型定义**：完整的TypeScript类型系统
-4. **主旨注入机制**：将主旨内容注入到system prompt中
-5. **数据流设计**：清晰的数据流向和交互流程
+1. **单主旨设计**：每个项目只支持一个主旨，简化主旨管理逻辑
+2. **数据库设计**：采用软删除机制，支持版本管理和历史记录
+3. **API设计**：RESTful风格，支持完整的CRUD操作和历史记录查询
+4. **类型定义**：完整的TypeScript类型系统
+5. **主旨注入机制**：将主旨内容注入到system prompt中
+6. **数据流设计**：清晰的数据流向和交互流程
 
 该方案遵循项目现有的代码规范，与现有系统无缝集成，同时考虑了性能优化、安全性和可扩展性。

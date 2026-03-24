@@ -225,48 +225,32 @@ export const dbApi = {
 
 // 主旨管理 API
 export const themeApi = {
-  // 获取项目的主旨列表
-  list: (projectId: string) => 
+  // 获取项目的主旨（每个项目只有一个主旨）
+  list: (projectId: string) =>
     api.get(`/projects/${projectId}/themes`),
   
-  // 获取当前主旨（最新版本）
-  getCurrent: (projectId: string) => 
-    api.get(`/projects/${projectId}/themes/current`),
-  
-  // 获取回收站主旨列表
-  getTrash: (projectId: string) => 
-    api.get(`/projects/${projectId}/themes/trash`),
-  
-  // 创建新主旨
-  create: (projectId: string, data: CreateThemeRequest) => 
+  // 创建或更新项目主旨
+  create: (projectId: string, data: CreateThemeRequest) =>
     api.post(`/projects/${projectId}/themes`, data),
   
   // 获取单个主旨
-  get: (id: string) => 
+  get: (id: string) =>
     api.get(`/themes/${id}`),
   
   // 更新主旨
-  update: (id: string, data: UpdateThemeRequest) => 
+  update: (id: string, data: UpdateThemeRequest) =>
     api.put(`/themes/${id}`, data),
   
-  // 软删除主旨
-  delete: (id: string) => 
+  // 删除主旨
+  delete: (id: string) =>
     api.delete(`/themes/${id}`),
   
-  // 恢复主旨
-  restore: (id: string) => 
-    api.post(`/themes/${id}/restore`),
-  
-  // 永久删除主旨
-  permanentDelete: (id: string) => 
-    api.delete(`/themes/${id}/permanent`),
-  
   // 获取主旨的历史记录
-  getHistory: (id: string) => 
+  getHistory: (id: string) =>
     api.get(`/themes/${id}/history`),
   
   // 获取指定版本的历史记录
-  getHistoryVersion: (id: string, version: number) => 
+  getHistoryVersion: (id: string, version: number) =>
     api.get(`/themes/${id}/history/${version}`),
 };
 
