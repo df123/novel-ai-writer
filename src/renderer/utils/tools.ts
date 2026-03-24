@@ -281,6 +281,33 @@ export const getCharacterTool: ToolDefinition = {
 };
 
 /**
+ * 更新主旨工具
+ */
+export const updateThemeTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_theme',
+    description: '更新当前项目的主旨。主旨包括故事概述、类型、世界背景等核心内容。如果当前没有主旨，则会创建新的主旨。更新后会自动创建历史记录。',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: '主旨标题',
+        },
+        content: {
+          type: 'string',
+          description: '主旨内容（故事概述、类型、世界背景等）',
+        },
+      },
+      required: ['title', 'content'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
  * 所有可用工具
  */
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -292,4 +319,5 @@ export const ALL_TOOLS: ToolDefinition[] = [
   updateCharacterTool,
   deleteCharacterTool,
   getCharacterTool,
+  updateThemeTool,
 ];

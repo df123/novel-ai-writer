@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Message, Chat, TimelineNode, Character, Chapter } from '../../shared/types';
-import { chatApi, messageApi, llmApi, timelineApi, characterApi } from '../utils/api';
+import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
 import { ALL_TOOLS } from '../utils/tools';
@@ -570,6 +570,76 @@ export const useChatStore = defineStore('chat', () => {
               return JSON.stringify({ 
                 success: false, 
                 message: '获取人物失败，请稍后重试' 
+              });
+            }
+          }
+          case 'update_theme': {
+            // 检查是否选择了项目
+            if (!projectStore.currentProject) {
+              return JSON.stringify({ 
+                success: false, 
+                message: '未选择项目，请先选择一个项目' 
+              });
+            }
+
+            try {
+              // 尝试获取当前主旨
+              let currentTheme;
+              try {
+                const response = await themeApi.getCurrent(projectStore.currentProject.id);
+                currentTheme = response.data;
+              } catch (error: any) {
+                // 仅在404时创建新主旨，其他错误继续抛出
+                if (error?.response?.status === 404) {
+                  const createResponse = await themeApi.create(projectStore.currentProject.id, {
+                    title: parsedArgs.title,
+                    content: parsedArgs.content,
+                    created_by: 'llm',
+                  });
+                  const newTheme = createResponse.data;
+                  // 重新加载当前主旨到store
+                  await themeStore.loadCurrentTheme(projectStore.currentProject.id);
+                  return JSON.stringify({
+                    success: true,
+                    message: `已创建新主旨: ${parsedArgs.title}`,
+                    data: {
+                      id: newTheme.id,
+                      title: newTheme.title,
+                      content: newTheme.content,
+                      version: newTheme.version,
+                    },
+                  });
+                }
+                throw error;
+              }
+
+              // 更新现有主旨，标记created_by为'llm'
+              const updateResponse = await themeApi.update(currentTheme.id, {
+                title: parsedArgs.title,
+                content: parsedArgs.content,
+                created_by: 'llm',
+              });
+              const updatedTheme = updateResponse.data;
+              
+              // 重新加载当前主旨到store
+              await themeStore.loadCurrentTheme(projectStore.currentProject.id);
+              
+              return JSON.stringify({
+                success: true,
+                message: `已更新主旨: ${parsedArgs.title}`,
+                data: {
+                  id: updatedTheme.id,
+                  title: updatedTheme.title,
+                  content: updatedTheme.content,
+                  version: updatedTheme.version,
+                  previousVersion: currentTheme.version,
+                },
+              });
+            } catch (error) {
+              console.error('[update_theme] Failed to update theme:', error);
+              return JSON.stringify({ 
+                success: false, 
+                message: '更新主旨失败，请稍后重试' 
               });
             }
           }

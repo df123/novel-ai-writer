@@ -655,6 +655,9 @@ export interface CreateThemeRequest {
   
   /** 主旨内容 */
   content: string;
+
+  /** 创建者类型（可选，用于标记由LLM创建） */
+  created_by?: 'user' | 'llm';
 }
 
 /**
@@ -666,4 +669,7 @@ export interface UpdateThemeRequest {
   
   /** 主旨内容（可选） */
   content?: string;
+
+  /** 创建者类型（可选，用于标记由LLM修改） */
+  created_by?: 'user' | 'llm';
 }

@@ -14,6 +14,7 @@ const router: Router = express.Router({ mergeParams: true });
 interface CreateThemeRequestBody {
   title: string;
   content: string;
+  created_by?: string;
 }
 
 /**
@@ -22,6 +23,7 @@ interface CreateThemeRequestBody {
 interface UpdateThemeRequestBody {
   title?: string;
   content?: string;
+  created_by?: string;
 }
 
 /**
@@ -84,7 +86,7 @@ router.get('/current', asyncHandler(async (req: Request, res: Response) => {
  */
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { title, content } = req.body as CreateThemeRequestBody;
+  const { title, content, created_by } = req.body as CreateThemeRequestBody;
 
   // 验证项目是否存在
   if (!validateProjectExists(projectId)) {
@@ -98,10 +100,16 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
+  // 验证 created_by 的值
+  if (created_by !== undefined && created_by !== 'user' && created_by !== 'llm') {
+    res.status(400).json({ error: 'created_by 必须为 user 或 llm' });
+    return;
+  }
+
   const id = generateId();
   const createdAt = now();
   const updatedAt = now();
-  const createdBy = 'user'; // 默认由用户创建
+  const createdBy = created_by || 'user'; // 默认由用户创建
 
   run(
     'INSERT INTO themes (id, project_id, title, content, version, created_by, deleted, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, 0, NULL, ?, ?)',
@@ -155,7 +163,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
  */
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { title, content } = req.body as UpdateThemeRequestBody;
+  const { title, content, created_by } = req.body as UpdateThemeRequestBody;
 
   // 获取现有主旨
   const existingThemes = query<DbTheme>('SELECT * FROM themes WHERE id = ?', [id]);
@@ -168,8 +176,14 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const existingTheme = existingThemes[0];
 
   // 检查是否提供了更新内容
-  if (title === undefined && content === undefined) {
+  if (title === undefined && content === undefined && created_by === undefined) {
     res.status(400).json({ error: '没有提供任何更新内容' });
+    return;
+  }
+
+  // 验证 created_by 的值
+  if (created_by !== undefined && created_by !== 'user' && created_by !== 'llm') {
+    res.status(400).json({ error: 'created_by 必须为 user 或 llm' });
     return;
   }
 
@@ -202,6 +216,13 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   params.push(newVersion);
   updates.push('updated_at = ?');
   params.push(now());
+
+  // 如果提供了created_by，则更新它
+  if (created_by !== undefined) {
+    updates.push('created_by = ?');
+    params.push(created_by);
+  }
+
   params.push(id);
 
   run(`UPDATE themes SET ${updates.join(', ')} WHERE id = ?`, params);
