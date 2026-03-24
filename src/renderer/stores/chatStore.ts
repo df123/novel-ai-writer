@@ -10,6 +10,7 @@ import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
 import { useSettingsStore } from './settingsStore';
+import { useThemeStore } from './themeStore';
 
 /**
  * 工具调用接口
@@ -132,6 +133,7 @@ export const useChatStore = defineStore('chat', () => {
     const timelineStore = useTimelineStore();
     const characterStore = useCharacterStore();
     const settingsStore = useSettingsStore();
+    const themeStore = useThemeStore();
     let assistantMessageId: string | null = null;
 
     if (!currentChat.value || !projectStore.currentProject) {
@@ -178,6 +180,7 @@ export const useChatStore = defineStore('chat', () => {
 
     let systemPrompt = buildSystemPrompt(
       options.systemPrompt,
+      themeStore.currentTheme,
       [],
       [],
       ALL_TOOLS

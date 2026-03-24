@@ -1,4 +1,5 @@
 import { ToolDefinition } from './tools';
+import { Theme } from '@shared/types';
 
 /**
  * 系统提示词配置
@@ -7,6 +8,7 @@ import { ToolDefinition } from './tools';
 /**
  * 构建完整的系统提示词
  * @param customPrompt 自定义提示词（可选）
+ * @param theme 当前主旨（可选）
  * @param selectedTimelineNodes 选中的时间线节点
  * @param selectedCharacters 选中的角色
  * @param tools 可用的工具定义
@@ -14,11 +16,18 @@ import { ToolDefinition } from './tools';
  */
 export const buildSystemPrompt = (
   customPrompt: string = '',
+  theme: Theme | null = null,
   _selectedTimelineNodes: { id: string; title: string; description: string }[] = [],
   _selectedCharacters: { id: string; name: string; personality?: string }[] = [],
   tools?: ToolDefinition[]
 ): string => {
-  let systemPrompt = customPrompt || '你是一个专业的小说创作助手。';
+  // 如果有主旨，将主旨内容放在最前面
+  let systemPrompt = '';
+  if (theme) {
+    systemPrompt += `## 小说主旨\n${theme.title}\n${theme.content}\n\n---\n\n`;
+  }
+
+  systemPrompt += customPrompt || '你是一个专业的小说创作助手。';
 
   if (tools && tools.length > 0) {
     systemPrompt += '\n\n你可以使用工具来管理时间线和人物信息（create_timeline, update_timeline, delete_timeline, create_character, update_character, delete_character）。\n\n';

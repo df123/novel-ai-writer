@@ -122,6 +122,18 @@
     </div>
 
     <el-footer class="chat-footer">
+      <!-- 主旨预览 -->
+      <div v-if="currentTheme" class="theme-preview" @click="handleThemeClick">
+        <div class="theme-preview-header">
+          <span class="theme-preview-icon">📖</span>
+          <span class="theme-preview-title">{{ currentTheme.title }}</span>
+          <span class="theme-preview-hint">点击查看详情</span>
+        </div>
+        <div class="theme-preview-content">
+          {{ getThemePreview(currentTheme.content) }}
+        </div>
+      </div>
+
       <el-input
         v-model="inputText"
         type="textarea"
@@ -176,6 +188,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useChapterStore } from '../stores/chapterStore';
+import { useThemeStore } from '../stores/themeStore';
 import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
 import { marked } from 'marked';
 
@@ -190,12 +203,14 @@ const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
 const settingsStore = useSettingsStore();
 const chapterStore = useChapterStore();
+const themeStore = useThemeStore();
 
 const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning, totalTokens } = storeToRefs(chatStore);
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters } = storeToRefs(characterStore);
 const { selectedProvider, selectedModel, models, isLoadingModels } = storeToRefs(settingsStore);
+const { currentTheme } = storeToRefs(themeStore);
 const { loadModels, updateSettings } = settingsStore;
 
 const { createChat, sendMessage, deleteMessage } = chatStore;
@@ -344,6 +359,18 @@ const handleSaveChapter = async () => {
     console.error('Failed to save chapter:', error);
     ElMessage.error('保存章节失败，请重试');
   }
+};
+
+// 获取主旨内容预览（截取前100个字符）
+const getThemePreview = (content: string): string => {
+  if (!content) return '';
+  const preview = content.length > 100 ? content.slice(0, 100) + '...' : content;
+  return preview;
+};
+
+// 点击主旨预览的处理函数（可选：可以打开主旨编辑对话框）
+const handleThemeClick = () => {
+  ElMessage.info('主旨已注入到对话中，AI将基于主旨进行回复');
 };
 
 onMounted(async () => {
@@ -573,6 +600,55 @@ onMounted(async () => {
   padding: 12px;
   height: auto;
   flex-shrink: 0;
+}
+
+.theme-preview {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.theme-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.theme-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.theme-preview-icon {
+  font-size: 18px;
+}
+
+.theme-preview-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  flex: 1;
+}
+
+.theme-preview-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.theme-preview-content {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .empty-project {

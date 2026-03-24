@@ -16,6 +16,14 @@
           章节管理
         </el-button>
         <el-button
+          :icon="Document"
+          type="primary"
+          class="theme-button"
+          @click="showThemeDialog = true"
+        >
+          主旨管理
+        </el-button>
+        <el-button
           :icon="Setting"
           circle
           class="settings-button"
@@ -66,21 +74,31 @@
     >
       <ChapterPanel />
     </el-dialog>
+
+    <el-dialog
+      v-model="showThemeDialog"
+      title="主旨管理"
+      width="80%"
+    >
+      <ThemePanel />
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { HomeFilled, Setting, MoreFilled, Reading } from '@element-plus/icons-vue';
+import { HomeFilled, Setting, MoreFilled, Reading, Document } from '@element-plus/icons-vue';
 import { useProjectStore } from '../stores/projectStore';
 import { useChatStore } from '../stores/chatStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
 import { useChapterStore } from '../stores/chapterStore';
+import { useThemeStore } from '../stores/themeStore';
 import ChapterPanel from './ChapterPanel.vue';
 import TimelinePanel from './TimelinePanel.vue';
 import ChatPanel from './ChatPanel.vue';
 import CharacterPanel from './CharacterPanel.vue';
+import ThemePanel from './ThemePanel.vue';
 import ProjectSelector from './ProjectSelector.vue';
 import CreateProjectDialog from './CreateProjectDialog.vue';
 import LLMSettingsDialog from './LLMSettingsDialog.vue';
@@ -91,11 +109,13 @@ const chatStore = useChatStore();
 const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
 const chapterStore = useChapterStore();
+const themeStore = useThemeStore();
 
 const showSettings = ref(false);
 const showCreateProject = ref(false);
 const showDatabase = ref(false);
 const showChapterDialog = ref(false);
+const showThemeDialog = ref(false);
 
 watch(
   () => projectStore.currentProject,
@@ -105,6 +125,10 @@ watch(
       await timelineStore.loadNodes(currentProject.id);
       await characterStore.loadCharacters(currentProject.id);
       await chapterStore.loadChapters(currentProject.id);
+      await themeStore.loadThemes(currentProject.id);
+      await themeStore.loadCurrentTheme(currentProject.id);
+    } else {
+      themeStore.clearThemes();
     }
   },
   { immediate: true }
@@ -155,6 +179,10 @@ const handleMenuCommand = (command: string) => {
 }
 
 .chapter-button {
+  margin-left: 8px;
+}
+
+.theme-button {
   margin-left: 8px;
 }
 

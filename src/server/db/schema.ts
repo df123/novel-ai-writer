@@ -17,6 +17,8 @@ export function getCreateTablesSQL(): string[] {
     'CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
     'CREATE TABLE IF NOT EXISTS timeline_versions (id TEXT PRIMARY KEY, timeline_node_id TEXT NOT NULL, title TEXT NOT NULL, date TEXT, content TEXT, version INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (timeline_node_id) REFERENCES timeline_nodes(id) ON DELETE CASCADE)',
     'CREATE TABLE IF NOT EXISTS character_versions (id TEXT PRIMARY KEY, character_id TEXT NOT NULL, name TEXT NOT NULL, personality TEXT, background TEXT, relationships TEXT, version INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE)',
+    'CREATE TABLE IF NOT EXISTS themes (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER DEFAULT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE)',
+    'CREATE TABLE IF NOT EXISTS theme_history (id TEXT PRIMARY KEY, theme_id TEXT NOT NULL, content TEXT NOT NULL, version INTEGER NOT NULL, created_by TEXT NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (theme_id) REFERENCES themes(id) ON DELETE CASCADE)',
     'CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_project_id ON timeline_nodes(project_id)',
     'CREATE INDEX IF NOT EXISTS idx_characters_project_id ON characters(project_id)',
@@ -25,7 +27,12 @@ export function getCreateTablesSQL(): string[] {
     'CREATE INDEX IF NOT EXISTS idx_chapters_project_deleted ON chapters(project_id, deleted)',
     'CREATE INDEX IF NOT EXISTS idx_chapters_chapter_number ON chapters(chapter_number)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_versions_node_id ON timeline_versions(timeline_node_id)',
-    'CREATE INDEX IF NOT EXISTS idx_character_versions_character_id ON character_versions(character_id)'
+    'CREATE INDEX IF NOT EXISTS idx_character_versions_character_id ON character_versions(character_id)',
+    'CREATE INDEX IF NOT EXISTS idx_themes_project_id ON themes(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_themes_deleted ON themes(deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_themes_deleted_at ON themes(deleted_at)',
+    'CREATE INDEX IF NOT EXISTS idx_themes_project_deleted ON themes(project_id, deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_theme_history_theme_id ON theme_history(theme_id)'
   ];
 }
 
@@ -38,9 +45,11 @@ export function getSoftDeleteIndexesSQL(): string[] {
     'CREATE INDEX IF NOT EXISTS idx_characters_deleted ON characters(deleted)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_deleted ON timeline_nodes(deleted)',
     'CREATE INDEX IF NOT EXISTS idx_chapters_deleted ON chapters(deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_themes_deleted ON themes(deleted)',
     'CREATE INDEX IF NOT EXISTS idx_characters_deleted_at ON characters(deleted_at)',
     'CREATE INDEX IF NOT EXISTS idx_timeline_deleted_at ON timeline_nodes(deleted_at)',
-    'CREATE INDEX IF NOT EXISTS idx_chapters_deleted_at ON chapters(deleted_at)'
+    'CREATE INDEX IF NOT EXISTS idx_chapters_deleted_at ON chapters(deleted_at)',
+    'CREATE INDEX IF NOT EXISTS idx_themes_deleted_at ON themes(deleted_at)'
   ];
 }
 

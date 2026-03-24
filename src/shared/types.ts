@@ -555,3 +555,115 @@ export interface ExportChaptersResponse {
   /** 文件名 */
   filename: string;
 }
+
+/**
+ * 主旨接口（前端格式）
+ * 表示小说的主旨信息，包括故事概述、类型、世界背景等
+ */
+export interface Theme {
+  /** 主旨唯一标识符（UUID） */
+  id: string;
+  
+  /** 所属项目的 ID */
+  projectId: string;
+  
+  /** 主旨标题 */
+  title: string;
+  
+  /** 主旨内容（故事概述、类型、世界背景等） */
+  content: string;
+  
+  /** 版本号（从 1 开始递增） */
+  version: number;
+  
+  /** 创建者类型 */
+  createdBy: 'user' | 'llm';
+  
+  /** 主旨创建时间戳（秒） */
+  createdAt: number;
+  
+  /** 主旨最后更新时间戳（秒） */
+  updatedAt: number;
+  
+  /** 是否已删除（软删除标记） */
+  deleted?: boolean;
+  
+  /** 删除时间戳（秒，可选） */
+  deletedAt?: number;
+}
+
+/**
+ * 主旨历史记录接口（前端格式）
+ * 表示主旨的历史版本
+ */
+export interface ThemeHistory {
+  /** 历史记录唯一标识符（UUID） */
+  id: string;
+  
+  /** 所属主旨的 ID */
+  themeId: string;
+  
+  /** 历史版本的主旨内容 */
+  content: string;
+  
+  /** 版本号（从 1 开始递增） */
+  version: number;
+  
+  /** 创建者类型 */
+  createdBy: 'user' | 'llm';
+  
+  /** 历史记录创建时间戳（秒） */
+  createdAt: number;
+}
+
+/**
+ * 数据库主旨接口（数据库格式）
+ */
+export interface DbTheme {
+  id: string;
+  project_id: string;
+  title: string;
+  content: string;
+  version: number;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  /** 是否已删除（0: 未删除, 1: 已删除） */
+  deleted: number;
+  /** 删除时间戳（秒，可选） */
+  deleted_at: number | null;
+}
+
+/**
+ * 数据库主旨历史记录接口（数据库格式）
+ */
+export interface DbThemeHistory {
+  id: string;
+  theme_id: string;
+  content: string;
+  version: number;
+  created_by: string;
+  created_at: number;
+}
+
+/**
+ * 创建主旨请求接口
+ */
+export interface CreateThemeRequest {
+  /** 主旨标题 */
+  title: string;
+  
+  /** 主旨内容 */
+  content: string;
+}
+
+/**
+ * 更新主旨请求接口
+ */
+export interface UpdateThemeRequest {
+  /** 主旨标题（可选） */
+  title?: string;
+  
+  /** 主旨内容（可选） */
+  content?: string;
+}

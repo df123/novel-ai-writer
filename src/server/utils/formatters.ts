@@ -16,6 +16,10 @@ import type {
   CharacterVersion,
   DbChapter,
   Chapter,
+  DbTheme,
+  Theme,
+  DbThemeHistory,
+  ThemeHistory,
   ToolCall
 } from '@shared/types';
 
@@ -180,5 +184,41 @@ export function formatChapter(chapter: DbChapter): Chapter {
     updatedAt: chapter.updated_at,
     deleted: chapter.deleted === 1,
     deletedAt: chapter.deleted_at ?? undefined
+  };
+}
+
+/**
+ * 格式化主旨数据（数据库格式 -> 前端格式）
+ * @param theme - 数据库中的主旨对象
+ * @returns 格式化后的主旨对象
+ */
+export function formatTheme(theme: DbTheme): Theme {
+  return {
+    id: theme.id,
+    projectId: theme.project_id,
+    title: theme.title,
+    content: theme.content,
+    version: theme.version,
+    createdBy: theme.created_by as 'user' | 'llm',
+    createdAt: theme.created_at,
+    updatedAt: theme.updated_at,
+    deleted: theme.deleted === 1,
+    deletedAt: theme.deleted_at ?? undefined
+  };
+}
+
+/**
+ * 格式化主旨历史记录数据（数据库格式 -> 前端格式）
+ * @param history - 数据库中的主旨历史记录对象
+ * @returns 格式化后的主旨历史记录对象
+ */
+export function formatThemeHistory(history: DbThemeHistory): ThemeHistory {
+  return {
+    id: history.id,
+    themeId: history.theme_id,
+    content: history.content,
+    version: history.version,
+    createdBy: history.created_by as 'user' | 'llm',
+    createdAt: history.created_at
   };
 }
