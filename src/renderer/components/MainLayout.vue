@@ -125,10 +125,9 @@ watch(
       await timelineStore.loadNodes(currentProject.id);
       await characterStore.loadCharacters(currentProject.id);
       await chapterStore.loadChapters(currentProject.id);
-      await themeStore.loadThemes(currentProject.id);
-      await themeStore.loadCurrentTheme(currentProject.id);
+      await themeStore.loadTheme(currentProject.id);
     } else {
-      themeStore.clearThemes();
+      themeStore.clearTheme();
     }
   },
   { immediate: true }
