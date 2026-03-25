@@ -16,7 +16,7 @@ router.get('/projects/:projectId/chats', asyncHandler(async (req: Request, res: 
 }));
 
 // 获取单个聊天
-router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.get('/chats/:id', asyncHandler(async (req: Request, res: Response) => {
   const chats = query<DbChat>('SELECT * FROM chats WHERE id = ?', [req.params.id]);
   if (chats.length === 0) {
     res.status(404).json({ error: '聊天未找到' });
@@ -42,7 +42,7 @@ router.post('/projects/:projectId/chats', asyncHandler(async (req: Request, res:
 }));
 
 // 更新聊天
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.put('/chats/:id', asyncHandler(async (req: Request, res: Response) => {
   const { name } = req.body;
   const updatedAt = now();
 
@@ -55,7 +55,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // 删除聊天
-router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.delete('/chats/:id', asyncHandler(async (req: Request, res: Response) => {
   run('DELETE FROM chats WHERE id = ?', [req.params.id]);
   saveDB();
   res.status(204).send();

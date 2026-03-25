@@ -101,13 +101,19 @@ export const characterApi = {
 
 // LLM
 export const llmApi = {
-  chat: (provider: string, messages: any[], options?: { model?: string; temperature?: number; apiKey?: string; tools?: any[]; thinking?: { type: string } }) => {
+  chat: (
+    provider: string,
+    messages: any[],
+    options?: { model?: string; temperature?: number; apiKey?: string; tools?: any[]; thinking?: { type: string } },
+    signal?: AbortSignal
+  ) => {
     return fetch(`${API_BASE_URL}/llm/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ provider, messages, options }),
+      signal,
     });
   },
 };

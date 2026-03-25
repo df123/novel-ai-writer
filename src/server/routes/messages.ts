@@ -78,7 +78,7 @@ router.post('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Re
 /**
  * 更新消息
  */
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.put('/messages/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { role, content, reasoning_content, tool_calls, tool_call_id } = req.body as UpdateMessageRequestBody;
 
@@ -113,19 +113,33 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 /**
  * 删除消息
  */
-router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.delete('/messages/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
+  console.log('[DELETE /messages/:id] 收到删除请求，消息ID:', id);
+  
   const messages = query<DbMessage>('SELECT * FROM messages WHERE id = ?', [id]);
+  console.log('[DELETE /messages/:id] 数据库查询结果，找到消息数量:', messages.length);
+  
+  if (messages.length === 0) {
+    console.log('[DELETE /messages/:id] 错误：消息不存在，ID:', id);
+    res.status(404).json({ error: '消息未找到' });
+    return;
+  }
+  
+  const message = messages[0];
+  console.log('[DELETE /messages/:id] 找到消息:', { id: message.id, chatId: message.chat_id, role: message.role });
   
   run('DELETE FROM messages WHERE id = ?', [id]);
+  console.log('[DELETE /messages/:id] 已执行删除操作');
 
-  if (messages.length > 0) {
-    const message = messages[0];
-    run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), message.chat_id]);
-  }
+  run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), message.chat_id]);
+  console.log('[DELETE /messages/:id] 已更新聊天时间戳');
 
   saveDB();
+  console.log('[DELETE /messages/:id] 数据库已保存');
+  
   res.status(204).send();
+  console.log('[DELETE /messages/:id] 返回 204 No Content');
 }));
 
 export default router;

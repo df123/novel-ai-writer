@@ -43,6 +43,15 @@
             >
               {{ message.role === 'user' ? '作者' : 'AI助手' }}
             </el-tag>
+            <!-- 流式传输状态指示器 -->
+            <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1" class="streaming-indicator">
+              <span class="streaming-dots">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </span>
+              <span class="streaming-text">正在生成回复</span>
+            </div>
             <span class="message-time">
               {{ formatTimestamp(message.timestamp) }}
             </span>
@@ -117,6 +126,15 @@
             </div>
           </el-card>
         </div>
+        
+        <!-- 加载指示器 -->
+        <div v-if="isLoading && !isStreaming" class="loading-indicator">
+          <el-icon class="is-loading" :size="20">
+            <Loading />
+          </el-icon>
+          <span class="loading-text">AI 正在思考...</span>
+        </div>
+        
         <div ref="messagesEndRef"></div>
       </div>
     </div>
@@ -134,22 +152,39 @@
         </div>
       </div>
 
-      <el-input
-        v-model="inputText"
-        type="textarea"
-        :rows="3"
-        placeholder="输入您的问题或写作需求..."
-        :disabled="isLoading || !currentChat"
-        @keydown.enter.prevent="handleSend"
-      >
-        <template #append>
+      <div class="input-wrapper">
+        <el-input
+          v-model="inputText"
+          type="textarea"
+          :rows="3"
+          placeholder="输入您的问题或写作需求..."
+          :disabled="isLoading || !currentChat"
+          @keydown.enter.prevent="handleSend"
+          class="chat-input"
+        />
+        <div class="input-actions">
+          <!-- 取消按钮 -->
           <el-button
+            v-if="isLoading"
+            :icon="Close"
+            type="danger"
+            @click="handleCancel"
+            class="cancel-button"
+          >
+            取消
+          </el-button>
+          <!-- 发送按钮 -->
+          <el-button
+            v-else
             :icon="Promotion"
+            type="primary"
             @click="handleSend"
-            :disabled="!inputText.trim() || isLoading || !currentChat"
-          />
-        </template>
-      </el-input>
+            :disabled="!inputText.trim() || !currentChat"
+          >
+            发送
+          </el-button>
+        </div>
+      </div>
     </el-footer>
 
     <el-dialog
@@ -180,7 +215,7 @@
 import { ref, watch, nextTick, onMounted, computed } from 'vue';
 import type { Message } from '../../shared/types';
 import { storeToRefs } from 'pinia';
-import { Promotion, MoreFilled } from '@element-plus/icons-vue';
+import { Promotion, MoreFilled, Close, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -210,10 +245,10 @@ const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters } = storeToRefs(characterStore);
 const { selectedProvider, selectedModel, models, isLoadingModels } = storeToRefs(settingsStore);
-const { currentTheme } = storeToRefs(themeStore);
+const { theme: currentTheme } = storeToRefs(themeStore);
 const { loadModels, updateSettings } = settingsStore;
 
-const { createChat, sendMessage, deleteMessage } = chatStore;
+const { createChat, sendMessage, cancelMessage, deleteMessage } = chatStore;
 
 const currentModel = computed(() => selectedModel.value || 'deepseek-reasoner');
 
@@ -305,6 +340,11 @@ const handleSend = async () => {
   } catch (error) {
     console.error('Failed to send message:', error);
   }
+};
+
+const handleCancel = () => {
+  cancelMessage();
+  ElMessage.info('已取消生成');
 };
 
 const handleCreateChat = async () => {
@@ -602,6 +642,26 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-input {
+  flex: 1;
+}
+
+.chat-input :deep(textarea) {
+  resize: none;
+}
+
+.input-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .theme-preview {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 8px;
@@ -762,5 +822,102 @@ onMounted(async () => {
 .markdown-content :deep(img) {
   max-width: 100%;
   height: auto;
+}
+
+/* 加载指示器样式 */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin-top: 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+.loading-indicator .el-icon {
+  color: #409eff;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: #666;
+}
+
+/* 流式传输状态指示器样式 */
+.streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #e6f7ff;
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease;
+}
+
+.streaming-dots {
+  display: flex;
+  gap: 2px;
+}
+
+.streaming-dots .dot {
+  width: 4px;
+  height: 4px;
+  background: #409eff;
+  border-radius: 50%;
+  animation: dotPulse 1.4s infinite;
+}
+
+.streaming-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.streaming-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.streaming-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.streaming-text {
+  font-size: 11px;
+  color: #409eff;
+  white-space: nowrap;
+}
+
+/* 取消按钮样式 */
+.cancel-button {
+  transition: all 0.3s ease;
+}
+
+.cancel-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.4);
+}
+
+/* 动画定义 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dotPulse {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 </style>

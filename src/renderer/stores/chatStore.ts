@@ -49,6 +49,8 @@ export const useChatStore = defineStore('chat', () => {
   const currentStreamReasoning = ref('');
   const totalTokens = ref(0);
   const chapterContext = ref<Chapter | null>(null);
+  const abortController = ref<AbortController | null>(null);
+  const createdMessageIds = ref<string[]>([]);
 
   const loadChats = async (projectId: string) => {
     try {
@@ -148,6 +150,11 @@ export const useChatStore = defineStore('chat', () => {
     if (!apiKey) {
       throw new Error(`请先配置 ${providerName === 'deepseek' ? 'DeepSeek' : 'OpenRouter'} API 密钥`);
     }
+
+    // 创建 AbortController 用于取消请求
+    abortController.value = new AbortController();
+    // 重置创建的消息 ID 数组
+    createdMessageIds.value = [];
 
     isLoading.value = true;
     isStreaming.value = true;
@@ -666,7 +673,8 @@ export const useChatStore = defineStore('chat', () => {
           apiKey,
           tools: ALL_TOOLS,
           thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
-        }
+        },
+        abortController.value?.signal
       );
 
       if (!response.body) {
@@ -681,6 +689,8 @@ export const useChatStore = defineStore('chat', () => {
       let buffer = '';
 
       assistantMessageId = generateId();
+      // 追踪创建的消息 ID
+      createdMessageIds.value.push(assistantMessageId);
       if (currentChat.value) {
         const assistantMessage: Message = {
           id: assistantMessageId,
@@ -698,6 +708,10 @@ export const useChatStore = defineStore('chat', () => {
       currentStreamReasoning.value = '';
 
       while (true) {
+        // 检查是否已取消
+        if (abortController.value?.signal.aborted) {
+          throw new DOMException('已取消生成', 'AbortError');
+        }
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -835,10 +849,6 @@ export const useChatStore = defineStore('chat', () => {
           await runLLMTurn(newMessages, true);
         } else {
           updateTokenCount();
-          isLoading.value = false;
-          isStreaming.value = false;
-          currentStreamContent.value = '';
-          currentStreamReasoning.value = '';
         }
       } else {
         const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
@@ -846,22 +856,36 @@ export const useChatStore = defineStore('chat', () => {
           messages.value = messages.value.filter(m => m.id !== assistantMessageId);
         }
         updateTokenCount();
-        isLoading.value = false;
-        isStreaming.value = false;
-        currentStreamContent.value = '';
-        currentStreamReasoning.value = '';
       }
     };
 
     try {
       await runLLMTurn(baseMessagesForLLM, true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Send message error:', error);
+      // 处理 AbortError（用户取消）
+      if (error.name === 'AbortError' || error.message === '已取消生成') {
+        console.log('用户取消了生成');
+        // 移除所有创建的消息
+        createdMessageIds.value.forEach(id => {
+          messages.value = messages.value.filter(m => m.id !== id);
+        });
+        createdMessageIds.value = [];
+      } else {
+        throw error;
+      }
+    } finally {
       isLoading.value = false;
       isStreaming.value = false;
       currentStreamContent.value = '';
       currentStreamReasoning.value = '';
-      throw error;
+      abortController.value = null;
+    }
+  };
+
+  const cancelMessage = () => {
+    if (abortController.value) {
+      abortController.value.abort();
     }
   };
 
@@ -909,6 +933,7 @@ export const useChatStore = defineStore('chat', () => {
     createChat,
     selectChat,
     sendMessage,
+    cancelMessage,
     deleteMessage,
     clearHistory,
     setChapterContext,
