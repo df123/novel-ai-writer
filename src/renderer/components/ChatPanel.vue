@@ -27,12 +27,16 @@
     </div>
 
     <div v-else class="messages-container">
-      <div class="messages-list">
-        <div
-          v-for="(message, index) in messages"
-          :key="message.id + index"
-          class="message-item"
-        >
+      <!-- 消息内容包裹容器 -->
+      <div class="messages-content-wrapper">
+        <!-- 消息列表 -->
+        <div class="messages-list">
+          <div
+            v-for="(message, index) in messages"
+            :key="message.id + index"
+            :id="'msg-' + message.id"
+            class="message-item"
+          >
           <div class="message-header">
             <span class="message-role">
               Role: {{ message.role }}
@@ -137,7 +141,42 @@
         
         <div ref="messagesEndRef"></div>
       </div>
+
+      <!-- 消息导航面板 -->
+      <div class="message-nav-panel" :class="{ 'nav-panel-collapsed': !isNavPanelVisible }">
+        <div class="nav-panel-header">
+          <span class="nav-panel-title">对话索引</span>
+          <el-button
+            :icon="isNavPanelVisible ? DArrowRight : DArrowLeft"
+            circle
+            size="small"
+            @click="isNavPanelVisible = !isNavPanelVisible"
+            class="nav-panel-toggle-btn"
+            title="折叠/展开索引面板"
+          />
+        </div>
+        <div v-if="isNavPanelVisible" class="nav-panel-list">
+          <div
+            v-for="msg in userMessages"
+            :key="msg.id"
+            :class="['nav-item', { 'nav-item-active': activeMessageId === msg.id }]"
+            @click="scrollToMessage(msg.id)"
+          >
+            <div class="nav-item-header">
+              <span class="nav-item-round">#{{ msg.roundIndex }}</span>
+              <span class="nav-item-time">{{ formatTimestamp(msg.timestamp) }}</span>
+            </div>
+            <div class="nav-item-content">
+              {{ msg.content.length > 40 ? msg.content.slice(0, 40) + '...' : msg.content }}
+            </div>
+          </div>
+          <div v-if="userMessages.length === 0" class="nav-empty">
+            暂无用户消息
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
     <el-footer class="chat-footer">
       <div class="input-wrapper">
@@ -203,7 +242,7 @@
 import { ref, watch, nextTick, onMounted, computed } from 'vue';
 import type { Message } from '../../shared/types';
 import { storeToRefs } from 'pinia';
-import { Promotion, MoreFilled, Close, Loading } from '@element-plus/icons-vue';
+import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -248,6 +287,22 @@ const saveChapterDialogVisible = ref(false);
 const saveChapterMessage = ref<Message | null>(null);
 const saveChapterTitle = ref('');
 const saveChapterNumber = ref(1);
+
+// 导航面板相关
+const isNavPanelVisible = ref(true);
+const activeMessageId = ref<string | null>(null);
+
+// 用户消息列表（用于导航）
+const userMessages = computed(() => {
+  return messages.value
+    .filter(msg => msg.role === 'user')
+    .map((msg, index) => ({
+      id: msg.id,
+      roundIndex: index + 1,
+      content: msg.content,
+      timestamp: msg.timestamp
+    }));
+});
 
 watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning]) => {
   nextTick(() => {
@@ -401,6 +456,20 @@ const handleThemeClick = () => {
   ElMessage.info('主旨已注入到对话中，AI将基于主旨进行回复');
 };
 
+// 滚动到指定消息
+const scrollToMessage = (messageId: string) => {
+  activeMessageId.value = messageId;
+  const element = document.getElementById('msg-' + messageId);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 添加闪烁效果
+    element.classList.add('highlight');
+    setTimeout(() => {
+      element.classList.remove('highlight');
+    }, 2000);
+  }
+};
+
 onMounted(async () => {
   await loadModels(selectedProvider.value);
 });
@@ -470,18 +539,139 @@ onMounted(async () => {
 
 .messages-container {
   flex: 1;
-  overflow: auto;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messages-content-wrapper {
+  display: flex;
+  height: 100%;
+  gap: 0;
 }
 
 .messages-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.message-nav-panel {
+  width: 200px;
+  overflow: hidden;
+  border-left: 1px solid var(--el-border-color);
+  background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+}
+
+.message-nav-panel.nav-panel-collapsed {
+  width: 48px;
+}
+
+.nav-panel-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--el-border-color);
+  background-color: #f5f7fa;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.nav-panel-toggle-btn {
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.nav-panel-toggle-btn:hover {
+  background-color: #e6f7ff;
+  color: #409eff;
+  transform: scale(1.1);
+}
+
+.nav-panel-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.nav-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.nav-item:hover {
+  background-color: #f5f7fa;
+}
+
+.nav-item-active {
+  background-color: #e6f7ff;
+  border-left: 3px solid #409eff;
+}
+
+.nav-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.nav-item-round {
+  font-weight: 600;
+  color: #409eff;
+  font-size: 13px;
+}
+
+.nav-item-time {
+  font-size: 11px;
+  color: #999;
+}
+
+.nav-item-content {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-empty {
+  padding: 16px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
 }
 
 .message-item {
   width: 100%;
+  transition: background-color 0.3s ease;
+}
+
+.message-item.highlight {
+  animation: messageHighlight 2s ease;
+}
+
+@keyframes messageHighlight {
+  0% {
+    background-color: rgba(64, 158, 255, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .message-header {
