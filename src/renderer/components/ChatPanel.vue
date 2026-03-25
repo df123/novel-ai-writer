@@ -140,18 +140,6 @@
     </div>
 
     <el-footer class="chat-footer">
-      <!-- 主旨预览 -->
-      <div v-if="currentTheme" class="theme-preview" @click="handleThemeClick">
-        <div class="theme-preview-header">
-          <span class="theme-preview-icon">📖</span>
-          <span class="theme-preview-title">{{ currentTheme.title }}</span>
-          <span class="theme-preview-hint">点击查看详情</span>
-        </div>
-        <div class="theme-preview-content">
-          {{ getThemePreview(currentTheme.content) }}
-        </div>
-      </div>
-
       <div class="input-wrapper">
         <el-input
           v-model="inputText"
