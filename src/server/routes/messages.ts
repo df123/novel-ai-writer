@@ -31,6 +31,13 @@ interface UpdateMessageRequestBody {
 }
 
 /**
+ * 批量删除消息请求体接口
+ */
+interface BatchDeleteMessagesRequestBody {
+  ids: string[];
+}
+
+/**
  * 获取聊天的所有消息
  */
 router.get('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Response) => {
@@ -140,6 +147,40 @@ router.delete('/messages/:id', asyncHandler(async (req: Request, res: Response) 
   
   res.status(204).send();
   console.log('[DELETE /messages/:id] 返回 204 No Content');
+}));
+
+/**
+ * 批量删除消息
+ */
+router.post('/messages/batch-delete', asyncHandler(async (req: Request, res: Response) => {
+  const { ids } = req.body as BatchDeleteMessagesRequestBody;
+  console.log('[POST /messages/batch-delete] 收到批量删除请求，消息ID数量:', ids.length);
+
+  if (!ids || ids.length === 0) {
+    res.status(400).json({ error: '消息ID列表不能为空' });
+    return;
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
+  const messages = query<DbMessage>(`SELECT * FROM messages WHERE id IN (${placeholders})`, ids);
+
+  if (messages.length === 0) {
+    res.status(404).json({ error: '未找到任何消息' });
+    return;
+  }
+
+  run(`DELETE FROM messages WHERE id IN (${placeholders})`, ids);
+  console.log('[POST /messages/batch-delete] 已执行批量删除操作');
+
+  const chatId = messages[0].chat_id;
+  run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), chatId]);
+  console.log('[POST /messages/batch-delete] 已更新聊天时间戳');
+
+  saveDB();
+  console.log('[POST /messages/batch-delete] 数据库已保存');
+
+  res.status(204).send();
+  console.log('[POST /messages/batch-delete] 返回 204 No Content');
 }));
 
 export default router;

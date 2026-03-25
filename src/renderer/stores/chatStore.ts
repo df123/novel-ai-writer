@@ -890,9 +890,40 @@ export const useChatStore = defineStore('chat', () => {
   };
 
   const deleteMessage = async (messageId: string) => {
-    await messageApi.delete(messageId);
-    messages.value = messages.value.filter(m => m.id !== messageId);
-    updateTokenCount();
+    const messageIndex = messages.value.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) {
+      console.error('消息未找到:', messageId);
+      return;
+    }
+
+    const message = messages.value[messageIndex];
+
+    if (message.role === 'user') {
+      const idsToDelete: string[] = [messageId];
+      let currentIndex = messageIndex + 1;
+
+      while (currentIndex < messages.value.length) {
+        const nextMessage = messages.value[currentIndex];
+        if (nextMessage.role === 'user') {
+          break;
+        }
+        idsToDelete.push(nextMessage.id);
+        currentIndex++;
+      }
+
+      try {
+        await messageApi.batchDelete(idsToDelete);
+        messages.value = messages.value.filter(m => !idsToDelete.includes(m.id));
+        updateTokenCount();
+      } catch (error) {
+        console.error('批量删除消息失败:', error);
+        throw error;
+      }
+    } else {
+      await messageApi.delete(messageId);
+      messages.value = messages.value.filter(m => m.id !== messageId);
+      updateTokenCount();
+    }
   };
 
   const clearHistory = async () => {
