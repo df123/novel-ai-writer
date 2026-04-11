@@ -10,12 +10,13 @@
     "start:server": "lsof -ti:3002 | xargs kill -9 2>/dev/null; tsx src/server/index.ts",
     "start:renderer": "lsof -ti:3004 | xargs kill -9 2>/dev/null; vite",
     "build:renderer": "vite build",
-    "build": "pnpm run build:renderer",
+    "build": "pnpm run build:server && pnpm run build:renderer",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.vue",
     "typecheck": "tsc --noEmit",
     "build:server": "tsc -p tsconfig.server.json",
-    "typecheck:server": "tsc --noEmit -p tsconfig.server.json"
+    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
+    "start": "NODE_ENV=production node dist/server/index.js"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

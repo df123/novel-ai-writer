@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 import { dbDir, PORT } from './config';
 import { initDB } from './db';
@@ -68,6 +70,21 @@ app.use('/api', charactersRouter);
 console.log('13. 注册 exportRouter (路径: /api)');
 app.use('/api', exportRouter);
 console.log('=== 路由注册完成 ===');
+
+// 托管前端静态文件（生产模式）
+if (process.env.NODE_ENV !== 'development') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const rendererPath = path.resolve(__dirname, '../../renderer');
+  app.use(express.static(rendererPath));
+
+  // SPA fallback：非 API 请求返回 index.html
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(rendererPath, 'index.html'));
+  });
+}
 
 // 404 处理
 app.use(notFoundHandler as any);

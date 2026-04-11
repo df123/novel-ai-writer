@@ -3,10 +3,16 @@ import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypt
 import { hostname, platform } from 'os';
 
 /**
- * 生成机器特定密钥
- * @returns 32字符的十六进制密钥
+ * 生成加密密钥
+ * 优先使用环境变量 ENCRYPTION_KEY（Docker 容器中 hostname 可能变化，导致机器指纹不可靠），
+ * 若未设置则回退到机器指纹生成，保持向后兼容。
+ * @returns 32字符的密钥
  */
 export function getMachineKey(): string {
+  const envKey = process.env.ENCRYPTION_KEY;
+  if (envKey) {
+    return envKey.substring(0, 32);
+  }
   return createHash('sha256').update(hostname() + platform()).digest('hex').substring(0, 32);
 }
 

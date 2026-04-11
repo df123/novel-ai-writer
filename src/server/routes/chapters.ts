@@ -275,7 +275,6 @@ router.put('/:chapterId', asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const existingChapter = existingChapters[0];
   const updates: string[] = [];
   const params: (string | number)[] = [];
 

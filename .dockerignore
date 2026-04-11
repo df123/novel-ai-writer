@@ -1,0 +1,17 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+logs
+*.log
+*.db
+*.db-shm
+*.db-wal
+docs
+*.md
+!README.md
+.vscode
+.idea

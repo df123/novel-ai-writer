@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { TableInfo, TableDataResponse, QueryResponse, CreateThemeRequest, UpdateThemeRequest } from '@shared/types';
 
-const API_BASE_URL = 'http://localhost:3002/api';
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
