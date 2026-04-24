@@ -51,8 +51,8 @@ export const LLM_PROVIDERS: LLMProviders = {
   deepseek: {
     apiUrl: 'https://api.deepseek.com/v1/chat/completions',
     models: [
-      { id: 'deepseek-chat', name: 'DeepSeek Chat' },
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner' }
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash' },
+      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }
     ]
   },
   openrouter: {
