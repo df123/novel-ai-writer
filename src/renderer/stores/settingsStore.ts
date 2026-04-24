@@ -8,12 +8,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const openrouterApiKey = ref('');
   const temperature = ref(0.7);
   const selectedProvider = ref('deepseek');
-  const selectedModel = ref('deepseek-reasoner');
+  const selectedModel = ref('deepseek-v4-flash');
   const models = ref<Model[]>([]);
   const isLoading = ref(false);
   const isLoadingModels = ref(false);
   const showThinkingContent = ref(false);
   const showToolCalls = ref(false);
+  const reasoningEffort = ref('high');
 
   const loadSettings = async () => {
     isLoading.value = true;
@@ -25,7 +26,8 @@ export const useSettingsStore = defineStore('settings', () => {
       openrouterApiKey.value = settings.openrouter_api_key || '';
       temperature.value = settings.temperature ? parseFloat(settings.temperature) : 0.7;
       selectedProvider.value = settings.selected_provider || 'deepseek';
-      selectedModel.value = settings.selected_model || 'deepseek-reasoner';
+      selectedModel.value = settings.selected_model || 'deepseek-v4-flash';
+      reasoningEffort.value = settings.reasoning_effort || 'high';
       showThinkingContent.value = settings.show_thinking_content === 'true' || settings.show_thinking_content === true;
       showToolCalls.value = settings.show_tool_calls === 'true' || settings.show_tool_calls === true;
     } catch (error) {
@@ -35,7 +37,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   };
 
-  const updateSettings = async (settings: { deepseekApiKey?: string; openrouterApiKey?: string; temperature?: number; selectedProvider?: string; selectedModel?: string; showThinkingContent?: boolean; showToolCalls?: boolean }) => {
+  const updateSettings = async (settings: { deepseekApiKey?: string; openrouterApiKey?: string; temperature?: number; selectedProvider?: string; selectedModel?: string; showThinkingContent?: boolean; showToolCalls?: boolean; reasoningEffort?: string }) => {
     isLoading.value = true;
     try {
       const currentSettings: Record<string, string | number> = {};
@@ -64,6 +66,10 @@ export const useSettingsStore = defineStore('settings', () => {
         currentSettings.show_thinking_content = settings.showThinkingContent ? 'true' : 'false';
       }
 
+      if (settings.reasoningEffort !== undefined) {
+        currentSettings.reasoning_effort = settings.reasoningEffort;
+      }
+
       if (settings.showToolCalls !== undefined) {
         currentSettings.show_tool_calls = settings.showToolCalls ? 'true' : 'false';
       }
@@ -75,7 +81,8 @@ export const useSettingsStore = defineStore('settings', () => {
       openrouterApiKey.value = updated.openrouter_api_key || '';
       temperature.value = updated.temperature ? parseFloat(updated.temperature) : 0.7;
       selectedProvider.value = updated.selected_provider || 'deepseek';
-      selectedModel.value = updated.selected_model || 'deepseek-reasoner';
+      selectedModel.value = updated.selected_model || 'deepseek-v4-flash';
+      reasoningEffort.value = updated.reasoning_effort || 'high';
       showThinkingContent.value = updated.show_thinking_content === 'true' || updated.show_thinking_content === true;
       showToolCalls.value = updated.show_tool_calls === 'true' || updated.show_tool_calls === true;
     } catch (error) {
@@ -128,6 +135,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoadingModels,
     showThinkingContent,
     showToolCalls,
+    reasoningEffort,
     loadSettings,
     updateSettings,
     loadModels,
