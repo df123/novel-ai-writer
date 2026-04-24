@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "build:server": "tsc -p tsconfig.server.json",
     "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
-    "start": "NODE_ENV=production node dist/server/index.js"
+    "start": "NODE_ENV=production tsx src/server/index.ts"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

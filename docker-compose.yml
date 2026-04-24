@@ -1,8 +1,13 @@
-version: '3.8'
-
 services:
   app:
-    build: .
+    build:
+      context: .
+      network: host
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     container_name: novel-ai-writer
     ports:
       - "${APP_PORT:-3002}:3002"

@@ -186,7 +186,7 @@
           :rows="3"
           placeholder="输入您的问题或写作需求..."
           :disabled="isLoading || !currentChat"
-          @keydown.enter.prevent="handleSend"
+          @keydown.enter="handleKeyDown"
           class="chat-input"
         />
         <div class="input-actions">
@@ -365,6 +365,16 @@ const renderMarkdown = (content: string) => {
     console.error('Markdown render error:', error);
     return content;
   }
+};
+
+const handleKeyDown = (event: KeyboardEvent) => {
+  // Shift+Enter 允许正常换行
+  if (event.shiftKey) {
+    return;
+  }
+  // 单独按 Enter 发送消息
+  event.preventDefault();
+  handleSend();
 };
 
 const handleSend = async () => {

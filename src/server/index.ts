@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { fileURLToPath } from 'url';
+
 import * as fs from 'fs';
 import { dbDir, PORT } from './config';
 import { initDB } from './db';
@@ -73,8 +73,7 @@ console.log('=== 路由注册完成 ===');
 
 // 托管前端静态文件（生产模式）
 if (process.env.NODE_ENV !== 'development') {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const rendererPath = path.resolve(__dirname, '../../renderer');
+  const rendererPath = path.resolve(process.cwd(), 'dist/renderer');
   app.use(express.static(rendererPath));
 
   // SPA fallback：非 API 请求返回 index.html
