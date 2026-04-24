@@ -28,6 +28,9 @@ interface ChatStreamOptions {
   
   /** 思考参数（deepseek 专用） */
   thinking?: unknown;
+
+  /** 推理努力程度（deepseek 专用，可选值：high/medium/low） */
+  reasoning_effort?: string;
 }
 
 /**
@@ -84,7 +87,7 @@ export async function chatStream(
   
   if (provider === 'deepseek') {
     apiUrl = LLM_PROVIDERS.deepseek.apiUrl;
-    modelName = options.model || 'deepseek-reasoner';
+    modelName = options.model || 'deepseek-v4-flash';
   } else if (provider === 'openrouter') {
     apiUrl = LLM_PROVIDERS.openrouter.apiUrl!;
     modelName = options.model || 'openai/gpt-3.5-turbo';
@@ -126,6 +129,10 @@ export async function chatStream(
 
   if (options.thinking && provider === 'deepseek') {
     requestBody.thinking = options.thinking;
+  }
+
+  if (options.reasoning_effort && provider === 'deepseek') {
+    requestBody.reasoning_effort = options.reasoning_effort;
   }
 
   const response = await fetch(apiUrl, {
