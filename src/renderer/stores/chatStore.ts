@@ -673,6 +673,7 @@ export const useChatStore = defineStore('chat', () => {
           apiKey,
           tools: ALL_TOOLS,
           thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
+          reasoning_effort: providerName === 'deepseek' ? settingsStore.reasoningEffort : undefined,
         },
         abortController.value?.signal
       );
