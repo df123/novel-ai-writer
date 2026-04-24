@@ -105,7 +105,7 @@ export const llmApi = {
   chat: (
     provider: string,
     messages: any[],
-    options?: { model?: string; temperature?: number; apiKey?: string; tools?: any[]; thinking?: { type: string } },
+    options?: { model?: string; temperature?: number; apiKey?: string; tools?: any[]; thinking?: { type: string }; reasoning_effort?: string },
     signal?: AbortSignal
   ) => {
     return fetch(`${API_BASE_URL}/llm/chat`, {
