@@ -13,6 +13,11 @@
             <span v-if="model.price" class="model-price">{{ model.price }}</span>
           </el-option>
         </el-select>
+        <el-select v-if="selectedProvider === 'deepseek'" v-model="reasoningEffort" size="small" class="effort-select" @change="handleReasoningEffortChange">
+          <el-option label="高" value="high" />
+          <el-option label="中" value="medium" />
+          <el-option label="低" value="low" />
+        </el-select>
         <el-tag size="small" type="info">
           {{ totalTokens }} tokens
         </el-tag>
@@ -271,13 +276,13 @@ const { chats, currentChat, messages, isLoading, isStreaming, currentStreamConte
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters } = storeToRefs(characterStore);
-const { selectedProvider, selectedModel, models, isLoadingModels } = storeToRefs(settingsStore);
+const { selectedProvider, selectedModel, models, isLoadingModels, reasoningEffort } = storeToRefs(settingsStore);
 const { theme: currentTheme } = storeToRefs(themeStore);
 const { loadModels, updateSettings } = settingsStore;
 
 const { createChat, sendMessage, cancelMessage, deleteMessage } = chatStore;
 
-const currentModel = computed(() => selectedModel.value || 'deepseek-reasoner');
+const currentModel = computed(() => selectedModel.value || 'deepseek-v4-flash');
 
 const inputText = ref('');
 const messagesEndRef = ref<HTMLElement | null>(null);
@@ -433,6 +438,14 @@ const handleModelChange = async () => {
   await updateSettings({ selectedModel: selectedModel.value });
 };
 
+const handleReasoningEffortChange = async (value: string) => {
+  try {
+    await settingsStore.updateSettings({ reasoningEffort: value });
+  } catch (error) {
+    console.error('Failed to save reasoning effort:', error);
+  }
+};
+
 const handleSaveChapter = async () => {
   if (!saveChapterMessage.value || !projectStore.currentProject) return;
 
@@ -522,6 +535,10 @@ onMounted(async () => {
 
 .model-select {
   width: 260px;
+}
+
+.effort-select {
+  width: 80px;
 }
 
 .model-price {
