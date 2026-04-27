@@ -21,6 +21,7 @@ import settingsRouter from './routes/settings';
 import promptsRouter from './routes/prompts';
 import exportRouter from './routes/export';
 import databaseRouter from './routes/database';
+import miscRecordsRouter from './routes/miscRecords';
 
 // 初始化 Express 应用
 const app: App = express();
@@ -69,6 +70,8 @@ console.log('12. 注册 charactersRouter (路径: /api)');
 app.use('/api', charactersRouter);
 console.log('13. 注册 exportRouter (路径: /api)');
 app.use('/api', exportRouter);
+console.log('14. 注册 miscRecordsRouter (路径: /api)');
+app.use('/api', miscRecordsRouter);
 console.log('=== 路由注册完成 ===');
 
 // 托管前端静态文件（生产模式）

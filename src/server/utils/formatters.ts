@@ -22,6 +22,8 @@ import type {
   ThemeHistory,
   DbMiscRecord,
   MiscRecord,
+  DbMiscRecordVersion,
+  MiscRecordVersion,
   ToolCall
 } from '@shared/types';
 
@@ -241,5 +243,22 @@ export function formatMiscRecord(record: DbMiscRecord): MiscRecord {
     createdAt: record.created_at,
     deleted: record.deleted === 1,
     deletedAt: record.deleted_at ?? undefined,
+  };
+}
+
+/**
+ * 格式化杂物记录版本数据（数据库格式 -> 前端格式）
+ * @param version - 数据库中的杂物记录版本对象
+ * @returns 格式化后的杂物记录版本对象
+ */
+export function formatMiscRecordVersion(version: DbMiscRecordVersion): MiscRecordVersion {
+  return {
+    id: version.id,
+    miscRecordId: version.misc_record_id,
+    title: version.title,
+    category: version.category || '',
+    content: version.content || '',
+    version: version.version,
+    createdAt: version.created_at,
   };
 }
