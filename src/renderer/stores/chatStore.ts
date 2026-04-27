@@ -84,6 +84,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = response.data.map((m: any, i: number) => ({
       ...m,
       orderIndex: i + 1,
+      reasoning_content: m.reasoning_content || undefined,
     }));
     updateTokenCount();
   };

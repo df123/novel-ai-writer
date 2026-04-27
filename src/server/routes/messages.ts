@@ -46,7 +46,8 @@ router.get('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Res
   
   const messagesWithParsedCalls = messages.map((msg: DbMessage) => ({
     ...msg,
-    tool_calls: parseToolCalls(msg.tool_calls)
+    tool_calls: parseToolCalls(msg.tool_calls),
+    reasoning_content: msg.reasoning_content ?? undefined,
   }));
   
   res.json(messagesWithParsedCalls);
