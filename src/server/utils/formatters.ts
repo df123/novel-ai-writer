@@ -20,6 +20,8 @@ import type {
   Theme,
   DbThemeHistory,
   ThemeHistory,
+  DbMiscRecord,
+  MiscRecord,
   ToolCall
 } from '@shared/types';
 
@@ -220,5 +222,24 @@ export function formatThemeHistory(history: DbThemeHistory): ThemeHistory {
     version: history.version,
     createdBy: history.created_by as 'user' | 'llm',
     createdAt: history.created_at
+  };
+}
+
+/**
+ * 格式化杂物记录数据（数据库格式 -> 前端格式）
+ * @param record - 数据库中的杂物记录对象
+ * @returns 格式化后的杂物记录对象
+ */
+export function formatMiscRecord(record: DbMiscRecord): MiscRecord {
+  return {
+    id: record.id,
+    projectId: record.project_id,
+    title: record.title,
+    category: record.category || '',
+    content: record.content || '',
+    orderIndex: record.order_index,
+    createdAt: record.created_at,
+    deleted: record.deleted === 1,
+    deletedAt: record.deleted_at ?? undefined,
   };
 }
