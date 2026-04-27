@@ -673,3 +673,50 @@ export interface UpdateThemeRequest {
   /** 创建者类型（可选，用于标记由LLM修改） */
   created_by?: 'user' | 'llm';
 }
+
+// ===== 杂物记录（MiscRecord）类型 =====
+
+export interface MiscRecord {
+  id: string;
+  projectId: string;
+  title: string;
+  category: string;
+  content: string;
+  orderIndex: number;
+  createdAt: number;
+  deleted?: boolean;
+  deletedAt?: number;
+}
+
+export interface MiscRecordVersion {
+  id: string;
+  miscRecordId: string;
+  title: string;
+  category: string;
+  content: string;
+  version: number;
+  createdAt: number;
+}
+
+export interface DbMiscRecord {
+  id: string;
+  project_id: string;
+  title: string;
+  category: string;
+  content: string;
+  order_index: number;
+  created_at: number;
+  updated_at: number;
+  deleted: number;
+  deleted_at: number | null;
+}
+
+export interface DbMiscRecordVersion {
+  id: string;
+  misc_record_id: string;
+  title: string;
+  category: string;
+  content: string;
+  version: number;
+  created_at: number;
+}
