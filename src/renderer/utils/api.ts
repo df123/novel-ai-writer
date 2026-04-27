@@ -261,4 +261,27 @@ export const themeApi = {
     api.get(`/themes/${id}/history/${version}`),
 };
 
+// 杂项记录 API
+export const miscRecordApi = {
+  list: (projectId: string, filters?: { search?: string; category?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.category) params.append('category', filters.category);
+    const queryString = params.toString();
+    return api.get(`/projects/${projectId}/misc-records${queryString ? `?${queryString}` : ''}`);
+  },
+  get: (id: string) => api.get(`/misc-records/${id}`),
+  create: (projectId: string, data: { title: string; category?: string; content?: string }) =>
+    api.post(`/projects/${projectId}/misc-records`, data),
+  update: (id: string, data: { title?: string; category?: string; content?: string; createVersion?: boolean }) =>
+    api.put(`/misc-records/${id}`, data),
+  delete: (id: string) => api.delete(`/misc-records/${id}`),
+  restore: (id: string) => api.post(`/misc-records/${id}/restore`),
+  permanentDelete: (id: string) => api.delete(`/misc-records/${id}/permanent`),
+  getTrash: (projectId: string) => api.get(`/projects/${projectId}/misc-records/trash`),
+  getVersions: (recordId: string) => api.get(`/misc-records/${recordId}/versions`),
+  restoreVersion: (recordId: string, versionId: string) =>
+    api.post(`/misc-records/${recordId}/versions/${versionId}/restore`),
+};
+
 export default api;
