@@ -22,6 +22,13 @@
           title="主旨管理"
         />
         <el-button
+          :icon="Notebook"
+          circle
+          class="action-button misc-record-button"
+          @click="showMiscRecord = true"
+          title="杂物记录"
+        />
+        <el-button
           :icon="Plus"
           circle
           class="action-button create-project-button"
@@ -85,12 +92,14 @@
     >
       <ThemePanel />
     </el-dialog>
+
+    <MiscRecordPanel v-model="showMiscRecord" />
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { HomeFilled, Setting, MoreFilled, Reading, Document, Plus } from '@element-plus/icons-vue';
+import { HomeFilled, Setting, MoreFilled, Reading, Document, Plus, Notebook } from '@element-plus/icons-vue';
 import { useProjectStore } from '../stores/projectStore';
 import { useChatStore } from '../stores/chatStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -106,6 +115,7 @@ import ProjectSelector from './ProjectSelector.vue';
 import CreateProjectDialog from './CreateProjectDialog.vue';
 import LLMSettingsDialog from './LLMSettingsDialog.vue';
 import DatabasePanel from './DatabasePanel.vue';
+import MiscRecordPanel from './MiscRecordPanel.vue';
 
 const projectStore = useProjectStore();
 const chatStore = useChatStore();
@@ -119,6 +129,7 @@ const showCreateProject = ref(false);
 const showDatabase = ref(false);
 const showChapterDialog = ref(false);
 const showThemeDialog = ref(false);
+const showMiscRecord = ref(false);
 
 watch(
   () => projectStore.currentProject,
@@ -198,6 +209,10 @@ const handleMenuCommand = (command: string) => {
 }
 
 .theme-button {
+  margin-left: 8px;
+}
+
+.misc-record-button {
   margin-left: 8px;
 }
 
