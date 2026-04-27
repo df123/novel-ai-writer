@@ -84,7 +84,7 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = response.data.map((m: any, i: number) => ({
       ...m,
       orderIndex: i + 1,
-      reasoning_content: m.reasoning_content || undefined,
+      reasoning_content: m.reasoning_content ?? undefined,
     }));
     updateTokenCount();
   };
@@ -771,7 +771,7 @@ export const useChatStore = defineStore('chat', () => {
       
       if (toolCalls.length > 0) {
         finalContent = '';
-        finalReasoning = fullReasoning;
+        finalReasoning = fullReasoning || undefined;
       } else if (!fullContent && fullReasoning) {
         console.warn('Unexpected: reasoning without content or tool_calls - treating reasoning as content');
         finalContent = fullReasoning;

@@ -47,7 +47,7 @@ router.get('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Res
   const messagesWithParsedCalls = messages.map((msg: DbMessage) => ({
     ...msg,
     tool_calls: parseToolCalls(msg.tool_calls),
-    reasoning_content: msg.reasoning_content ?? undefined,
+    reasoning_content: msg.reasoning_content,
   }));
   
   res.json(messagesWithParsedCalls);
@@ -66,7 +66,7 @@ router.post('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Re
 
   run(
     'INSERT INTO messages (id, chat_id, role, content, reasoning_content, tool_calls, tool_call_id, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, chatId, role, content, reasoning_content || null, toolCallsJson, tool_call_id || null, timestamp]
+    [id, chatId, role, content, reasoning_content ?? null, toolCallsJson, tool_call_id || null, timestamp]
   );
 
   run('UPDATE chats SET updated_at = ? WHERE id = ?', [timestamp, chatId]);
@@ -101,7 +101,7 @@ router.put('/messages/:id', asyncHandler(async (req: Request, res: Response) => 
   
   run(
     'UPDATE messages SET role = ?, content = ?, reasoning_content = ?, tool_calls = ?, tool_call_id = ? WHERE id = ?',
-    [role, content, reasoning_content || null, toolCallsJson, tool_call_id || null, id]
+    [role, content, reasoning_content ?? null, toolCallsJson, tool_call_id || null, id]
   );
 
   run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), existingMessage.chat_id]);

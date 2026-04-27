@@ -110,7 +110,7 @@ export async function chatStream(
     if (msg.content !== undefined) cleaned.content = msg.content;
     if (msg.tool_calls) cleaned.tool_calls = msg.tool_calls;
     if (msg.tool_call_id) cleaned.tool_call_id = msg.tool_call_id;
-    if (msg.reasoning_content) cleaned.reasoning_content = msg.reasoning_content;
+    if (msg.reasoning_content !== undefined && msg.reasoning_content !== null) cleaned.reasoning_content = msg.reasoning_content;
     return cleaned;
   });
 
