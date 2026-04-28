@@ -9,7 +9,7 @@ import type { DbMiscRecord, DbMiscRecordVersion } from '@shared/types';
 const router: Router = express.Router();
 
 /**
- * 创建杂物记录请求体接口
+ * 创建杂项记录请求体接口
  */
 interface CreateMiscRecordRequestBody {
   title: string;
@@ -18,7 +18,7 @@ interface CreateMiscRecordRequestBody {
 }
 
 /**
- * 更新杂物记录请求体接口
+ * 更新杂项记录请求体接口
  */
 interface UpdateMiscRecordRequestBody {
   title?: string;
@@ -28,7 +28,7 @@ interface UpdateMiscRecordRequestBody {
 }
 
 /**
- * 查询杂物记录参数接口
+ * 查询杂项记录参数接口
  */
 interface GetMiscRecordsQuery {
   search?: string;
@@ -36,7 +36,7 @@ interface GetMiscRecordsQuery {
 }
 
 /**
- * 获取项目的所有杂物记录
+ * 获取项目的所有杂项记录
  */
 router.get('/projects/:projectId/misc-records', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
@@ -63,7 +63,7 @@ router.get('/projects/:projectId/misc-records', asyncHandler(async (req: Request
 }));
 
 /**
- * 创建杂物记录
+ * 创建杂项记录
  */
 router.post('/projects/:projectId/misc-records', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
@@ -99,20 +99,20 @@ router.post('/projects/:projectId/misc-records', asyncHandler(async (req: Reques
 }));
 
 /**
- * 获取单个杂物记录
+ * 获取单个杂项记录
  */
 router.get('/misc-records/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const records = query<DbMiscRecord>('SELECT * FROM misc_records WHERE id = ? AND deleted = 0', [id]);
   if (records.length === 0) {
-    res.status(404).json({ error: '杂物记录未找到' });
+    res.status(404).json({ error: '杂项记录未找到' });
     return;
   }
   res.json(formatMiscRecord(records[0]));
 }));
 
 /**
- * 更新杂物记录
+ * 更新杂项记录
  */
 router.put('/misc-records/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -123,7 +123,7 @@ router.put('/misc-records/:id', asyncHandler(async (req: Request, res: Response)
   // 检查记录是否存在
   const existingRecords = query<DbMiscRecord>('SELECT * FROM misc_records WHERE id = ?', [id]);
   if (existingRecords.length === 0) {
-    res.status(404).json({ error: '杂物记录未找到' });
+    res.status(404).json({ error: '杂项记录未找到' });
     return;
   }
 
@@ -191,7 +191,7 @@ router.put('/misc-records/:id', asyncHandler(async (req: Request, res: Response)
 }));
 
 /**
- * 删除杂物记录（软删除）
+ * 删除杂项记录（软删除）
  */
 router.delete('/misc-records/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -202,13 +202,13 @@ router.delete('/misc-records/:id', asyncHandler(async (req: Request, res: Respon
 }));
 
 /**
- * 恢复杂物记录
+ * 恢复杂项记录
  */
 router.post('/misc-records/:id/restore', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const records = query<DbMiscRecord>('SELECT * FROM misc_records WHERE id = ?', [id]);
   if (records.length === 0) {
-    res.status(404).json({ error: '杂物记录未找到' });
+    res.status(404).json({ error: '杂项记录未找到' });
     return;
   }
   run('UPDATE misc_records SET deleted = 0, deleted_at = NULL WHERE id = ?', [id]);
@@ -218,17 +218,17 @@ router.post('/misc-records/:id/restore', asyncHandler(async (req: Request, res: 
 }));
 
 /**
- * 永久删除杂物记录
+ * 永久删除杂项记录
  */
 router.delete('/misc-records/:id/permanent', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const records = query<DbMiscRecord>('SELECT * FROM misc_records WHERE id = ?', [id]);
   if (records.length === 0) {
-    res.status(404).json({ error: '杂物记录未找到' });
+    res.status(404).json({ error: '杂项记录未找到' });
     return;
   }
   if (records[0].deleted === 0) {
-    res.status(400).json({ error: '只能永久删除已软删除的杂物记录' });
+    res.status(400).json({ error: '只能永久删除已软删除的杂项记录' });
     return;
   }
   run('DELETE FROM misc_records WHERE id = ?', [id]);
@@ -237,7 +237,7 @@ router.delete('/misc-records/:id/permanent', asyncHandler(async (req: Request, r
 }));
 
 /**
- * 获取项目的杂物记录回收站
+ * 获取项目的杂项记录回收站
  */
 router.get('/projects/:projectId/misc-records/trash', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;

@@ -1,8 +1,8 @@
-# 杂物记录（MiscRecord）实施计划
+# 杂项记录（MiscRecord）实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 新增杂物记录模块，用于记录小说中各类设定（功法、星球、城市等），支持分类筛选、搜索、版本历史和回收站。
+**Goal:** 新增杂项记录模块，用于记录小说中各类设定（功法、星球、城市等），支持分类筛选、搜索、版本历史和回收站。
 
 **Architecture:** 完全遵循项目现有的 6 层架构模式（类型定义 → 数据库 Schema → 后端路由 → 格式化器 → 前端 API → Store → 组件）。与时间线/人物模块结构一致，使用弹窗交互。
 
@@ -16,7 +16,7 @@
 | 文件 | 职责 |
 |------|------|
 | `src/server/routes/miscRecords.ts` | 后端 CRUD + 软删除 + 版本管理路由 |
-| `src/renderer/stores/miscRecordStore.ts` | Pinia Store，管理杂物记录状态 |
+| `src/renderer/stores/miscRecordStore.ts` | Pinia Store，管理杂项记录状态 |
 | `src/renderer/components/MiscRecordPanel.vue` | 弹窗组件，记录列表 + 编辑区 |
 
 ### 修改文件
@@ -41,7 +41,7 @@
 在文件末尾（`DbSetting` 接口之后）添加以下接口定义：
 
 ```typescript
-// ===== 杂物记录（MiscRecord）类型 =====
+// ===== 杂项记录（MiscRecord）类型 =====
 
 export interface MiscRecord {
   id: string;
@@ -407,7 +407,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       const { data } = await miscRecordApi.list(projectId, filters);
       records.value = data;
     } catch (error) {
-      console.error('加载杂物记录失败:', error);
+      console.error('加载杂项记录失败:', error);
     } finally {
       isLoading.value = false;
     }
@@ -421,7 +421,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       selectedRecord.value = newRecord;
       return newRecord;
     } catch (error) {
-      console.error('创建杂物记录失败:', error);
+      console.error('创建杂项记录失败:', error);
       throw error;
     }
   }
@@ -435,7 +435,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       if (selectedRecord.value?.id === id) selectedRecord.value = updated;
       return updated;
     } catch (error) {
-      console.error('更新杂物记录失败:', error);
+      console.error('更新杂项记录失败:', error);
       throw error;
     }
   }
@@ -447,7 +447,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       records.value = records.value.filter(r => r.id !== id);
       if (selectedRecord.value?.id === id) selectedRecord.value = null;
     } catch (error) {
-      console.error('删除杂物记录失败:', error);
+      console.error('删除杂项记录失败:', error);
       throw error;
     }
   }
@@ -592,7 +592,7 @@ const emit = defineEmits<{
 <el-dialog
   :model-value="modelValue"
   @update:model-value="emit('update:modelValue', $event)"
-  title="杂物记录"
+  title="杂项记录"
   width="900px"
   :close-on-click-modal="false"
   destroy-on-close
@@ -749,7 +749,7 @@ git commit -m "feat: add MiscRecordPanel component"
 **Files:**
 - Modify: `src/renderer/components/MainLayout.vue`
 
-- [ ] **Step 1: 在 MainLayout.vue 中集成杂物记录功能**
+- [ ] **Step 1: 在 MainLayout.vue 中集成杂项记录功能**
 
 具体修改：
 
@@ -770,7 +770,7 @@ const miscRecordStore = useMiscRecordStore();
 ```html
 <el-button @click="showMiscRecord = true">
   <el-icon><Notebook /></el-icon>
-  <span>杂物记录</span>
+  <span>杂项记录</span>
 </el-button>
 ```
 需要导入 Notebook 图标：`import { Notebook } from '@element-plus/icons-vue';`
@@ -789,7 +789,7 @@ Expected: 无错误
 - [ ] **Step 3: 启动开发服务器验证**
 
 Run: `pnpm dev`
-Expected: 开发服务器启动成功，Header 中出现「杂物记录」按钮
+Expected: 开发服务器启动成功，Header 中出现「杂项记录」按钮
 
 - [ ] **Step 4: 提交**
 
@@ -807,7 +807,7 @@ git commit -m "feat: integrate MiscRecordPanel into MainLayout"
 - [ ] `pnpm typecheck` 通过
 - [ ] `pnpm lint` 通过
 - [ ] `pnpm dev` 启动成功
-- [ ] Header 中可见「杂物记录」按钮
+- [ ] Header 中可见「杂项记录」按钮
 - [ ] 点击按钮可打开弹窗
 - [ ] 可以创建新记录（标题、分类、内容）
 - [ ] 记录列表可搜索和按分类筛选

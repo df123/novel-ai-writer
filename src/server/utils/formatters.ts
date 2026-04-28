@@ -228,9 +228,9 @@ export function formatThemeHistory(history: DbThemeHistory): ThemeHistory {
 }
 
 /**
- * 格式化杂物记录数据（数据库格式 -> 前端格式）
- * @param record - 数据库中的杂物记录对象
- * @returns 格式化后的杂物记录对象
+ * 格式化杂项记录数据（数据库格式 -> 前端格式）
+ * @param record - 数据库中的杂项记录对象
+ * @returns 格式化后的杂项记录对象
  */
 export function formatMiscRecord(record: DbMiscRecord): MiscRecord {
   return {
@@ -247,9 +247,9 @@ export function formatMiscRecord(record: DbMiscRecord): MiscRecord {
 }
 
 /**
- * 格式化杂物记录版本数据（数据库格式 -> 前端格式）
- * @param version - 数据库中的杂物记录版本对象
- * @returns 格式化后的杂物记录版本对象
+ * 格式化杂项记录版本数据（数据库格式 -> 前端格式）
+ * @param version - 数据库中的杂项记录版本对象
+ * @returns 格式化后的杂项记录版本对象
  */
 export function formatMiscRecordVersion(version: DbMiscRecordVersion): MiscRecordVersion {
   return {

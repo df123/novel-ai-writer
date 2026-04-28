@@ -26,7 +26,7 @@
           circle
           class="action-button misc-record-button"
           @click="showMiscRecord = true"
-          title="杂物记录"
+          title="杂项记录"
         />
         <el-button
           :icon="Plus"

@@ -308,13 +308,13 @@ export const updateThemeTool: ToolDefinition = {
 };
 
 /**
- * 创建杂物记录工具
+ * 创建杂项记录工具
  */
 export const createMiscRecordTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'create_misc_record',
-    description: '创建一个新的杂物记录。杂物记录用于管理小说中各类设定信息，如功法、星球、城市、组织、物品等。',
+    description: '创建一个新的杂项记录。杂项记录用于管理小说中各类设定信息，如功法、星球、城市、组织、物品等。',
     strict: true,
     parameters: {
       type: 'object',
@@ -339,20 +339,20 @@ export const createMiscRecordTool: ToolDefinition = {
 };
 
 /**
- * 更新杂物记录工具
+ * 更新杂项记录工具
  */
 export const updateMiscRecordTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'update_misc_record',
-    description: '更新已存在的杂物记录',
+    description: '更新已存在的杂项记录',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         id: {
           type: 'string',
-          description: '杂物记录的 ID',
+          description: '杂项记录的 ID',
         },
         title: {
           type: 'string',
@@ -374,20 +374,20 @@ export const updateMiscRecordTool: ToolDefinition = {
 };
 
 /**
- * 删除杂物记录工具
+ * 删除杂项记录工具
  */
 export const deleteMiscRecordTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'delete_misc_record',
-    description: '删除指定的杂物记录',
+    description: '删除指定的杂项记录',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         id: {
           type: 'string',
-          description: '杂物记录的 ID',
+          description: '杂项记录的 ID',
         },
       },
       required: ['id'],
@@ -397,20 +397,20 @@ export const deleteMiscRecordTool: ToolDefinition = {
 };
 
 /**
- * 查询杂物记录工具
+ * 查询杂项记录工具
  */
 export const getMiscRecordTool: ToolDefinition = {
   type: 'function',
   function: {
     name: 'get_misc_record',
-    description: '查询杂物记录列表。可以通过 ID 获取单条记录，或通过标题、分类、关键词筛选。如果提供 id 参数，则返回指定 ID 的记录详情；否则返回筛选后的记录列表。',
+    description: '查询杂项记录列表。可以通过 ID 获取单条记录，或通过标题、分类、关键词筛选。如果提供 id 参数，则返回指定 ID 的记录详情；否则返回筛选后的记录列表。',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         id: {
           type: 'string',
-          description: '杂物记录的 ID（可选，提供则返回指定 ID 的记录详情）',
+          description: '杂项记录的 ID（可选，提供则返回指定 ID 的记录详情）',
         },
         title: {
           type: 'string',

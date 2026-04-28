@@ -1,12 +1,12 @@
-# 杂物记录模块设计文档
+# 杂项记录模块设计文档
 
 ## 概述
 
-杂物记录（MiscRecord）模块用于记录小说中各种设定信息，如修仙小说的功法、太空类型的星球特性、城市、法宝、势力等。该模块采用与时间线和人物模块完全一致的架构模式，通过弹窗方式呈现。
+杂项记录（MiscRecord）模块用于记录小说中各种设定信息，如修仙小说的功法、太空类型的星球特性、城市、法宝、势力等。该模块采用与时间线和人物模块完全一致的架构模式，通过弹窗方式呈现。
 
 ## 需求
 
-- 用户可以创建、编辑、删除杂物记录
+- 用户可以创建、编辑、删除杂项记录
 - 每条记录包含标题、分类（自定义标签）、内容描述三个核心字段
 - 支持按分类筛选记录
 - 支持搜索（标题和内容）
@@ -118,7 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_misc_records_category ON misc_records(project_id,
 
 | HTTP | 路径 | 功能 |
 |------|------|------|
-| GET | `/projects/:projectId/misc-records` | 获取项目杂物记录（支持 title/content 搜索，category 筛选） |
+| GET | `/projects/:projectId/misc-records` | 获取项目杂项记录（支持 title/content 搜索，category 筛选） |
 | POST | `/projects/:projectId/misc-records` | 创建记录 |
 | PUT | `/misc-records/:id` | 更新记录（支持 createVersion） |
 | DELETE | `/misc-records/:id` | 软删除记录 |
@@ -132,7 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_misc_records_category ON misc_records(project_id,
 ## UI 设计
 
 ### 入口
-- 在 MainLayout.vue 的 Header 导航栏中添加「杂物记录」按钮
+- 在 MainLayout.vue 的 Header 导航栏中添加「杂项记录」按钮
 - 按钮样式与「章节管理」「主旨管理」按钮保持一致
 - 使用 Element Plus 的 `Notebook` 图标
 
@@ -178,7 +178,7 @@ CREATE INDEX IF NOT EXISTS idx_misc_records_category ON misc_records(project_id,
 | `src/server/index.ts` | 注册 miscRecords 路由 |
 | `src/server/utils/formatters.ts` | 添加 formatMiscRecord 函数 |
 | `src/renderer/utils/api.ts` | 添加 miscRecordApi 对象 |
-| `src/renderer/components/MainLayout.vue` | 添加杂物记录按钮和弹窗组件 |
+| `src/renderer/components/MainLayout.vue` | 添加杂项记录按钮和弹窗组件 |
 
 ## 实施顺序
 

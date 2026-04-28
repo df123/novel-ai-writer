@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :model-value="modelValue"
-    title="杂物记录"
+    title="杂项记录"
     width="900px"
     :close-on-click-modal="false"
     destroy-on-close

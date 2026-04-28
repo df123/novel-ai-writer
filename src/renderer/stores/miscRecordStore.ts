@@ -27,7 +27,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       });
       records.value = response.data;
     } catch (error) {
-      console.error('加载杂物记录失败:', error);
+      console.error('加载杂项记录失败:', error);
     } finally {
       isLoading.value = false;
     }
@@ -40,7 +40,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       records.value.push(newRecord);
       return newRecord;
     } catch (error) {
-      console.error('创建杂物记录失败:', error);
+      console.error('创建杂项记录失败:', error);
       throw error;
     }
   };
@@ -54,7 +54,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       const updated = response.data;
       records.value = records.value.map(r => (r.id === id ? updated : r));
     } catch (error) {
-      console.error('更新杂物记录失败:', error);
+      console.error('更新杂项记录失败:', error);
       throw error;
     }
   };
@@ -65,7 +65,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       records.value = records.value.filter(r => r.id !== id);
       versions.value.delete(id);
     } catch (error) {
-      console.error('删除杂物记录失败:', error);
+      console.error('删除杂项记录失败:', error);
       throw error;
     }
   };
@@ -80,7 +80,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       const response = await miscRecordApi.getVersions(recordId);
       versions.value.set(recordId, response.data);
     } catch (error) {
-      console.error('加载杂物记录版本失败:', error);
+      console.error('加载杂项记录版本失败:', error);
     } finally {
       isLoadingVersions.value = false;
     }
@@ -101,7 +101,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       }
       return updatedRecord;
     } catch (error) {
-      console.error('恢复杂物记录版本失败:', error);
+      console.error('恢复杂项记录版本失败:', error);
       throw error;
     }
   };
@@ -113,7 +113,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       records.value.push(restored);
       return restored;
     } catch (error) {
-      console.error('恢复杂物记录失败:', error);
+      console.error('恢复杂项记录失败:', error);
       throw error;
     }
   };
@@ -124,7 +124,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       records.value = records.value.filter(r => r.id !== id);
       versions.value.delete(id);
     } catch (error) {
-      console.error('永久删除杂物记录失败:', error);
+      console.error('永久删除杂项记录失败:', error);
       throw error;
     }
   };

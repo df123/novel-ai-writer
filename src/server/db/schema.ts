@@ -34,7 +34,7 @@ export function getCreateTablesSQL(): string[] {
     'CREATE INDEX IF NOT EXISTS idx_themes_project_deleted ON themes(project_id, deleted)',
     'CREATE INDEX IF NOT EXISTS idx_theme_history_theme_id ON theme_history(theme_id)',
 
-    // ===== 杂物记录表 =====
+    // ===== 杂项记录表 =====
     'CREATE TABLE IF NOT EXISTS misc_records (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, title TEXT NOT NULL, category TEXT NOT NULL DEFAULT \'\', content TEXT, order_index INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER DEFAULT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE)',
 
     'CREATE TABLE IF NOT EXISTS misc_record_versions (id TEXT PRIMARY KEY, misc_record_id TEXT NOT NULL, title TEXT NOT NULL, category TEXT NOT NULL DEFAULT \'\', content TEXT, version INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (misc_record_id) REFERENCES misc_records(id) ON DELETE CASCADE)',

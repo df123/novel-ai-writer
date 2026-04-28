@@ -607,7 +607,7 @@ export const useChatStore = defineStore('chat', () => {
                     },
                   });
                 }
-                return JSON.stringify({ success: false, message: `未找到杂物记录: ${parsedArgs.id}` });
+                return JSON.stringify({ success: false, message: `未找到杂项记录: ${parsedArgs.id}` });
               } else {
                 const filters: { title?: string; category?: string; search?: string } = {};
                 
@@ -646,7 +646,7 @@ export const useChatStore = defineStore('chat', () => {
               console.error('[get_misc_record] Failed to fetch misc records:', error);
               return JSON.stringify({ 
                 success: false, 
-                message: '获取杂物记录失败，请稍后重试' 
+                message: '获取杂项记录失败，请稍后重试' 
               });
             }
           }
@@ -661,7 +661,7 @@ export const useChatStore = defineStore('chat', () => {
             if (existingRecord) {
               return JSON.stringify({
                 success: false,
-                message: `杂物记录"${parsedArgs.title}"已存在，请使用update_misc_record工具更新它`,
+                message: `杂项记录"${parsedArgs.title}"已存在，请使用update_misc_record工具更新它`,
                 existingData: {
                   id: existingRecord.id,
                   title: existingRecord.title,
@@ -676,7 +676,7 @@ export const useChatStore = defineStore('chat', () => {
               category: parsedArgs.category,
               content: parsedArgs.content,
             });
-            return JSON.stringify({ success: true, message: `已创建杂物记录: ${parsedArgs.title}` });
+            return JSON.stringify({ success: true, message: `已创建杂项记录: ${parsedArgs.title}` });
           }
           case 'update_misc_record': {
             if (!parsedArgs.id) {
@@ -689,12 +689,12 @@ export const useChatStore = defineStore('chat', () => {
               return JSON.stringify({ 
                 success: false, 
                 message: '缺少必需的 id 参数',
-                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表，或使用 get_misc_record(id="xxx") 获取特定记录',
+                hint: '请先调用 get_misc_record() 获取所有杂项记录的 ID 列表，或使用 get_misc_record(id="xxx") 获取特定记录',
                 example: 'get_misc_record() 或 get_misc_record(id="记录ID")',
                 availableRecords: records.length > 0 ? records : undefined,
                 suggestion: records.length > 0 
-                  ? `当前有 ${records.length} 条杂物记录，请选择要更新的记录并使用其 ID 调用 update_misc_record`
-                  : '当前没有杂物记录，请先使用 create_misc_record 创建'
+                  ? `当前有 ${records.length} 条杂项记录，请选择要更新的记录并使用其 ID 调用 update_misc_record`
+                  : '当前没有杂项记录，请先使用 create_misc_record 创建'
               });
             }
             
@@ -702,8 +702,8 @@ export const useChatStore = defineStore('chat', () => {
             if (!record) {
               return JSON.stringify({ 
                 success: false, 
-                message: `未找到杂物记录: ${parsedArgs.id}`,
-                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表',
+                message: `未找到杂项记录: ${parsedArgs.id}`,
+                hint: '请先调用 get_misc_record() 获取所有杂项记录的 ID 列表',
                 availableRecords: miscRecordStore.records.map(r => ({
                   id: r.id,
                   title: r.title,
@@ -718,7 +718,7 @@ export const useChatStore = defineStore('chat', () => {
               category: parsedArgs.category,
               content: parsedArgs.content,
             });
-            return JSON.stringify({ success: true, message: `已更新杂物记录: ${parsedArgs.title || record.title}` });
+            return JSON.stringify({ success: true, message: `已更新杂项记录: ${parsedArgs.title || record.title}` });
           }
           case 'delete_misc_record': {
             if (!parsedArgs.id) {
@@ -731,12 +731,12 @@ export const useChatStore = defineStore('chat', () => {
               return JSON.stringify({ 
                 success: false, 
                 message: '缺少必需的 id 参数',
-                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表',
+                hint: '请先调用 get_misc_record() 获取所有杂项记录的 ID 列表',
                 example: 'get_misc_record() 或 get_misc_record(id="记录ID")',
                 availableRecords: records.length > 0 ? records : undefined,
                 suggestion: records.length > 0 
-                  ? `当前有 ${records.length} 条杂物记录，请选择要删除的记录并使用其 ID 调用 delete_misc_record`
-                  : '当前没有杂物记录'
+                  ? `当前有 ${records.length} 条杂项记录，请选择要删除的记录并使用其 ID 调用 delete_misc_record`
+                  : '当前没有杂项记录'
               });
             }
             
@@ -744,8 +744,8 @@ export const useChatStore = defineStore('chat', () => {
             if (!record) {
               return JSON.stringify({ 
                 success: false, 
-                message: `未找到杂物记录: ${parsedArgs.id}`,
-                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表',
+                message: `未找到杂项记录: ${parsedArgs.id}`,
+                hint: '请先调用 get_misc_record() 获取所有杂项记录的 ID 列表',
                 availableRecords: miscRecordStore.records.map(r => ({
                   id: r.id,
                   title: r.title,
@@ -756,7 +756,7 @@ export const useChatStore = defineStore('chat', () => {
             }
             
             await miscRecordStore.deleteRecord(parsedArgs.id);
-            return JSON.stringify({ success: true, message: `已删除杂物记录: ${record.title}` });
+            return JSON.stringify({ success: true, message: `已删除杂项记录: ${record.title}` });
           }
           case 'update_theme': {
             // 检查是否选择了项目

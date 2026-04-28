@@ -674,7 +674,7 @@ export interface UpdateThemeRequest {
   created_by?: 'user' | 'llm';
 }
 
-// ===== 杂物记录（MiscRecord）类型 =====
+// ===== 杂项记录（MiscRecord）类型 =====
 
 export interface MiscRecord {
   id: string;
