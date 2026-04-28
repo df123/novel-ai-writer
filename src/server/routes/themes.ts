@@ -54,7 +54,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   );
 
   if (themes.length === 0) {
-    res.status(404).json({ error: '未找到主旨' });
+    res.json(null);
     return;
   }
 

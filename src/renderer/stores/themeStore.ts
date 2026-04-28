@@ -16,7 +16,12 @@ export const useThemeStore = defineStore('theme', () => {
       const response = await themeApi.list(projectId);
       theme.value = response.data;
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // 404 表示该项目没有主旨，清空状态而非抛出异常
+      if (error?.response?.status === 404) {
+        theme.value = null;
+        return null;
+      }
       console.error('加载主旨失败:', error);
       throw error;
     } finally {
