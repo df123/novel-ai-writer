@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Message, Chat, TimelineNode, Character, Chapter } from '../../shared/types';
-import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi } from '../utils/api';
+import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi, miscRecordApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
 import { ALL_TOOLS } from '../utils/tools';
@@ -11,6 +11,7 @@ import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
+import { useMiscRecordStore } from './miscRecordStore';
 
 /**
  * 工具调用接口
@@ -137,6 +138,7 @@ export const useChatStore = defineStore('chat', () => {
     const characterStore = useCharacterStore();
     const settingsStore = useSettingsStore();
     const themeStore = useThemeStore();
+    const miscRecordStore = useMiscRecordStore();
     let assistantMessageId: string | null = null;
 
     if (!currentChat.value || !projectStore.currentProject) {
@@ -580,6 +582,181 @@ export const useChatStore = defineStore('chat', () => {
                 message: '获取人物失败，请稍后重试' 
               });
             }
+          }
+          case 'get_misc_record': {
+            // 检查是否选择了项目
+            if (!projectStore.currentProject) {
+              return JSON.stringify({ 
+                success: false, 
+                message: '未选择项目，请先选择一个项目' 
+              });
+            }
+
+            try {
+              if (parsedArgs.id) {
+                const response = await miscRecordApi.get(parsedArgs.id);
+                const record = response.data;
+                if (record) {
+                  return JSON.stringify({
+                    success: true,
+                    data: {
+                      id: record.id,
+                      title: record.title,
+                      category: record.category || '',
+                      content: record.content || '',
+                    },
+                  });
+                }
+                return JSON.stringify({ success: false, message: `未找到杂物记录: ${parsedArgs.id}` });
+              } else {
+                const filters: { title?: string; category?: string; search?: string } = {};
+                
+                if (parsedArgs.title && parsedArgs.title.trim()) {
+                  filters.title = parsedArgs.title.trim();
+                }
+                
+                if (parsedArgs.category && parsedArgs.category.trim()) {
+                  filters.category = parsedArgs.category.trim();
+                }
+                
+                if (parsedArgs.search && parsedArgs.search.trim()) {
+                  filters.search = parsedArgs.search.trim();
+                }
+                
+                const response = await miscRecordApi.list(projectStore.currentProject.id, filters);
+                const records = response.data.map((r: any) => ({
+                  id: r.id,
+                  title: r.title,
+                  category: r.category || '',
+                  content: r.content || '',
+                }));
+                
+                return JSON.stringify({
+                  success: true,
+                  data: records,
+                  count: records.length,
+                  filters: {
+                    title: filters.title || null,
+                    category: filters.category || null,
+                    search: filters.search || null,
+                  },
+                });
+              }
+            } catch (error) {
+              console.error('[get_misc_record] Failed to fetch misc records:', error);
+              return JSON.stringify({ 
+                success: false, 
+                message: '获取杂物记录失败，请稍后重试' 
+              });
+            }
+          }
+          case 'create_misc_record': {
+            if (!projectStore.currentProject) {
+              return JSON.stringify({ 
+                success: false, 
+                message: '未选择项目，请先选择一个项目' 
+              });
+            }
+            const existingRecord = miscRecordStore.records.find(r => r.title === parsedArgs.title);
+            if (existingRecord) {
+              return JSON.stringify({
+                success: false,
+                message: `杂物记录"${parsedArgs.title}"已存在，请使用update_misc_record工具更新它`,
+                existingData: {
+                  id: existingRecord.id,
+                  title: existingRecord.title,
+                  category: existingRecord.category || '',
+                  content: existingRecord.content || '',
+                },
+                suggestion: '使用 update_misc_record 工具，传入上述 id 来更新此记录'
+              });
+            }
+            await miscRecordStore.createRecord(projectStore.currentProject.id, {
+              title: parsedArgs.title,
+              category: parsedArgs.category,
+              content: parsedArgs.content,
+            });
+            return JSON.stringify({ success: true, message: `已创建杂物记录: ${parsedArgs.title}` });
+          }
+          case 'update_misc_record': {
+            if (!parsedArgs.id) {
+              const records = miscRecordStore.records.map(r => ({
+                id: r.id,
+                title: r.title,
+                category: r.category || '',
+                content: r.content || '',
+              }));
+              return JSON.stringify({ 
+                success: false, 
+                message: '缺少必需的 id 参数',
+                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表，或使用 get_misc_record(id="xxx") 获取特定记录',
+                example: 'get_misc_record() 或 get_misc_record(id="记录ID")',
+                availableRecords: records.length > 0 ? records : undefined,
+                suggestion: records.length > 0 
+                  ? `当前有 ${records.length} 条杂物记录，请选择要更新的记录并使用其 ID 调用 update_misc_record`
+                  : '当前没有杂物记录，请先使用 create_misc_record 创建'
+              });
+            }
+            
+            const record = miscRecordStore.records.find(r => r.id === parsedArgs.id);
+            if (!record) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `未找到杂物记录: ${parsedArgs.id}`,
+                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表',
+                availableRecords: miscRecordStore.records.map(r => ({
+                  id: r.id,
+                  title: r.title,
+                  category: r.category || '',
+                  content: r.content || '',
+                }))
+              });
+            }
+            
+            await miscRecordStore.updateRecord(parsedArgs.id, {
+              title: parsedArgs.title,
+              category: parsedArgs.category,
+              content: parsedArgs.content,
+            });
+            return JSON.stringify({ success: true, message: `已更新杂物记录: ${parsedArgs.title || record.title}` });
+          }
+          case 'delete_misc_record': {
+            if (!parsedArgs.id) {
+              const records = miscRecordStore.records.map(r => ({
+                id: r.id,
+                title: r.title,
+                category: r.category || '',
+                content: r.content || '',
+              }));
+              return JSON.stringify({ 
+                success: false, 
+                message: '缺少必需的 id 参数',
+                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表',
+                example: 'get_misc_record() 或 get_misc_record(id="记录ID")',
+                availableRecords: records.length > 0 ? records : undefined,
+                suggestion: records.length > 0 
+                  ? `当前有 ${records.length} 条杂物记录，请选择要删除的记录并使用其 ID 调用 delete_misc_record`
+                  : '当前没有杂物记录'
+              });
+            }
+            
+            const record = miscRecordStore.records.find(r => r.id === parsedArgs.id);
+            if (!record) {
+              return JSON.stringify({ 
+                success: false, 
+                message: `未找到杂物记录: ${parsedArgs.id}`,
+                hint: '请先调用 get_misc_record() 获取所有杂物记录的 ID 列表',
+                availableRecords: miscRecordStore.records.map(r => ({
+                  id: r.id,
+                  title: r.title,
+                  category: r.category || '',
+                  content: r.content || '',
+                }))
+              });
+            }
+            
+            await miscRecordStore.deleteRecord(parsedArgs.id);
+            return JSON.stringify({ success: true, message: `已删除杂物记录: ${record.title}` });
           }
           case 'update_theme': {
             // 检查是否选择了项目

@@ -308,6 +308,130 @@ export const updateThemeTool: ToolDefinition = {
 };
 
 /**
+ * 创建杂物记录工具
+ */
+export const createMiscRecordTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'create_misc_record',
+    description: '创建一个新的杂物记录。杂物记录用于管理小说中各类设定信息，如功法、星球、城市、组织、物品等。',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: '记录标题',
+        },
+        category: {
+          type: 'string',
+          description: '分类标签，如功法、星球、城市、组织、物品等',
+        },
+        content: {
+          type: 'string',
+          description: '详细描述',
+        },
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 更新杂物记录工具
+ */
+export const updateMiscRecordTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_misc_record',
+    description: '更新已存在的杂物记录',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '杂物记录的 ID',
+        },
+        title: {
+          type: 'string',
+          description: '新标题',
+        },
+        category: {
+          type: 'string',
+          description: '新分类标签',
+        },
+        content: {
+          type: 'string',
+          description: '新描述内容',
+        },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 删除杂物记录工具
+ */
+export const deleteMiscRecordTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'delete_misc_record',
+    description: '删除指定的杂物记录',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '杂物记录的 ID',
+        },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 查询杂物记录工具
+ */
+export const getMiscRecordTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'get_misc_record',
+    description: '查询杂物记录列表。可以通过 ID 获取单条记录，或通过标题、分类、关键词筛选。如果提供 id 参数，则返回指定 ID 的记录详情；否则返回筛选后的记录列表。',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: '杂物记录的 ID（可选，提供则返回指定 ID 的记录详情）',
+        },
+        title: {
+          type: 'string',
+          description: '按标题筛选（可选，模糊匹配）',
+        },
+        category: {
+          type: 'string',
+          description: '按分类筛选（可选，精确匹配，如：功法、星球、城市等）',
+        },
+        search: {
+          type: 'string',
+          description: '搜索关键词（可选，匹配标题和内容）',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
  * 所有可用工具
  */
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -320,4 +444,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
   deleteCharacterTool,
   getCharacterTool,
   updateThemeTool,
+  createMiscRecordTool,
+  updateMiscRecordTool,
+  deleteMiscRecordTool,
+  getMiscRecordTool,
 ];
