@@ -11,7 +11,6 @@ export interface ToolDefinition {
   function: {
     name: string;
     description: string;
-    strict?: boolean;
     parameters: {
       type: 'object';
       properties: Record<string, {
@@ -32,7 +31,6 @@ export const createTimelineTool: ToolDefinition = {
   function: {
     name: 'create_timeline',
     description: '创建一个新的时间线节点。日期支持多种格式：相对时间（如：天桥三年、民国十年、唐朝贞观年间等）、绝对时间（如：2026-03-03、1990-01-01等）、其他时间描述（如：春、夏、秋、冬、早春、深秋等）',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -63,7 +61,6 @@ export const updateTimelineTool: ToolDefinition = {
   function: {
     name: 'update_timeline',
     description: '更新已存在的时间线节点。日期支持多种格式：相对时间（如：天桥三年、民国十年、唐朝贞观年间等）、绝对时间（如：2026-03-03、1990-01-01等）、其他时间描述（如：春、夏、秋、冬、早春、深秋等）',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -98,7 +95,6 @@ export const deleteTimelineTool: ToolDefinition = {
   function: {
     name: 'delete_timeline',
     description: '删除指定的时间线节点',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -121,7 +117,6 @@ export const getTimelineTool: ToolDefinition = {
   function: {
     name: 'get_timeline',
     description: '查询时间线节点列表。可以通过 ID、标题或内容进行筛选。如果提供 id 参数，则返回指定 ID 的节点详情；否则返回筛选后的节点列表。',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -152,7 +147,6 @@ export const createCharacterTool: ToolDefinition = {
   function: {
     name: 'create_character',
     description: '创建一个新的人物角色',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -187,7 +181,6 @@ export const updateCharacterTool: ToolDefinition = {
   function: {
     name: 'update_character',
     description: '更新已存在的人物角色',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -226,7 +219,6 @@ export const deleteCharacterTool: ToolDefinition = {
   function: {
     name: 'delete_character',
     description: '删除指定的人物角色',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -249,7 +241,6 @@ export const getCharacterTool: ToolDefinition = {
   function: {
     name: 'get_character',
     description: '查询人物列表。可以通过 ID、姓名、描述、性格或背景进行筛选。如果提供 id 参数，则返回指定 ID 的人物详情；否则返回筛选后的人物列表。',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -288,7 +279,6 @@ export const updateThemeTool: ToolDefinition = {
   function: {
     name: 'update_theme',
     description: '更新当前项目的主旨。主旨包括故事概述、类型、世界背景等核心内容。如果当前没有主旨，则会创建新的主旨。更新后会自动创建历史记录。',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -315,7 +305,6 @@ export const createMiscRecordTool: ToolDefinition = {
   function: {
     name: 'create_misc_record',
     description: '创建一个新的杂项记录。杂项记录用于管理小说中各类设定信息，如功法、星球、城市、组织、物品等。',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -346,7 +335,6 @@ export const updateMiscRecordTool: ToolDefinition = {
   function: {
     name: 'update_misc_record',
     description: '更新已存在的杂项记录',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -381,7 +369,6 @@ export const deleteMiscRecordTool: ToolDefinition = {
   function: {
     name: 'delete_misc_record',
     description: '删除指定的杂项记录',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -404,7 +391,6 @@ export const getMiscRecordTool: ToolDefinition = {
   function: {
     name: 'get_misc_record',
     description: '查询杂项记录列表。可以通过 ID 获取单条记录，或通过标题、分类、关键词筛选。如果提供 id 参数，则返回指定 ID 的记录详情；否则返回筛选后的记录列表。',
-    strict: true,
     parameters: {
       type: 'object',
       properties: {

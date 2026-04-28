@@ -30,7 +30,7 @@ export const buildSystemPrompt = (
   systemPrompt += customPrompt || '你是一个专业的小说创作助手。';
 
   if (tools && tools.length > 0) {
-    systemPrompt += '\n\n你可以使用工具来管理时间线、人物和杂项记录信息（create_timeline, update_timeline, delete_timeline, get_timeline, create_character, update_character, delete_character, get_character, create_misc_record, update_misc_record, delete_misc_record, get_misc_record）。\n\n';
+    systemPrompt += '\n\n你可以使用工具来管理时间线、人物、主旨和杂项记录信息（create_timeline, update_timeline, delete_timeline, get_timeline, create_character, update_character, delete_character, get_character, update_theme, create_misc_record, update_misc_record, delete_misc_record, get_misc_record）。\n\n';
     systemPrompt += '重要：工具调用流程\n';
     systemPrompt += '1. 创建新实体：直接调用 create_timeline、create_character 或 create_misc_record\n';
     systemPrompt += '2. 更新现有实体：必须遵循以下步骤\n';
