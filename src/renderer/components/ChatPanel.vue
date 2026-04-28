@@ -34,7 +34,7 @@
       <!-- 消息内容包裹容器 -->
       <div class="messages-content-wrapper">
         <!-- 消息列表 -->
-        <div class="messages-list">
+        <div class="messages-list" ref="messagesListRef" @scroll="handleScroll">
           <div
             v-for="(message, index) in messages"
             :key="message.id + index"
@@ -144,6 +144,17 @@
         </div>
         
         <div ref="messagesEndRef"></div>
+
+        <!-- 回到底部按钮 -->
+        <transition name="fade">
+          <div
+            v-if="showScrollToBottom"
+            class="scroll-to-bottom-btn"
+            @click="onScrollToBottomClick"
+          >
+            <el-icon :size="20"><ArrowDown /></el-icon>
+          </div>
+        </transition>
       </div>
 
       <!-- 消息导航面板 -->
@@ -246,7 +257,7 @@
 import { ref, watch, nextTick, onMounted, computed } from 'vue';
 import type { Message } from '../../shared/types';
 import { storeToRefs } from 'pinia';
-import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight } from '@element-plus/icons-vue';
+import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight, ArrowDown } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -296,6 +307,56 @@ const saveChapterNumber = ref(1);
 const isNavPanelVisible = ref(true);
 const activeMessageId = ref<string | null>(null);
 
+// 智能滚动相关
+const messagesListRef = ref<HTMLElement | null>(null);  // 消息列表容器 ref
+const isUserScrolledUp = ref(false);                     // 用户是否手动上滚
+const showScrollToBottom = ref(false);                   // 是否显示"回到底部"按钮
+const SCROLL_THRESHOLD = 100;                            // 判断是否在底部的阈值（像素）
+
+// 节流滚动
+let scrollRafId: number | null = null;
+
+// 判断滚动容器是否在底部附近
+const isNearBottom = () => {
+  const el = messagesListRef.value;
+  if (!el) return true;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD;
+};
+
+// 滚动到底部
+const scrollToBottomFn = (smooth: boolean = true) => {
+  const el = messagesListRef.value;
+  if (!el) return;
+  el.scrollTo({
+    top: el.scrollHeight,
+    behavior: smooth ? 'smooth' : 'instant',
+  });
+};
+
+// 使用 requestAnimationFrame 节流滚动
+const requestScrollToBottom = () => {
+  if (scrollRafId !== null) return;
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = null;
+    if (!isUserScrolledUp.value) {
+      scrollToBottomFn(false);  // 流式中用 instant 避免 smooth 堆叠
+    }
+  });
+};
+
+// 监听滚动事件，判断用户是否手动上滚
+const handleScroll = () => {
+  const nearBottom = isNearBottom();
+  isUserScrolledUp.value = !nearBottom;
+  showScrollToBottom.value = !nearBottom;
+};
+
+// 点击"回到底部"按钮
+const onScrollToBottomClick = () => {
+  isUserScrolledUp.value = false;
+  scrollToBottomFn(true);
+};
+
 // 用户消息列表（用于导航）
 const userMessages = computed(() => {
   return messages.value
@@ -308,15 +369,25 @@ const userMessages = computed(() => {
     }));
 });
 
-watch([currentStreamContent, currentStreamReasoning], ([newContent, newReasoning]) => {
-  nextTick(() => {
-    messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
-  });
+// 流式内容变化时的智能滚动
+watch([currentStreamContent, currentStreamReasoning], () => {
+  if (!isUserScrolledUp.value) {
+    nextTick(() => {
+      requestScrollToBottom();
+    });
+  }
 });
 
+// 消息列表变化时的智能滚动
 watch(messages, async () => {
   await nextTick();
-  messagesEndRef.value?.scrollIntoView({ behavior: 'smooth' });
+  if (!isStreaming.value) {
+    // 非流式状态（新消息、删除等），始终滚动到底部
+    scrollToBottomFn(true);
+  } else if (!isUserScrolledUp.value) {
+    // 流式中且用户未上滚
+    requestScrollToBottom();
+  }
 });
 
 const toggleCollapse = (key: string) => {
@@ -575,6 +646,7 @@ onMounted(async () => {
   display: flex;
   height: 100%;
   gap: 0;
+  position: relative;
 }
 
 .messages-list {
@@ -1123,5 +1195,41 @@ onMounted(async () => {
     opacity: 1;
     transform: scale(1.2);
   }
+}
+
+/* 回到底部按钮 */
+.scroll-to-bottom-btn {
+  position: absolute;
+  bottom: 30px;
+  left: calc(50% - 100px);
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.scroll-to-bottom-btn:hover {
+  background: var(--el-color-primary);
+  color: white;
+  border-color: var(--el-color-primary);
+}
+
+/* 淡入淡出动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
