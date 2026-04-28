@@ -15,6 +15,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const isLoadingModels = ref(false);
   const showThinkingContent = ref(false);
   const showToolCalls = ref(false);
+  /** DeepSeek 推理努力程度（可选值：high/max，默认 high） */
   const reasoningEffort = ref('high');
   // 记录解密失败的 API 密钥 key 名称，供组件读取以显示提示
   const decryptFailedKeys = ref<string[]>([]);

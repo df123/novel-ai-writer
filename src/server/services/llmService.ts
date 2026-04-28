@@ -29,7 +29,7 @@ interface ChatStreamOptions {
   /** 思考参数（deepseek 专用） */
   thinking?: unknown;
 
-  /** 推理努力程度（deepseek 专用，可选值：high/medium/low） */
+  /** 推理努力程度（deepseek 专用，可选值：high/max） */
   reasoning_effort?: string;
 }
 

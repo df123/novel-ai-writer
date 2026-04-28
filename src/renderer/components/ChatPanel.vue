@@ -15,8 +15,7 @@
         </el-select>
         <el-select v-if="selectedProvider === 'deepseek'" v-model="reasoningEffort" size="small" class="effort-select" @change="handleReasoningEffortChange">
           <el-option label="高" value="high" />
-          <el-option label="中" value="medium" />
-          <el-option label="低" value="low" />
+          <el-option label="最大" value="max" />
         </el-select>
         <el-tag size="small" type="info">
           {{ totalTokens }} tokens
