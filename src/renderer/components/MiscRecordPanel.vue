@@ -17,19 +17,13 @@
           clearable
           style="margin-bottom: 8px;"
         />
-        <el-select
+        <el-autocomplete
           v-model="store.selectedCategory"
-          placeholder="筛选分类"
+          :fetch-suggestions="queryFilterCategorySuggestions"
+          placeholder="输入分类筛选"
           clearable
           style="margin-bottom: 12px; width: 100%;"
-        >
-          <el-option
-            v-for="cat in store.categories"
-            :key="cat"
-            :label="cat"
-            :value="cat"
-          />
-        </el-select>
+        />
 
         <el-tabs v-model="activeTab" style="flex: 1; display: flex; flex-direction: column;" @tab-change="handleTabChange">
           <el-tab-pane label="记录" name="records">
@@ -380,8 +374,16 @@ const handleRestoreVersion = async (versionId: string) => {
   }
 };
 
-// 分类自动补全
+// 分类自动补全（编辑区）
 const queryCategorySuggestions = (queryString: string, cb: (results: { value: string }[]) => void) => {
+  const results = store.categories
+    .filter(cat => cat.toLowerCase().includes(queryString.toLowerCase()))
+    .map(cat => ({ value: cat }));
+  cb(results);
+};
+
+// 分类自动补全（筛选区）
+const queryFilterCategorySuggestions = (queryString: string, cb: (results: { value: string }[]) => void) => {
   const results = store.categories
     .filter(cat => cat.toLowerCase().includes(queryString.toLowerCase()))
     .map(cat => ({ value: cat }));
