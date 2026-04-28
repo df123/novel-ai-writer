@@ -2,6 +2,9 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { hostname, platform } from 'os';
 
+// 模块级标记，确保回退警告只打印一次
+let hasWarnedFallbackKey = false;
+
 /**
  * 生成加密密钥
  * 优先使用环境变量 ENCRYPTION_KEY（Docker 容器中 hostname 可能变化，导致机器指纹不可靠），
@@ -13,6 +16,18 @@ export function getMachineKey(): string {
   if (envKey) {
     return envKey.substring(0, 32);
   }
+
+  // 使用回退逻辑时输出一次性警告
+  if (!hasWarnedFallbackKey) {
+    hasWarnedFallbackKey = true;
+    console.warn(
+      '⚠️ [加密警告] 未设置 ENCRYPTION_KEY 环境变量，正在使用机器指纹生成加密密钥。\n' +
+      '  在 Docker 等环境中容器重建后 hostname 会变化，可能导致之前加密的 API 密钥无法解密。\n' +
+      '  建议在 .env 文件中设置 ENCRYPTION_KEY，可通过以下命令生成：\n' +
+      '    openssl rand -hex 16'
+    );
+  }
+
   return createHash('sha256').update(hostname() + platform()).digest('hex').substring(0, 32);
 }
 

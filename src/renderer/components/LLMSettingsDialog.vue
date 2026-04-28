@@ -17,6 +17,14 @@
             placeholder="sk-..."
             show-password
           />
+          <el-alert
+            v-if="decryptFailedKeys.includes('deepseek_api_key')"
+            title="此密钥因加密密钥变化无法解密，请重新输入"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
+          />
         </div>
       </el-tab-pane>
       <el-tab-pane label="OpenRouter" name="openrouter">
@@ -32,6 +40,14 @@
             type="password"
             placeholder="sk-or-..."
             show-password
+          />
+          <el-alert
+            v-if="decryptFailedKeys.includes('openrouter_api_key')"
+            title="此密钥因加密密钥变化无法解密，请重新输入"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
           />
         </div>
       </el-tab-pane>
@@ -112,7 +128,7 @@ const emit = defineEmits<{
 }>();
 
 const settingsStore = useSettingsStore();
-const { deepseekApiKey, openrouterApiKey, temperature, showThinkingContent, showToolCalls } = storeToRefs(settingsStore);
+const { deepseekApiKey, openrouterApiKey, temperature, showThinkingContent, showToolCalls, decryptFailedKeys } = storeToRefs(settingsStore);
 const { loadSettings, updateSettings } = settingsStore;
 
 const visible = computed({
@@ -221,5 +237,9 @@ const handleClose = () => {
   font-size: 14px;
   font-weight: bold;
   color: #409eff;
+}
+
+.decrypt-warning {
+  margin-top: 12px;
 }
 </style>

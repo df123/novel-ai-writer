@@ -36,6 +36,34 @@ npm install -g pnpm
 pnpm install
 ```
 
+## Docker 部署
+
+### 快速启动
+
+1. 复制环境变量配置文件：
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **重要：生成加密密钥**（首次部署必须执行）：
+   ```bash
+   # 生成随机的加密密钥并写入 .env
+   sed -i "s/^ENCRYPTION_KEY=$/ENCRYPTION_KEY=$(openssl rand -hex 16)/" .env
+   ```
+
+3. 启动服务：
+   ```bash
+   docker-compose up -d
+   ```
+
+4. 访问应用：`http://localhost:3002`
+
+### ⚠️ 注意事项
+
+- **加密密钥（ENCRYPTION_KEY）**：用于加密存储 API 密钥。首次部署时必须设置，设置后请勿更改，否则已保存的 API 密钥将无法解密。
+- **数据持久化**：Docker 使用命名卷 `novel-ai-data` 存储数据库，`docker-compose down` 不会删除数据（除非使用 `-v` 参数）。
+- **更新部署**：重建容器时 API 密钥不会丢失，前提是 `.env` 中的 `ENCRYPTION_KEY` 保持不变。
+
 ## 开发
 
 ```bash
@@ -145,6 +173,7 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 - 推荐使用现代浏览器（Chrome、Firefox、Edge、Safari）
 - 后端服务器运行在 http://localhost:3002
 - 前端开发服务器运行在 http://localhost:3004
+- Docker 部署时必须在 `.env` 文件中设置 `ENCRYPTION_KEY`，否则容器重建后 API 密钥将无法解密
 
 ## License
 

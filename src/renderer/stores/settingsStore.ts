@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { settingsApi, modelsApi } from '../utils/api';
+import { ElMessage } from 'element-plus';
 import type { Model } from '../../shared/types';
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -15,12 +16,46 @@ export const useSettingsStore = defineStore('settings', () => {
   const showThinkingContent = ref(false);
   const showToolCalls = ref(false);
   const reasoningEffort = ref('high');
+  // 记录解密失败的 API 密钥 key 名称，供组件读取以显示提示
+  const decryptFailedKeys = ref<string[]>([]);
+
+  // API 密钥名称到友好名称的映射
+  const apiKeyLabels: Record<string, string> = {
+    deepseek_api_key: 'DeepSeek',
+    openrouter_api_key: 'OpenRouter',
+  };
+
+  // 检查并提示解密失败的 API 密钥
+  const checkDecryptFailed = (failedKeys: string[]) => {
+    if (!failedKeys || failedKeys.length === 0) return;
+
+    // 保存失败的 key 供组件使用
+    decryptFailedKeys.value = failedKeys;
+
+    const labels = failedKeys
+      .map(key => apiKeyLabels[key] || key)
+      .join('、');
+
+    ElMessage({
+      message: `检测到以下 API 密钥无法解密：${labels}。可能是因为容器重建导致加密密钥变化，请重新输入相关密钥。`,
+      type: 'warning',
+      duration: 8000,
+      showClose: true,
+    });
+  };
 
   const loadSettings = async () => {
     isLoading.value = true;
     try {
       const response = await settingsApi.get();
       const settings = response.data;
+
+      // 检查是否有解密失败的 API 密钥
+      const decryptFailed = settings._decryptFailed as string[] | undefined;
+      if (decryptFailed) {
+        checkDecryptFailed(decryptFailed);
+        delete settings._decryptFailed;
+      }
 
       deepseekApiKey.value = settings.deepseek_api_key || '';
       openrouterApiKey.value = settings.openrouter_api_key || '';
@@ -76,6 +111,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
       const response = await settingsApi.update(currentSettings);
       const updated = response.data;
+
+      // 检查是否有解密失败的 API 密钥
+      const decryptFailed = updated._decryptFailed as string[] | undefined;
+      if (decryptFailed) {
+        checkDecryptFailed(decryptFailed);
+        delete updated._decryptFailed;
+      }
 
       deepseekApiKey.value = updated.deepseek_api_key || '';
       openrouterApiKey.value = updated.openrouter_api_key || '';
@@ -136,6 +178,7 @@ export const useSettingsStore = defineStore('settings', () => {
     showThinkingContent,
     showToolCalls,
     reasoningEffort,
+    decryptFailedKeys,
     loadSettings,
     updateSettings,
     loadModels,
