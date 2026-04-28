@@ -87,8 +87,7 @@
             }"
             shadow="never"
           >
-            <div v-if="message.role === 'user'" class="user-message">
-              {{ message.content }}
+            <div v-if="message.role === 'user'" class="user-message" v-html="highlightCommands(message.content)">
             </div>
             <div v-if="message.role === 'tool'">
               <div class="tool-result">
@@ -195,13 +194,46 @@
 
     <el-footer class="chat-footer">
       <div class="input-wrapper">
+        <!-- 命令下拉菜单 -->
+        <transition name="command-menu-fade">
+          <div v-if="showCommandMenu && filteredCommands.length > 0" class="command-menu">
+            <div class="command-menu-header">
+              <span class="command-menu-title">可用命令</span>
+              <span class="command-menu-hint">↑↓ 导航 · Enter 选择 · Esc 关闭</span>
+            </div>
+            <div class="command-menu-list">
+              <template v-for="[group, commands] in groupedCommands" :key="group">
+                <div class="command-group-header">
+                  {{ COMMAND_GROUP_LABELS[group] }}
+                </div>
+                <div
+                  v-for="cmd in commands"
+                  :key="cmd.name"
+                  :class="['command-item', { 'command-item-active': filteredCommands[selectedCommandIndex]?.name === cmd.name }]"
+                  @click="selectCommand(cmd)"
+                  @mouseenter="selectedCommandIndex = filteredCommands.findIndex(c => c.name === cmd.name)"
+                >
+                  <div class="command-item-main">
+                    <span class="command-name">/{{ cmd.name }}</span>
+                    <span class="command-label">{{ cmd.label }}</span>
+                  </div>
+                  <div class="command-description">{{ cmd.description }}</div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </transition>
+        
         <el-input
+          ref="inputRef"
           v-model="inputText"
           type="textarea"
           :rows="3"
-          placeholder="输入您的问题或写作需求..."
+          placeholder="输入您的问题或写作需求... (输入 / 查看可用命令)"
           :disabled="isLoading || !currentChat"
           @keydown.enter="handleKeyDown"
+          @input="handleInput"
+          @focus="handleFocus"
           class="chat-input"
         />
         <div class="input-actions">
@@ -254,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, computed } from 'vue';
+import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue';
 import type { Message } from '../../shared/types';
 import { storeToRefs } from 'pinia';
 import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight, ArrowDown } from '@element-plus/icons-vue';
@@ -268,6 +300,8 @@ import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
 import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
 import { marked } from 'marked';
+import { COMMANDS, COMMAND_GROUP_LABELS, CommandGroup, type Command } from '../utils/commands';
+import type { InputInstance } from 'element-plus';
 
 marked.setOptions({
   breaks: true,
@@ -306,6 +340,170 @@ const saveChapterNumber = ref(1);
 // 导航面板相关
 const isNavPanelVisible = ref(true);
 const activeMessageId = ref<string | null>(null);
+
+// 命令菜单相关
+const showCommandMenu = ref(false);
+const commandFilter = ref('');
+const selectedCommandIndex = ref(0);
+const inputRef = ref<InputInstance | null>(null);
+
+// 按分组过滤后的命令列表
+const groupedCommands = computed(() => {
+  const filter = commandFilter.value.toLowerCase();
+  const grouped = new Map<CommandGroup, Command[]>();
+  
+  for (const group of Object.values(CommandGroup)) {
+    const commands = COMMANDS.filter(cmd => {
+      if (cmd.group !== group) return false;
+      if (!filter) return true;
+      // 支持名称、标签、描述和别名过滤
+      return cmd.name.includes(filter) || 
+             cmd.label.includes(filter) || 
+             cmd.description.includes(filter) ||
+             cmd.aliases?.some(alias => alias.includes(filter));
+    });
+    if (commands.length > 0) {
+      grouped.set(group, commands);
+    }
+  }
+  
+  return grouped;
+});
+
+// 扁平化的过滤后命令列表（用于键盘导航）
+const filteredCommands = computed(() => {
+  const commands: Command[] = [];
+  for (const cmdList of groupedCommands.value.values()) {
+    commands.push(...cmdList);
+  }
+  return commands;
+});
+
+// 处理输入事件，检测斜杠命令
+const handleInput = () => {
+  const text = inputText.value;
+  
+  // 检查是否在输入命令（以 / 开头，且在当前行的开头）
+  if (text.startsWith('/')) {
+    // 提取命令过滤文本（/ 后面的内容，直到空格或行尾）
+    const spaceIndex = text.indexOf(' ');
+    const filterText = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
+    
+    // 只有在没有空格时才显示命令菜单（即还在输入命令名称）
+    if (spaceIndex === -1) {
+      commandFilter.value = filterText;
+      showCommandMenu.value = true;
+      selectedCommandIndex.value = 0;
+      return;
+    }
+  }
+  
+  // 不显示命令菜单
+  showCommandMenu.value = false;
+  commandFilter.value = '';
+};
+
+// 处理输入框聚焦事件
+const handleFocus = () => {
+  const text = inputText.value;
+  if (text.startsWith('/') && !text.includes(' ')) {
+    commandFilter.value = text.slice(1);
+    showCommandMenu.value = true;
+    selectedCommandIndex.value = 0;
+  }
+};
+
+// 处理命令菜单的键盘事件
+const handleCommandMenuKeyDown = (event: KeyboardEvent) => {
+  if (!showCommandMenu.value) return false;
+  
+  const commands = filteredCommands.value;
+  if (commands.length === 0) return false;
+  
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      selectedCommandIndex.value = (selectedCommandIndex.value + 1) % commands.length;
+      scrollToSelectedCommand();
+      return true;
+      
+    case 'ArrowUp':
+      event.preventDefault();
+      selectedCommandIndex.value = (selectedCommandIndex.value - 1 + commands.length) % commands.length;
+      scrollToSelectedCommand();
+      return true;
+      
+    case 'Enter':
+      event.preventDefault();
+      selectCommand(commands[selectedCommandIndex.value]);
+      return true;
+      
+    case 'Escape':
+      event.preventDefault();
+      showCommandMenu.value = false;
+      return true;
+      
+    case 'Tab':
+      event.preventDefault();
+      selectCommand(commands[selectedCommandIndex.value]);
+      return true;
+      
+    default:
+      return false;
+  }
+};
+
+// 选择命令
+const selectCommand = (command: Command) => {
+  inputText.value = `/${command.name} `;
+  showCommandMenu.value = false;
+  commandFilter.value = '';
+  
+  // 聚焦输入框并将光标移到末尾
+  nextTick(() => {
+    if (inputRef.value) {
+      inputRef.value.focus();
+      const textarea = inputRef.value.textarea;
+      if (textarea) {
+        const length = inputText.value.length;
+        textarea.setSelectionRange(length, length);
+      }
+    }
+  });
+};
+
+// 滚动到选中的命令项
+const scrollToSelectedCommand = () => {
+  nextTick(() => {
+    const selectedElement = document.querySelector('.command-item-active');
+    if (selectedElement) {
+      selectedElement.scrollIntoView({ block: 'nearest' });
+    }
+  });
+};
+
+// 点击外部关闭命令菜单
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.command-menu') && !target.closest('.chat-input')) {
+    showCommandMenu.value = false;
+  }
+};
+
+// 监听命令过滤变化，重置选中索引
+watch(commandFilter, () => {
+  selectedCommandIndex.value = 0;
+});
+
+// 添加/移除点击外部事件监听
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+// 组件卸载时移除事件监听（Vue 3 自动处理，但为明确起见）
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
 
 // 智能滚动相关
 const messagesListRef = ref<HTMLElement | null>(null);  // 消息列表容器 ref
@@ -442,7 +640,50 @@ const renderMarkdown = (content: string) => {
   }
 };
 
+/**
+ * 高亮显示用户消息中的斜杠命令
+ * 将 /command 格式的文本包装为带样式的 span 标签
+ */
+const highlightCommands = (content: string): string => {
+  // 构建所有有效命令名称的正则表达式（包括别名）
+  const commandNames = COMMANDS.flatMap(cmd => [cmd.name, ...(cmd.aliases || [])]);
+  const pattern = new RegExp(`/(${commandNames.join('|')})(?=\\s|$|[^\\w])`, 'gi');
+  
+  // 转义 HTML 特殊字符，防止 XSS
+  const escapeHtml = (text: string): string => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  };
+  
+  // 分割文本，高亮命令部分
+  const parts = content.split(pattern);
+  const matches = content.match(pattern) || [];
+  
+  let result = '';
+  let matchIndex = 0;
+  
+  for (let i = 0; i < parts.length; i++) {
+    // 添加非命令文本（已转义）
+    result += escapeHtml(parts[i]);
+    
+    // 如果有匹配的命令，添加高亮版本
+    if (matchIndex < matches.length && i < parts.length - 1) {
+      const cmd = matches[matchIndex];
+      result += `<span class="command-highlight">${escapeHtml(cmd)}</span>`;
+      matchIndex++;
+    }
+  }
+  
+  return result;
+};
+
 const handleKeyDown = (event: KeyboardEvent) => {
+  // 先处理命令菜单的键盘事件
+  if (handleCommandMenuKeyDown(event)) {
+    return;
+  }
+  
   // Shift+Enter 允许正常换行
   if (event.shiftKey) {
     return;
@@ -806,6 +1047,19 @@ onMounted(async () => {
   line-height: 1.6;
 }
 
+/* 斜杠命令高亮样式 */
+.user-message :deep(.command-highlight) {
+  display: inline;
+  background-color: #e6f7ff;
+  color: #1890ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.95em;
+  font-weight: 600;
+  border: 1px solid #91d5ff;
+}
+
 .tool-result {
   padding: 8px;
   background: #f0f9eb;
@@ -922,6 +1176,111 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+}
+
+/* 命令菜单样式 */
+.command-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.command-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--el-fill-color-light);
+  border-bottom: 1px solid var(--el-border-color);
+  flex-shrink: 0;
+}
+
+.command-menu-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.command-menu-hint {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+
+.command-menu-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.command-group-header {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-lighter);
+}
+
+.command-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.command-item:hover,
+.command-item-active {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.command-item-active {
+  background-color: var(--el-color-primary-light-8);
+}
+
+.command-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.command-name {
+  font-weight: 600;
+  color: var(--el-color-primary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.command-label {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+}
+
+.command-description {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  padding-left: 0;
+}
+
+/* 命令菜单动画 */
+.command-menu-fade-enter-active,
+.command-menu-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.command-menu-fade-enter-from,
+.command-menu-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 .chat-input {
