@@ -84,8 +84,8 @@ router.post('/projects/:projectId/misc-records', asyncHandler(async (req: Reques
       id,
       projectId,
       title,
-      category || null,
-      content || null,
+      category ?? null,
+      content ?? null,
       orderIndex,
       createdAt,
       updatedAt
