@@ -29,6 +29,10 @@ export const buildSystemPrompt = (
 
   systemPrompt += customPrompt || '你是一个专业的小说创作助手。';
 
+  // 追加核心规则：不猜测不明确的设定，必须询问用户
+  systemPrompt += '\n\n## 核心规则\n';
+  systemPrompt += '对于不清楚、不明确的设定（包括但不限于角色外貌与性格特征、世界观规则、势力关系、情节细节等），你绝对不要自行猜测、编造或补充。你必须向用户询问并确认后，再基于用户的回答进行创作。';
+
   if (tools && tools.length > 0) {
     systemPrompt += '\n\n你可以使用工具来管理时间线、人物、主旨和杂项记录信息（create_timeline, update_timeline, delete_timeline, get_timeline, create_character, update_character, delete_character, get_character, update_theme, create_misc_record, update_misc_record, delete_misc_record, get_misc_record）。\n\n';
     systemPrompt += '重要：工具调用流程\n';
