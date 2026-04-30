@@ -79,7 +79,8 @@ export function getMigrationSQLs(): string[] {
     'ALTER TABLE characters ADD COLUMN deleted INTEGER DEFAULT 0',
     'ALTER TABLE characters ADD COLUMN deleted_at INTEGER DEFAULT NULL',
     'ALTER TABLE timeline_nodes ADD COLUMN deleted INTEGER DEFAULT 0',
-    'ALTER TABLE timeline_nodes ADD COLUMN deleted_at INTEGER DEFAULT NULL'
+    'ALTER TABLE timeline_nodes ADD COLUMN deleted_at INTEGER DEFAULT NULL',
+    'ALTER TABLE messages ADD COLUMN token_usage TEXT DEFAULT NULL'
   ];
 }
 

@@ -24,7 +24,8 @@ import type {
   MiscRecord,
   DbMiscRecordVersion,
   MiscRecordVersion,
-  ToolCall
+  ToolCall,
+  TokenUsage
 } from '@shared/types';
 
 /**
@@ -90,14 +91,33 @@ export function formatMessage(message: DbMessage): Message {
     orderIndex: message.order_index,
     deleted: message.deleted === 1,
     deletedAt: message.deleted_at ?? undefined,
-    tool_calls: undefined
+    tool_calls: undefined,
+    tokenUsage: undefined
   };
 
   if (message.tool_calls) {
     formatted.tool_calls = parseToolCalls(message.tool_calls) ?? undefined;
   }
 
+  if (message.token_usage) {
+    try {
+      formatted.tokenUsage = JSON.parse(message.token_usage) as TokenUsage;
+    } catch (e) {
+      console.error('Failed to parse token_usage:', e);
+    }
+  }
+
   return formatted;
+}
+
+/**
+ * 将 TokenUsage 对象序列化为数据库存储格式
+ * @param tokenUsage - TokenUsage 对象
+ * @returns JSON 字符串，输入为 undefined 时返回 null
+ */
+export function serializeTokenUsage(tokenUsage: TokenUsage | undefined): string | null {
+  if (!tokenUsage) return null;
+  return JSON.stringify(tokenUsage);
 }
 
 /**

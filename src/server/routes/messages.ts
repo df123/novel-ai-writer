@@ -2,7 +2,7 @@
 import express, { Router, Request, Response } from 'express';
 import { query, run, saveDB } from '../db';
 import { generateId, now } from '../utils/helpers';
-import { parseToolCalls } from '../utils/formatters';
+import { parseToolCalls, serializeTokenUsage } from '../utils/formatters';
 import { asyncHandler } from '../middleware/errorHandler';
 import type { DbMessage, ToolCall } from '@shared/types';
 
@@ -17,6 +17,7 @@ interface CreateMessageRequestBody {
   reasoning_content?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  tokenUsage?: import('@shared/types').TokenUsage;
 }
 
 /**
@@ -28,6 +29,7 @@ interface UpdateMessageRequestBody {
   reasoning_content?: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  tokenUsage?: import('@shared/types').TokenUsage;
 }
 
 /**
@@ -48,6 +50,7 @@ router.get('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Res
     ...msg,
     tool_calls: parseToolCalls(msg.tool_calls),
     reasoning_content: msg.reasoning_content,
+    token_usage: msg.token_usage,
   }));
   
   res.json(messagesWithParsedCalls);
@@ -58,15 +61,16 @@ router.get('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Res
  */
 router.post('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Response) => {
   const { chatId } = req.params;
-  const { role, content, reasoning_content, tool_calls, tool_call_id } = req.body as CreateMessageRequestBody;
+  const { role, content, reasoning_content, tool_calls, tool_call_id, tokenUsage } = req.body as CreateMessageRequestBody;
   
   const id = generateId();
   const timestamp = now();
   const toolCallsJson = tool_calls ? JSON.stringify(tool_calls) : null;
+  const tokenUsageJson = serializeTokenUsage(tokenUsage);
 
   run(
-    'INSERT INTO messages (id, chat_id, role, content, reasoning_content, tool_calls, tool_call_id, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, chatId, role, content, reasoning_content ?? null, toolCallsJson, tool_call_id || null, timestamp]
+    'INSERT INTO messages (id, chat_id, role, content, reasoning_content, tool_calls, tool_call_id, token_usage, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, chatId, role, content, reasoning_content ?? null, toolCallsJson, tool_call_id || null, tokenUsageJson, timestamp]
   );
 
   run('UPDATE chats SET updated_at = ? WHERE id = ?', [timestamp, chatId]);
@@ -77,7 +81,8 @@ router.post('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Re
   const message = messages[0];
   const messageWithParsedCalls = {
     ...message,
-    tool_calls: parseToolCalls(message.tool_calls)
+    tool_calls: parseToolCalls(message.tool_calls),
+    token_usage: message.token_usage
   };
   
   res.status(201).json(messageWithParsedCalls);
@@ -88,7 +93,7 @@ router.post('/chats/:chatId/messages', asyncHandler(async (req: Request, res: Re
  */
 router.put('/messages/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { role, content, reasoning_content, tool_calls, tool_call_id } = req.body as UpdateMessageRequestBody;
+  const { role, content, reasoning_content, tool_calls, tool_call_id, tokenUsage } = req.body as UpdateMessageRequestBody;
 
   const existing = query<DbMessage>('SELECT * FROM messages WHERE id = ?', [id]);
   if (existing.length === 0) {
@@ -98,10 +103,11 @@ router.put('/messages/:id', asyncHandler(async (req: Request, res: Response) => 
 
   const existingMessage = existing[0];
   const toolCallsJson = tool_calls ? JSON.stringify(tool_calls) : null;
+  const tokenUsageJson = serializeTokenUsage(tokenUsage);
   
   run(
-    'UPDATE messages SET role = ?, content = ?, reasoning_content = ?, tool_calls = ?, tool_call_id = ? WHERE id = ?',
-    [role, content, reasoning_content ?? null, toolCallsJson, tool_call_id || null, id]
+    'UPDATE messages SET role = ?, content = ?, reasoning_content = ?, tool_calls = ?, tool_call_id = ?, token_usage = ? WHERE id = ?',
+    [role, content, reasoning_content ?? null, toolCallsJson, tool_call_id || null, tokenUsageJson, id]
   );
 
   run('UPDATE chats SET updated_at = ? WHERE id = ?', [now(), existingMessage.chat_id]);
@@ -112,7 +118,8 @@ router.put('/messages/:id', asyncHandler(async (req: Request, res: Response) => 
   const message = messages[0];
   const messageWithParsedCalls = {
     ...message,
-    tool_calls: parseToolCalls(message.tool_calls)
+    tool_calls: parseToolCalls(message.tool_calls),
+    token_usage: message.token_usage
   };
   
   res.json(messageWithParsedCalls);

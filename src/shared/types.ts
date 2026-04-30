@@ -19,6 +19,24 @@ export interface ToolCall {
 }
 
 /**
+ * LLM API 返回的 token 用量（统一接口）
+ */
+export interface TokenUsage {
+  /** 输入 token 数 */
+  promptTokens: number;
+  /** 输出 token 数 */
+  completionTokens: number;
+  /** 总 token 数 */
+  totalTokens: number;
+  /** 缓存命中 token（DeepSeek 专有） */
+  promptCacheHitTokens?: number;
+  /** 缓存未命中 token（DeepSeek 专有） */
+  promptCacheMissTokens?: number;
+  /** 思考 token 数 */
+  reasoningTokens?: number;
+}
+
+/**
  * 聊天消息接口
  * 表示一次对话中的单条消息
  */
@@ -55,6 +73,9 @@ export interface Message {
   
   /** 消息在聊天中的顺序索引 */
   orderIndex: number;
+
+  /** 该消息的 token 用量（仅助手角色，可选） */
+  tokenUsage?: TokenUsage;
 }
 
 /**
@@ -364,6 +385,8 @@ export interface DbMessage {
   order_index: number;
   deleted: number;
   deleted_at: number | null;
+  /** token 用量 JSON 字符串 */
+  token_usage: string | null;
 }
 
 /**

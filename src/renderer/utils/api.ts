@@ -32,8 +32,8 @@ export const chatApi = {
 // Messages
 export const messageApi = {
   list: (chatId: string) => api.get(`/chats/${chatId}/messages`),
-  create: (chatId: string, data: { role: string; content: string; reasoning_content?: string; tool_calls?: any[]; tool_call_id?: string }) => api.post(`/chats/${chatId}/messages`, data),
-  update: (id: string, data: { role: string; content: string; reasoning_content?: string; tool_calls?: any[]; tool_call_id?: string }) => api.put(`/messages/${id}`, data),
+  create: (chatId: string, data: { role: string; content: string; reasoning_content?: string; tool_calls?: any[]; tool_call_id?: string; tokenUsage?: any }) => api.post(`/chats/${chatId}/messages`, data),
+  update: (id: string, data: { role: string; content: string; reasoning_content?: string; tool_calls?: any[]; tool_call_id?: string; tokenUsage?: any }) => api.put(`/messages/${id}`, data),
   delete: (id: string) => api.delete(`/messages/${id}`),
   batchDelete: (ids: string[]) => api.post('/messages/batch-delete', { ids }),
 };

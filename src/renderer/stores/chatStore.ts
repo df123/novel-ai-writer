@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { Message, Chat, TimelineNode, Character, Chapter } from '../../shared/types';
+import { Message, Chat, TimelineNode, Character, Chapter, TokenUsage } from '../../shared/types';
 import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi, miscRecordApi } from '../utils/api';
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
@@ -38,6 +38,16 @@ interface StreamChunk {
       tool_calls?: ToolCall[];
     };
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    prompt_cache_hit_tokens?: number;
+    prompt_cache_miss_tokens?: number;
+    completion_tokens_details?: {
+      reasoning_tokens?: number;
+    };
+  } | null;
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -86,6 +96,7 @@ export const useChatStore = defineStore('chat', () => {
       ...m,
       orderIndex: i + 1,
       reasoning_content: m.reasoning_content ?? undefined,
+      tokenUsage: m.token_usage ? (typeof m.token_usage === 'string' ? JSON.parse(m.token_usage) : m.token_usage) : undefined,
     }));
     updateTokenCount();
   };
@@ -866,6 +877,7 @@ export const useChatStore = defineStore('chat', () => {
       let fullReasoning = '';
       const accumulatedToolCalls: Record<number, ToolCall> = {};
       let buffer = '';
+      let tokenUsage: TokenUsage | null = null;
 
       assistantMessageId = generateId();
       // 追踪创建的消息 ID
@@ -934,6 +946,17 @@ export const useChatStore = defineStore('chat', () => {
                   }
                 }
               }
+              // 提取 token usage（在最后一个包含 usage 的 chunk 中）
+              if (parsed.usage) {
+                tokenUsage = {
+                  promptTokens: parsed.usage.prompt_tokens,
+                  completionTokens: parsed.usage.completion_tokens,
+                  totalTokens: parsed.usage.total_tokens,
+                  promptCacheHitTokens: parsed.usage.prompt_cache_hit_tokens,
+                  promptCacheMissTokens: parsed.usage.prompt_cache_miss_tokens,
+                  reasoningTokens: parsed.usage.completion_tokens_details?.reasoning_tokens,
+                };
+              }
             } catch (e) {
               console.error('Failed to parse stream chunk:', e, data);
             }
@@ -967,6 +990,7 @@ export const useChatStore = defineStore('chat', () => {
               content: finalContent,
               reasoning_content: finalReasoning,
               tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+              tokenUsage: tokenUsage ?? undefined,
             } : m
           );
         }
@@ -977,6 +1001,7 @@ export const useChatStore = defineStore('chat', () => {
             content: finalContent,
             reasoning_content: finalReasoning,
             tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+            tokenUsage: tokenUsage ?? undefined,
           });
           const newMessageIndex = messages.value.findIndex(m => m.id === assistantMessageId);
           if (newMessageIndex !== -1) {

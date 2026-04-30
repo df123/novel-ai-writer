@@ -17,8 +17,11 @@
           <el-option label="高" value="high" />
           <el-option label="最大" value="max" />
         </el-select>
-        <el-tag size="small" type="info">
-          {{ totalTokens }} tokens
+        <el-tag v-if="accumulatedTokenUsage.totalTokens > 0" size="small" type="info">
+          累计: {{ formatTokenCount(accumulatedTokenUsage.totalTokens) }} tokens
+        </el-tag>
+        <el-tag v-else size="small" type="info">
+          ~{{ totalTokens }} tokens
         </el-tag>
       </div>
     </el-header>
@@ -130,6 +133,26 @@
                 <div v-if="isStreaming && message.role === 'assistant' && index === messages.length - 1" class="markdown-content" v-html="renderMarkdown(displayContent(message))"></div>
                 <div v-else class="markdown-content" v-html="renderMarkdown(displayContent(message))"></div>
               </div>
+            </div>
+            <!-- Token 用量展示 -->
+            <div v-if="message.role === 'assistant' && message.tokenUsage" class="token-usage-bar">
+              <span class="token-usage-item">输入: {{ formatTokenCount(message.tokenUsage.promptTokens) }}</span>
+              <span class="token-usage-separator">|</span>
+              <span class="token-usage-item">输出: {{ formatTokenCount(message.tokenUsage.completionTokens) }}</span>
+              <span class="token-usage-separator">|</span>
+              <span class="token-usage-item">总计: {{ formatTokenCount(message.tokenUsage.totalTokens) }}</span>
+              <template v-if="message.tokenUsage.promptCacheHitTokens !== undefined">
+                <span class="token-usage-separator">|</span>
+                <span class="token-usage-item">缓存命中: {{ formatTokenCount(message.tokenUsage.promptCacheHitTokens) }}</span>
+              </template>
+              <template v-if="message.tokenUsage.promptCacheMissTokens !== undefined">
+                <span class="token-usage-separator">|</span>
+                <span class="token-usage-item">缓存未命中: {{ formatTokenCount(message.tokenUsage.promptCacheMissTokens) }}</span>
+              </template>
+              <template v-if="message.tokenUsage.reasoningTokens !== undefined && message.tokenUsage.reasoningTokens > 0">
+                <span class="token-usage-separator">|</span>
+                <span class="token-usage-item">思考: {{ formatTokenCount(message.tokenUsage.reasoningTokens) }}</span>
+              </template>
             </div>
           </el-card>
         </div>
@@ -287,7 +310,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue';
-import type { Message } from '../../shared/types';
+import type { Message, TokenUsage } from '../../shared/types';
 import { storeToRefs } from 'pinia';
 import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight, ArrowDown } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
@@ -325,6 +348,27 @@ const { theme: currentTheme } = storeToRefs(themeStore);
 const { loadModels, updateSettings } = settingsStore;
 
 const { createChat, sendMessage, cancelMessage, deleteMessage } = chatStore;
+
+/** 累计 token 用量（基于有实际 tokenUsage 数据的 assistant 消息） */
+const accumulatedTokenUsage = computed(() => {
+  const result = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  for (const msg of messages.value) {
+    if (msg.role === 'assistant' && msg.tokenUsage) {
+      result.promptTokens += msg.tokenUsage.promptTokens;
+      result.completionTokens += msg.tokenUsage.completionTokens;
+      result.totalTokens += msg.tokenUsage.totalTokens;
+    }
+  }
+  return result;
+});
+
+/** 格式化 token 数量显示 */
+const formatTokenCount = (count: number): string => {
+  if (count >= 1000) {
+    return (count / 1000).toFixed(1) + 'k';
+  }
+  return String(count);
+};
 
 const currentModel = computed(() => selectedModel.value || 'deepseek-v4-flash');
 
@@ -1590,5 +1634,27 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Token 用量展示样式 */
+.token-usage-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #ebeef5;
+  font-size: 11px;
+  color: #909399;
+}
+
+.token-usage-item {
+  white-space: nowrap;
+}
+
+.token-usage-separator {
+  margin: 0 4px;
+  color: #dcdfe6;
 }
 </style>

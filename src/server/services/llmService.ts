@@ -135,6 +135,11 @@ export async function chatStream(
     requestBody.reasoning_effort = options.reasoning_effort;
   }
 
+  // DeepSeek 支持 stream_options 以在流式响应中返回 usage
+  if (provider === 'deepseek') {
+    requestBody.stream_options = { include_usage: true };
+  }
+
   const response = await fetch(apiUrl, {
     method: 'POST',
     headers: headers,
