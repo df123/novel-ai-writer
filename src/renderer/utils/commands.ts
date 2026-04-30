@@ -341,6 +341,50 @@ function calculateMatchScore(input: string, target: string): number {
 }
 
 /**
+ * 解析输入中的所有斜杠命令
+ * 
+ * 从用户输入中提取所有匹配 /xxx 格式的命令名称
+ * 
+ * @param input 用户输入文本
+ * @returns 匹配到的命令名称数组（不含斜杠），如 ['ask', 'timeline']
+ */
+export function parseCommands(input: string): string[] {
+  const matches = input.match(/\/\w+/g);
+  if (!matches) return [];
+  return matches.map(cmd => cmd.slice(1).toLowerCase());
+}
+
+/**
+ * 检查指定命令是否是有效命令
+ * 
+ * @param cmd 命令名称（含斜杠），如 '/ask'
+ * @returns 是否是有效的命令
+ */
+export function isValidCommand(cmd: string): boolean {
+  const name = cmd.startsWith('/') ? cmd.slice(1).toLowerCase() : cmd.toLowerCase();
+  return COMMANDS.some(c => 
+    c.name === name || 
+    c.aliases?.some(alias => alias.toLowerCase() === name)
+  );
+}
+
+/**
+ * 检查输入中是否包含有效命令
+ * 
+ * @param input 用户输入文本
+ * @returns 是否包含至少一个有效命令
+ */
+export function hasCommands(input: string): boolean {
+  const commandNames = parseCommands(input);
+  return commandNames.some(name => 
+    COMMANDS.some(cmd => 
+      cmd.name === name || 
+      cmd.aliases?.some(alias => alias.toLowerCase() === name)
+    )
+  );
+}
+
+/**
  * 检查输入是否是命令格式
  * 
  * @param input 用户输入
