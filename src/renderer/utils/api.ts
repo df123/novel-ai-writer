@@ -105,7 +105,21 @@ export const llmApi = {
   chat: (
     provider: string,
     messages: any[],
-    options?: { model?: string; temperature?: number; apiKey?: string; tools?: any[]; thinking?: { type: string }; reasoning_effort?: string },
+    options?: {
+      model?: string;
+      temperature?: number;
+      apiKey?: string;
+      tools?: any[];
+      thinking?: { type: string };
+      reasoning_effort?: string;
+      cliproxyBaseUrl?: string;
+      zaiReasoningEnabled?: boolean;
+      zaiReasoningEffort?: string;
+      opencodeReasoningEnabled?: boolean;
+      opencodeReasoningEffort?: string;
+      cliproxyReasoningEnabled?: boolean;
+      cliproxyReasoningEffort?: string;
+    },
     signal?: AbortSignal
   ) => {
     return fetch(`${API_BASE_URL}/llm/chat`, {
@@ -127,8 +141,8 @@ export const settingsApi = {
 
 // Models
 export const modelsApi = {
-  list: (provider: string, apiKey: string) =>
-    api.post(`/llm/models/${provider}`, { apiKey }),
+  list: (provider: string, apiKey: string, baseUrl?: string) =>
+    api.post(`/llm/models/${provider}`, { apiKey, baseUrl }),
 };
 
 // Prompts

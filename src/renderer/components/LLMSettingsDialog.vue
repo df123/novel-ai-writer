@@ -51,6 +51,156 @@
           />
         </div>
       </el-tab-pane>
+      <el-tab-pane label="Z.AI" name="zai">
+        <div class="tab-content">
+          <p class="description">
+            输入您的 Z.AI Coding Plan API 密钥。该端点仅适用于编码/Agent 场景，请求会按 OpenCode 客户端方式发送。
+          </p>
+          <el-input
+            v-model="zaiKey"
+            type="password"
+            placeholder="sk-..."
+            show-password
+          />
+          <el-alert
+            v-if="decryptFailedKeys.includes('zai_api_key')"
+            title="此密钥因加密密钥变化无法解密，请重新输入"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
+          />
+          <p class="note">
+            思考强度适用于 GLM-5.2 / GLM-5.3，Coding Plan 端点会按官方规则映射。
+            GLM-5.3 不支持关闭思考，none/minimal/low 会映射为 low；GLM-5.2 的 none/minimal 会停止思考。
+          </p>
+          <div class="provider-option">
+            <div class="switch-item">
+              <el-switch v-model="zaiReasoningValue" />
+              <span class="switch-label">启用思考强度</span>
+            </div>
+            <el-select
+              v-model="zaiEffortValue"
+              :disabled="!zaiReasoningValue"
+              size="small"
+              class="effort-select"
+            >
+              <el-option
+                label="最大 max"
+                value="max"
+              />
+              <el-option
+                label="超高高 xhigh"
+                value="xhigh"
+              />
+              <el-option
+                label="高 high"
+                value="high"
+              />
+              <el-option
+                label="中 medium"
+                value="medium"
+              />
+              <el-option
+                label="低 low"
+                value="low"
+              />
+              <el-option
+                label="极低 minimal"
+                value="minimal"
+              />
+              <el-option
+                label="none（GLM-5.2 关闭）"
+                value="none"
+              />
+            </el-select>
+          </div>
+        </div>
+      </el-tab-pane>
+      <el-tab-pane label="OpenCode" name="opencode">
+        <div class="tab-content">
+          <p class="description">
+            输入您的 OpenCode API 密钥。模型列表会同时包含 Zen（opencode/）和 Go（opencode-go/）端点。
+          </p>
+          <el-input
+            v-model="opencodeKey"
+            type="password"
+            placeholder="sk-..."
+            show-password
+          />
+          <el-alert
+            v-if="decryptFailedKeys.includes('opencode_api_key')"
+            title="此密钥因加密密钥变化无法解密，请重新输入"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
+          />
+          <div class="provider-option">
+            <div class="switch-item">
+              <el-switch v-model="opencodeReasoningValue" />
+              <span class="switch-label">启用推理强度</span>
+            </div>
+            <el-select
+              v-model="opencodeEffortValue"
+              :disabled="!opencodeReasoningValue"
+              size="small"
+              class="effort-select"
+            >
+              <el-option label="不推理" value="none" />
+              <el-option label="极低" value="minimal" />
+              <el-option label="低" value="low" />
+              <el-option label="中" value="medium" />
+              <el-option label="高" value="high" />
+            </el-select>
+          </div>
+        </div>
+      </el-tab-pane>
+      <el-tab-pane label="CLI Proxy API" name="cliproxy">
+        <div class="tab-content">
+          <p class="description">
+            输入本地 CLI Proxy API 的密钥和 OpenAI 兼容基础地址。模型列表会从该服务的 /models 接口动态获取。
+          </p>
+          <el-input
+            v-model="cliproxyKey"
+            type="password"
+            placeholder="API Key"
+            show-password
+            class="stack-input"
+          />
+          <el-input
+            v-model="cliproxyBaseUrlValue"
+            placeholder="http://127.0.0.1:8317/v1"
+            class="stack-input"
+          />
+          <el-alert
+            v-if="decryptFailedKeys.includes('cliproxy_api_key')"
+            title="此密钥因加密密钥变化无法解密，请重新输入"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
+          />
+          <div class="provider-option">
+            <div class="switch-item">
+              <el-switch v-model="cliproxyReasoningValue" />
+              <span class="switch-label">启用推理强度</span>
+            </div>
+            <el-select
+              v-model="cliproxyEffortValue"
+              :disabled="!cliproxyReasoningValue"
+              size="small"
+              class="effort-select"
+            >
+              <el-option label="自动" value="auto" />
+              <el-option label="不推理" value="none" />
+              <el-option label="低" value="low" />
+              <el-option label="中" value="medium" />
+              <el-option label="高" value="high" />
+            </el-select>
+          </div>
+        </div>
+      </el-tab-pane>
       <el-tab-pane label="模型参数" name="params">
         <div class="tab-content">
           <div class="param-section">
@@ -107,6 +257,15 @@
       <el-button v-if="activeTab === 'openrouter'" type="primary" @click="handleSaveOpenRouter">
         保存OpenRouter密钥
       </el-button>
+      <el-button v-if="activeTab === 'zai'" type="primary" @click="handleSaveZai">
+        保存Z.AI设置
+      </el-button>
+      <el-button v-if="activeTab === 'opencode'" type="primary" @click="handleSaveOpencode">
+        保存OpenCode设置
+      </el-button>
+      <el-button v-if="activeTab === 'cliproxy'" type="primary" @click="handleSaveCliproxy">
+        保存CLI Proxy API设置
+      </el-button>
     </template>
   </el-dialog>
 </template>
@@ -128,8 +287,23 @@ const emit = defineEmits<{
 }>();
 
 const settingsStore = useSettingsStore();
-const { deepseekApiKey, openrouterApiKey, temperature, showThinkingContent, showToolCalls, decryptFailedKeys } = storeToRefs(settingsStore);
-const { loadSettings, updateSettings } = settingsStore;
+const {
+  deepseekApiKey,
+  openrouterApiKey,
+  zaiApiKey,
+  opencodeApiKey,
+  cliproxyApiKey,
+  cliproxyBaseUrl,
+  temperature,
+  showThinkingContent,
+  showToolCalls,
+  opencodeReasoningEnabled,
+  opencodeReasoningEffort,
+  cliproxyReasoningEnabled,
+  cliproxyReasoningEffort,
+  decryptFailedKeys,
+} = storeToRefs(settingsStore);
+const { loadSettings, updateSettings, loadModels } = settingsStore;
 
 const visible = computed({
   get: () => props.modelValue,
@@ -139,9 +313,19 @@ const visible = computed({
 const activeTab = ref('deepseek');
 const deepseekKey = ref('');
 const openrouterKey = ref('');
+const zaiKey = ref('');
+const opencodeKey = ref('');
+const cliproxyKey = ref('');
+const cliproxyBaseUrlValue = ref('http://127.0.0.1:8317/v1');
 const tempValue = ref(0.7);
 const showThinkingValue = ref(false);
 const showToolCallsValue = ref(false);
+const zaiReasoningValue = ref(true);
+const zaiEffortValue = ref('max');
+const opencodeReasoningValue = ref(false);
+const opencodeEffortValue = ref('none');
+const cliproxyReasoningValue = ref(false);
+const cliproxyEffortValue = ref('auto');
 
 watch(visible, async (val) => {
   if (val) {
@@ -149,8 +333,18 @@ watch(visible, async (val) => {
     tempValue.value = temperature.value;
     deepseekKey.value = deepseekApiKey.value;
     openrouterKey.value = openrouterApiKey.value;
+    zaiKey.value = zaiApiKey.value;
+    opencodeKey.value = opencodeApiKey.value;
+    cliproxyKey.value = cliproxyApiKey.value;
+    cliproxyBaseUrlValue.value = cliproxyBaseUrl.value;
     showThinkingValue.value = showThinkingContent.value;
     showToolCallsValue.value = showToolCalls.value;
+    zaiReasoningValue.value = settingsStore.zaiReasoningEnabled;
+    zaiEffortValue.value = settingsStore.zaiReasoningEffort;
+    opencodeReasoningValue.value = opencodeReasoningEnabled.value;
+    opencodeEffortValue.value = opencodeReasoningEffort.value;
+    cliproxyReasoningValue.value = cliproxyReasoningEnabled.value;
+    cliproxyEffortValue.value = cliproxyReasoningEffort.value;
   }
 });
 
@@ -172,9 +366,62 @@ const handleSaveOpenRouter = async () => {
   }
 };
 
+const handleSaveZai = async () => {
+  try {
+    await updateSettings({
+      zaiApiKey: zaiKey.value,
+      zaiReasoningEnabled: zaiReasoningValue.value,
+      zaiReasoningEffort: zaiEffortValue.value,
+    });
+    if (settingsStore.selectedProvider === 'zai') {
+      await loadModels('zai');
+    }
+    ElMessage.success('Z.AI设置已保存');
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error as Error).message);
+  }
+};
+
+const handleSaveOpencode = async () => {
+  try {
+    await updateSettings({
+      opencodeApiKey: opencodeKey.value,
+      opencodeReasoningEnabled: opencodeReasoningValue.value,
+      opencodeReasoningEffort: opencodeEffortValue.value,
+    });
+    if (settingsStore.selectedProvider === 'opencode') {
+      await loadModels('opencode');
+    }
+    ElMessage.success('OpenCode设置已保存');
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error as Error).message);
+  }
+};
+
+const handleSaveCliproxy = async () => {
+  try {
+    await updateSettings({
+      cliproxyApiKey: cliproxyKey.value,
+      cliproxyBaseUrl: cliproxyBaseUrlValue.value,
+      cliproxyReasoningEnabled: cliproxyReasoningValue.value,
+      cliproxyReasoningEffort: cliproxyEffortValue.value,
+    });
+    if (settingsStore.selectedProvider === 'cliproxy') {
+      await loadModels('cliproxy');
+    }
+    ElMessage.success('CLI Proxy API设置已保存');
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error as Error).message);
+  }
+};
+
 const handleSaveParams = async () => {
   try {
-    await updateSettings({ temperature: tempValue.value });
+    await updateSettings({
+      temperature: tempValue.value,
+      showThinkingContent: showThinkingValue.value,
+      showToolCalls: showToolCallsValue.value,
+    });
     ElMessage.success('参数设置已保存');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
@@ -184,7 +431,19 @@ const handleSaveParams = async () => {
 const handleClose = () => {
   deepseekKey.value = deepseekApiKey.value;
   openrouterKey.value = openrouterApiKey.value;
+  zaiKey.value = zaiApiKey.value;
+  opencodeKey.value = opencodeApiKey.value;
+  cliproxyKey.value = cliproxyApiKey.value;
+  cliproxyBaseUrlValue.value = cliproxyBaseUrl.value;
   tempValue.value = temperature.value;
+  showThinkingValue.value = showThinkingContent.value;
+  showToolCallsValue.value = showToolCalls.value;
+  zaiReasoningValue.value = settingsStore.zaiReasoningEnabled;
+  zaiEffortValue.value = settingsStore.zaiReasoningEffort;
+  opencodeReasoningValue.value = opencodeReasoningEnabled.value;
+  opencodeEffortValue.value = opencodeReasoningEffort.value;
+  cliproxyReasoningValue.value = cliproxyReasoningEnabled.value;
+  cliproxyEffortValue.value = cliproxyReasoningEffort.value;
   visible.value = false;
 };
 </script>
@@ -241,5 +500,30 @@ const handleClose = () => {
 
 .decrypt-warning {
   margin-top: 12px;
+}
+
+.stack-input + .stack-input {
+  margin-top: 12px;
+}
+
+.provider-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.switch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switch-label {
+  font-size: 14px;
+}
+
+.effort-select {
+  width: 110px;
 }
 </style>

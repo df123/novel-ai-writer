@@ -256,6 +256,9 @@ export interface Model {
   
   /** 模型显示名称 */
   name: string;
+
+  /** 模型所属服务（用于区分 OpenCode Zen / Go） */
+  provider?: string;
   
   /** 模型价格描述（可选） */
   price?: string;

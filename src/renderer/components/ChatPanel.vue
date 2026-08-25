@@ -6,10 +6,14 @@
         <el-select v-model="selectedProvider" size="small" class="provider-select" @change="handleProviderChange">
           <el-option label="DeepSeek" value="deepseek" />
           <el-option label="OpenRouter" value="openrouter" />
+          <el-option label="Z.AI" value="zai" />
+          <el-option label="OpenCode (Zen/Go)" value="opencode" />
+          <el-option label="CLI Proxy API" value="cliproxy" />
         </el-select>
         <el-select v-model="selectedModel" size="small" class="model-select" filterable :loading="isLoadingModels" @change="handleModelChange" placeholder="选择模型">
           <el-option v-for="model in models" :key="model.id" :label="model.name" :value="model.id">
             <span>{{ model.name }}</span>
+            <span v-if="model.provider" class="model-provider">{{ model.provider }}</span>
             <span v-if="model.price" class="model-price">{{ model.price }}</span>
           </el-option>
         </el-select>
@@ -746,7 +750,7 @@ const handleSend = async () => {
     }
     await sendMessage(inputText.value, {
       systemPrompt: '你是一个专业的小说写作助手。',
-      providerName: selectedProvider.value as 'deepseek' | 'openrouter',
+      providerName: selectedProvider.value as 'deepseek' | 'openrouter' | 'zai' | 'opencode' | 'cliproxy',
       modelName: currentModel.value,
     });
     inputText.value = '';
@@ -786,7 +790,10 @@ const handleMessageCommand = async (command: string, message: Message) => {
 
 const handleProviderChange = async () => {
   await loadModels(selectedProvider.value);
-  await updateSettings({ selectedProvider: selectedProvider.value });
+  await updateSettings({
+    selectedProvider: selectedProvider.value,
+    selectedModel: selectedModel.value,
+  });
 };
 
 const handleModelChange = async () => {
@@ -899,6 +906,12 @@ onMounted(async () => {
 .model-price {
   float: right;
   color: #909399;
+  font-size: 12px;
+}
+
+.model-provider {
+  margin-left: 8px;
+  color: #67c23a;
   font-size: 12px;
 }
 

@@ -17,6 +17,10 @@ export interface LLMProvider {
   apiUrl: string;
   models?: LLMModel[];
   modelsUrl?: string;
+  responsesUrl?: string;
+  goApiUrl?: string;
+  goModelsUrl?: string;
+  goResponsesUrl?: string;
 }
 
 /**
@@ -58,5 +62,27 @@ export const LLM_PROVIDERS: LLMProviders = {
   openrouter: {
     apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
     modelsUrl: 'https://openrouter.ai/api/v1/models'
+  },
+  zai: {
+    apiUrl: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    models: [
+      { id: 'glm-5.3', name: 'GLM-5.3' },
+      { id: 'glm-5.2', name: 'GLM-5.2' },
+    ]
+  },
+  opencode: {
+    apiUrl: 'https://opencode.ai/zen/v1/chat/completions',
+    modelsUrl: 'https://opencode.ai/zen/v1/models',
+    responsesUrl: 'https://opencode.ai/zen/v1/responses',
+    goApiUrl: 'https://opencode.ai/zen/go/v1/chat/completions',
+    goModelsUrl: 'https://opencode.ai/zen/go/v1/models',
+    goResponsesUrl: 'https://opencode.ai/zen/go/v1/responses'
+  },
+  cliproxy: {
+    apiUrl: 'chat/completions',
+    modelsUrl: 'models'
   }
 };
+
+/** CLI Proxy API 默认地址 */
+export const CLIPROXY_DEFAULT_BASE_URL = 'http://127.0.0.1:8317/v1';

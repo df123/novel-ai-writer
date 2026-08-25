@@ -9,7 +9,7 @@
 - **人物线管理**：创建角色设定、关系网络和发展轨迹，支持版本管理
 - **上下文注入**：将选中的时间线和人物信息注入到对话中
 - **版本管理**：为时间线节点和人物创建版本历史，支持回退到任意版本
-- **多LLM提供商**：支持DeepSeek、OpenRouter等主流LLM服务
+- **多LLM提供商**：支持DeepSeek、OpenRouter、Z.AI、OpenCode Zen/Go和CLI Proxy API
 - **思考模式**：支持LLM的推理/思考过程显示
 - **导出功能**：支持导出为Markdown和文本格式
 
@@ -100,7 +100,7 @@ pnpm lint
 ## 使用说明
 
 1. **创建项目**：首次运行时，点击"创建第一个项目"按钮
-2. **配置LLM**：在设置中输入您的API密钥（支持DeepSeek和OpenRouter）
+2. **配置LLM**：在设置中输入您的API密钥（支持DeepSeek、OpenRouter、Z.AI、OpenCode和CLI Proxy API）
 3. **添加时间节点**：在左侧时间线面板添加故事的时间节点
 4. **添加人物**：在右侧人物面板添加角色信息
 5. **选择上下文**：勾选需要注入到对话中的时间线和人物
@@ -151,13 +151,36 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 ## LLM 提供商配置
 
 ### DeepSeek
-- **模型**: `deepseek-chat`, `deepseek-reasoner`
+- **模型**: `deepseek-v4-flash`, `deepseek-v4-pro`
 - **API Endpoint**: `https://api.deepseek.com/v1/chat/completions`
 
 ### OpenRouter
 - **模型**: 从 API 动态获取
 - **API Endpoint**: `https://openrouter.ai/api/v1/chat/completions`
-- **思考模式**: 默认启用，使用 `reasoning: { enabled: true }`
+- **思考模式**: 使用上游模型默认行为；返回 `reasoning_content` 时可在界面展示
+
+### Z.AI Coding Plan
+- **模型**: `glm-5.3`, `glm-5.2`
+- **API Endpoint**: `https://api.z.ai/api/coding/paas/v4/chat/completions`
+- **请求特征**: 按 OpenCode 客户端方式发送会话亲和与 User-Agent，并默认开启 GLM thinking
+- **思考模式**: 可在设置中选择 `max/xhigh/high/medium/low/minimal/none`，默认 `max`
+- **说明**: Coding Plan 端点仅适用于编码/Agent 场景
+
+### OpenCode Zen / Go
+- **模型**: 从 Zen 与 Go 的 `/models` 接口动态获取，并分别使用 `opencode/`、`opencode-go/` 前缀路由
+- **API Endpoint**:
+  - Zen: `https://opencode.ai/zen/v1/chat/completions`
+  - Go: `https://opencode.ai/zen/go/v1/chat/completions`
+- **思考模式**: 可在设置中启用 `reasoning_effort`；Hy3 会自动映射为 `no_think/low/high`
+- **输出上限**: 单次请求最多 32000 tokens
+
+### CLI Proxy API
+- **模型**: 从本地 CLI Proxy API 的 `/models` 接口动态获取，模型 ID 使用 `cliproxy/` 前缀
+- **默认 Base URL**: `http://127.0.0.1:8317/v1`，可在设置中修改
+- **API Endpoint**: `<Base URL>/chat/completions`
+- **思考模式**: 可选择 `auto/none/low/medium/high`，由 CLI Proxy API 转换给上游模型
+
+> 详细路由和请求参数说明见 [docs/implementation/LLM_PROVIDER_EXPANSION.md](docs/implementation/LLM_PROVIDER_EXPANSION.md)。
 
 ## 为什么要用pnpm
 

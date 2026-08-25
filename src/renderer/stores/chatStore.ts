@@ -5,7 +5,7 @@ import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi, miscR
 import { generateId, estimateConversationTokens } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
 import { ALL_TOOLS } from '../utils/tools';
-import { ChatOptions } from './chatStoreTypes';
+import { ChatOptions, type LLMProviderName } from './chatStoreTypes';
 import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
@@ -156,13 +156,25 @@ export const useChatStore = defineStore('chat', () => {
       throw new Error('No chat or project selected');
     }
 
-    const providerName = options.providerName || 'deepseek';
-    const apiKey = providerName === 'deepseek'
-      ? settingsStore.deepseekApiKey
-      : settingsStore.openrouterApiKey;
+    const providerName: LLMProviderName = options.providerName || 'deepseek';
+    const providerLabels: Record<LLMProviderName, string> = {
+      deepseek: 'DeepSeek',
+      openrouter: 'OpenRouter',
+      zai: 'Z.AI',
+      opencode: 'OpenCode',
+      cliproxy: 'CLI Proxy API',
+    };
+    const apiKeyMap: Record<LLMProviderName, string> = {
+      deepseek: settingsStore.deepseekApiKey,
+      openrouter: settingsStore.openrouterApiKey,
+      zai: settingsStore.zaiApiKey,
+      opencode: settingsStore.opencodeApiKey,
+      cliproxy: settingsStore.cliproxyApiKey,
+    };
+    const apiKey = apiKeyMap[providerName];
 
     if (!apiKey) {
-      throw new Error(`请先配置 ${providerName === 'deepseek' ? 'DeepSeek' : 'OpenRouter'} API 密钥`);
+      throw new Error(`请先配置 ${providerLabels[providerName]} API 密钥`);
     }
 
     // 创建 AbortController 用于取消请求
@@ -863,6 +875,13 @@ export const useChatStore = defineStore('chat', () => {
           tools: ALL_TOOLS,
           thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
           reasoning_effort: providerName === 'deepseek' ? settingsStore.reasoningEffort : undefined,
+          cliproxyBaseUrl: providerName === 'cliproxy' ? settingsStore.cliproxyBaseUrl : undefined,
+          zaiReasoningEnabled: providerName === 'zai' ? settingsStore.zaiReasoningEnabled : undefined,
+          zaiReasoningEffort: providerName === 'zai' ? settingsStore.zaiReasoningEffort : undefined,
+          opencodeReasoningEnabled: providerName === 'opencode' ? settingsStore.opencodeReasoningEnabled : undefined,
+          opencodeReasoningEffort: providerName === 'opencode' ? settingsStore.opencodeReasoningEffort : undefined,
+          cliproxyReasoningEnabled: providerName === 'cliproxy' ? settingsStore.cliproxyReasoningEnabled : undefined,
+          cliproxyReasoningEffort: providerName === 'cliproxy' ? settingsStore.cliproxyReasoningEffort : undefined,
         },
         abortController.value?.signal
       );

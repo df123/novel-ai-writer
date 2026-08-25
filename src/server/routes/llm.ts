@@ -1,10 +1,8 @@
 // LLM API 路由
 import express, { Router, Request, Response } from 'express';
-import { chatStream, getModels } from '../services/llmService';
+import { chatStream, getModels, type LLMProvider } from '../services/llmService';
 import { asyncHandler } from '../middleware/errorHandler';
 import type { LLMChatMessage } from '../types/service.types';
-
-type LLMProvider = 'deepseek' | 'openrouter';
 
 const router: Router = express.Router();
 
@@ -17,8 +15,8 @@ router.post('/chat', asyncHandler(async (req: Request, res: Response) => {
 // 获取可用模型列表
 router.post('/models/:provider', asyncHandler(async (req: Request, res: Response) => {
   const { provider } = req.params;
-  const { apiKey } = req.body;
-  const models = await getModels(provider as LLMProvider, apiKey);
+  const { apiKey, baseUrl } = req.body;
+  const models = await getModels(provider as LLMProvider, apiKey, baseUrl);
   res.json({ models });
 }));
 
