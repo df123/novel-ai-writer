@@ -783,7 +783,7 @@ function convertResponsesEvent(
 }
 
 /** 表示端点或模型不支持 Responses API、且尚未产生输出时可安全回退的状态码 */
-const RESPONSES_FALLBACK_STATUSES = new Set([400, 404, 405, 410, 415, 501]);
+const RESPONSES_FALLBACK_STATUSES = new Set([400, 404, 405, 410, 415, 500, 501, 502, 503, 504]);
 
 function getResponsesUrl(endpoint: ProviderEndpoint): string {
   return endpoint.responsesUrl || endpoint.apiUrl.replace(/\/chat\/completions$/, '/responses');
@@ -794,6 +794,28 @@ async function readErrorMessage(response: FetchResponse): Promise<string> {
   return errorText.slice(0, 2000);
 }
 
+async function postLLMStream(
+  url: string,
+  headers: Record<string, string>,
+  body: string
+): Promise<FetchResponse> {
+  try {
+    return await fetch(url, { method: 'POST', headers, body });
+  } catch (error) {
+    const cause = (error as { cause?: unknown }).cause;
+    const causeMessage = cause instanceof Error
+      ? `${cause.name}: ${cause.message}`
+      : cause === undefined
+        ? ''
+        : String(cause);
+    const requestError = error as Error;
+    throw new Error(
+      `LLM API 请求失败 (${url}): ${requestError.message}` +
+      (causeMessage ? `; ${causeMessage}` : '')
+    );
+  }
+}
+
 async function fetchLLMStream(
   provider: LLMProvider,
   endpoint: ProviderEndpoint,
@@ -802,16 +824,16 @@ async function fetchLLMStream(
   options: ChatStreamOptions
 ): Promise<LLMStreamResult> {
   const responsesUrl = getResponsesUrl(endpoint);
-  const responsesResponse = await fetch(responsesUrl, {
-    method: 'POST',
-    headers: buildHeaders(provider, responsesUrl, options.apiKey),
-    body: JSON.stringify(buildResponsesPayload(
+  const responsesResponse = await postLLMStream(
+    responsesUrl,
+    buildHeaders(provider, responsesUrl, options.apiKey),
+    JSON.stringify(buildResponsesPayload(
       provider,
       endpoint.modelName,
       messages,
       options
     ))
-  });
+  );
 
   if (responsesResponse.ok) {
     return { response: responsesResponse, usesResponsesApi: true };
@@ -827,16 +849,16 @@ async function fetchLLMStream(
     `(${responsesResponse.status}), falling back to Chat Completions`
   );
 
-  const chatResponse = await fetch(endpoint.apiUrl, {
-    method: 'POST',
-    headers: buildHeaders(provider, endpoint.apiUrl, options.apiKey),
-    body: JSON.stringify(buildChatPayload(
+  const chatResponse = await postLLMStream(
+    endpoint.apiUrl,
+    buildHeaders(provider, endpoint.apiUrl, options.apiKey),
+    JSON.stringify(buildChatPayload(
       provider,
       endpoint.modelName,
       cleanedMessages,
       options
     ))
-  });
+  );
 
   if (!chatResponse.ok) {
     const chatError = await readErrorMessage(chatResponse);
@@ -952,6 +974,10 @@ export async function chatStream(
     console.error('[SSE] Stream error:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: '流传输中断' });
+    } else {
+      const details = error instanceof Error ? error.message.slice(0, 2000) : String(error);
+      res.write(`data: ${JSON.stringify({ error: '流传输中断', details })}\n\n`);
+      if (!doneSent) res.write('data: [DONE]\n\n');
     }
   } finally {
     res.end();

@@ -756,6 +756,7 @@ const handleSend = async () => {
     inputText.value = '';
   } catch (error) {
     console.error('Failed to send message:', error);
+    ElMessage.error(error instanceof Error && error.message ? error.message : '发送失败，请检查模型服务状态');
   }
 };
 

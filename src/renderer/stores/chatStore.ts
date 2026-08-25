@@ -30,6 +30,8 @@ interface ToolCall {
  * 流式响应块接口
  */
 interface StreamChunk {
+  error?: string;
+  details?: string;
   choices: Array<{
     delta: {
       role?: string;
@@ -886,6 +888,18 @@ export const useChatStore = defineStore('chat', () => {
         abortController.value?.signal
       );
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `LLM API error (${response.status})`;
+        try {
+          const parsedError = JSON.parse(errorText) as { error?: string };
+          if (parsedError.error) errorMessage = parsedError.error;
+        } catch {
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
+      }
+
       if (!response.body) {
         throw new Error('No response body');
       }
@@ -897,6 +911,7 @@ export const useChatStore = defineStore('chat', () => {
       const accumulatedToolCalls: Record<number, ToolCall> = {};
       let buffer = '';
       let tokenUsage: TokenUsage | null = null;
+      let streamErrorMessage: string | undefined;
 
       assistantMessageId = generateId();
       // 追踪创建的消息 ID
@@ -934,53 +949,65 @@ export const useChatStore = defineStore('chat', () => {
             const data = line.slice(6).trim();
             if (data === '[DONE]') break;
 
+            let parsed: StreamChunk;
             try {
-              const parsed = JSON.parse(data) as StreamChunk;
-              const delta = parsed.choices[0]?.delta;
-
-              if (delta?.content) {
-                fullContent += delta.content;
-                currentStreamContent.value = fullContent;
-              }
-              if (delta?.reasoning_content) {
-                fullReasoning += delta.reasoning_content;
-                currentStreamReasoning.value = fullReasoning;
-              }
-              if (delta?.tool_calls) {
-                for (const toolCall of delta.tool_calls) {
-                  const index = toolCall.index;
-                  if (!accumulatedToolCalls[index]) {
-                    accumulatedToolCalls[index] = {
-                      id: toolCall.id,
-                      type: toolCall.type,
-                      index: toolCall.index,
-                      function: {
-                        name: toolCall.function.name || '',
-                        arguments: '',
-                      },
-                    };
-                  }
-                  if (toolCall.function.arguments) {
-                    accumulatedToolCalls[index].function.arguments += toolCall.function.arguments;
-                  }
-                }
-              }
-              // 提取 token usage（在最后一个包含 usage 的 chunk 中）
-              if (parsed.usage) {
-                tokenUsage = {
-                  promptTokens: parsed.usage.prompt_tokens,
-                  completionTokens: parsed.usage.completion_tokens,
-                  totalTokens: parsed.usage.total_tokens,
-                  promptCacheHitTokens: parsed.usage.prompt_cache_hit_tokens,
-                  promptCacheMissTokens: parsed.usage.prompt_cache_miss_tokens,
-                  reasoningTokens: parsed.usage.completion_tokens_details?.reasoning_tokens,
-                };
-              }
+              parsed = JSON.parse(data) as StreamChunk;
             } catch (e) {
               console.error('Failed to parse stream chunk:', e, data);
+              continue;
+            }
+
+            if (parsed.error) {
+              streamErrorMessage = parsed.details
+                ? `${parsed.error}: ${parsed.details}`
+                : parsed.error;
+              break;
+            }
+
+            const delta = parsed.choices[0]?.delta;
+            if (delta?.content) {
+              fullContent += delta.content;
+              currentStreamContent.value = fullContent;
+            }
+            if (delta?.reasoning_content) {
+              fullReasoning += delta.reasoning_content;
+              currentStreamReasoning.value = fullReasoning;
+            }
+            if (delta?.tool_calls) {
+              for (const toolCall of delta.tool_calls) {
+                const index = toolCall.index;
+                if (!accumulatedToolCalls[index]) {
+                  accumulatedToolCalls[index] = {
+                    id: toolCall.id,
+                    type: toolCall.type,
+                    index: toolCall.index,
+                    function: {
+                      name: toolCall.function.name || '',
+                      arguments: '',
+                    },
+                  };
+                }
+                if (toolCall.function.arguments) {
+                  accumulatedToolCalls[index].function.arguments += toolCall.function.arguments;
+                }
+              }
+            }
+            if (parsed.usage) {
+              tokenUsage = {
+                promptTokens: parsed.usage.prompt_tokens,
+                completionTokens: parsed.usage.completion_tokens,
+                totalTokens: parsed.usage.total_tokens,
+                promptCacheHitTokens: parsed.usage.prompt_cache_hit_tokens,
+                promptCacheMissTokens: parsed.usage.prompt_cache_miss_tokens,
+                reasoningTokens: parsed.usage.completion_tokens_details?.reasoning_tokens,
+              };
             }
           }
         }
+      }
+
+      if (streamErrorMessage) {
+        throw new Error(streamErrorMessage);
       }
 
       const toolCalls = Object.values(accumulatedToolCalls);
@@ -1095,6 +1122,9 @@ export const useChatStore = defineStore('chat', () => {
         });
         createdMessageIds.value = [];
       } else {
+        if (assistantMessageId) {
+          messages.value = messages.value.filter(m => m.id !== assistantMessageId);
+        }
         throw error;
       }
     } finally {

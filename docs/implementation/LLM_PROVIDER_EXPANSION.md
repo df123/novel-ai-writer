@@ -21,7 +21,7 @@
 | OpenCode Go | `opencode-go/<model>` | `https://opencode.ai/zen/go/v1/responses` | `https://opencode.ai/zen/go/v1/chat/completions` |
 | CLI Proxy API | `cliproxy/<model>` | `<CLIPROXY_BASE_URL>/responses` | `<CLIPROXY_BASE_URL>/chat/completions` |
 
-所有提供商先请求 Responses 端点。若端点或模型返回 `400/404/405/410/415/501`，且响应尚未开始输出，后端会记录警告并改用 Chat Completions；认证、额度、限流等错误不会触发重复请求。OpenCode 不再依赖静态协议模型集合决定请求格式，静态集合仅用于模型列表过滤。
+所有提供商先请求 Responses 端点。若端点或模型返回 `400/404/405/410/415/500/501/502/503/504`，且响应尚未开始输出，后端会记录警告并改用 Chat Completions；认证、额度、限流等错误不会触发重复请求。OpenCode 不再依赖静态协议模型集合决定请求格式，静态集合仅用于模型列表过滤。
 
 ## Responses API 转换
 
