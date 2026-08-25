@@ -150,35 +150,44 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 
 ## LLM 提供商配置
 
+所有提供商的流式请求都会优先使用 OpenAI Responses API，并在请求被端点或模型拒绝、且尚未开始输出时自动回退到 Chat Completions。Responses 请求会保留完整对话上下文，并把历史 `tool_calls` / `tool` 消息转换为 `function_call` / `function_call_output`；后端仍会把 Responses SSE 转换为前端已有的 Chat Completions SSE 格式。
+
 ### DeepSeek
 - **模型**: `deepseek-v4-flash`, `deepseek-v4-pro`
-- **API Endpoint**: `https://api.deepseek.com/v1/chat/completions`
+- **优先 Endpoint**: `https://api.deepseek.com/responses`
+- **回退 Endpoint**: `https://api.deepseek.com/v1/chat/completions`
 
 ### OpenRouter
 - **模型**: 从 API 动态获取
-- **API Endpoint**: `https://openrouter.ai/api/v1/chat/completions`
+- **优先 Endpoint**: `https://openrouter.ai/api/v1/responses`
+- **回退 Endpoint**: `https://openrouter.ai/api/v1/chat/completions`
 - **思考模式**: 使用上游模型默认行为；返回 `reasoning_content` 时可在界面展示
 
 ### Z.AI Coding Plan
 - **模型**: `glm-5.3`, `glm-5.2`
-- **API Endpoint**: `https://api.z.ai/api/coding/paas/v4/chat/completions`
+- **优先 Endpoint**: `https://api.z.ai/api/coding/paas/v4/responses`
+- **回退 Endpoint**: `https://api.z.ai/api/coding/paas/v4/chat/completions`
 - **请求特征**: 按 OpenCode 客户端方式发送会话亲和与 User-Agent，并默认开启 GLM thinking
 - **思考模式**: 可在设置中选择 `max/xhigh/high/medium/low/minimal/none`，默认 `max`
 - **说明**: Coding Plan 端点仅适用于编码/Agent 场景
 
 ### OpenCode Zen / Go
 - **模型**: 从 Zen 与 Go 的 `/models` 接口动态获取，并分别使用 `opencode/`、`opencode-go/` 前缀路由
-- **API Endpoint**:
+- **优先 Endpoint**:
+  - Zen: `https://opencode.ai/zen/v1/responses`
+  - Go: `https://opencode.ai/zen/go/v1/responses`
+- **回退 Endpoint**:
   - Zen: `https://opencode.ai/zen/v1/chat/completions`
   - Go: `https://opencode.ai/zen/go/v1/chat/completions`
-- **思考模式**: 可在设置中启用 `reasoning_effort`；Hy3 会自动映射为 `no_think/low/high`
+- **思考模式**: 可在设置中启用推理强度；Responses 使用标准 `low/high`，Chat 回退请求中的 Hy3 会映射为 `no_think/low/high`
 - **输出上限**: 单次请求最多 32000 tokens
 
 ### CLI Proxy API
 - **模型**: 从本地 CLI Proxy API 的 `/models` 接口动态获取，模型 ID 使用 `cliproxy/` 前缀
 - **默认 Base URL**: `http://127.0.0.1:8317/v1`，可在设置中修改
-- **API Endpoint**: `<Base URL>/chat/completions`
-- **思考模式**: 可选择 `auto/none/low/medium/high`，由 CLI Proxy API 转换给上游模型
+- **优先 Endpoint**: `<Base URL>/responses`
+- **回退 Endpoint**: `<Base URL>/chat/completions`（旧版 CLI Proxy API 或上游模型不支持 Responses 时）
+- **思考模式**: 可选择 `auto/none/low/medium/high`；Responses 请求使用 `reasoning.effort`，Chat Completions 回退请求使用 `reasoning_effort`
 
 > 详细路由和请求参数说明见 [docs/implementation/LLM_PROVIDER_EXPANSION.md](docs/implementation/LLM_PROVIDER_EXPANSION.md)。
 

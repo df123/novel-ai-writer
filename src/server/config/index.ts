@@ -54,6 +54,7 @@ export const ALLOWED_TABLES: readonly string[] = [
 export const LLM_PROVIDERS: LLMProviders = {
   deepseek: {
     apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+    responsesUrl: 'https://api.deepseek.com/responses',
     models: [
       { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash' },
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }
@@ -61,10 +62,12 @@ export const LLM_PROVIDERS: LLMProviders = {
   },
   openrouter: {
     apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
+    responsesUrl: 'https://openrouter.ai/api/v1/responses',
     modelsUrl: 'https://openrouter.ai/api/v1/models'
   },
   zai: {
     apiUrl: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+    responsesUrl: 'https://api.z.ai/api/coding/paas/v4/responses',
     models: [
       { id: 'glm-5.3', name: 'GLM-5.3' },
       { id: 'glm-5.2', name: 'GLM-5.2' },
@@ -80,6 +83,7 @@ export const LLM_PROVIDERS: LLMProviders = {
   },
   cliproxy: {
     apiUrl: 'chat/completions',
+    responsesUrl: 'responses',
     modelsUrl: 'models'
   }
 };

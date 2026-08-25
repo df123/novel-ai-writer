@@ -81,7 +81,7 @@ const PROVIDER_NAMES: Record<LLMProvider, string> = {
   cliproxy: 'CLI Proxy API'
 };
 
-/** OpenCode Zen 使用 Chat Completions 协议的模型 */
+/** OpenCode Zen 允许展示的 Chat Completions 模型 */
 const OPENCODE_ZEN_CHAT_MODELS = new Set([
   'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-flash-free',
   'minimax-m3', 'minimax-m2.7', 'minimax-m2.5',
@@ -102,7 +102,7 @@ const OPENCODE_ZEN_FREE_MODELS = new Set([
   'muse-spark-1.2-contributor', 'muse-spark-1.2-contributor-free'
 ]);
 
-/** OpenCode Go 使用 Chat Completions 协议的模型 */
+/** OpenCode Go 允许展示的 Chat Completions 模型 */
 const OPENCODE_GO_CHAT_MODELS = new Set([
   'glm-5.3', 'glm-5.2', 'glm-5.1',
   'kimi-k3', 'kimi-k2.7-code', 'kimi-k2.6',
@@ -115,11 +115,6 @@ const OPENCODE_GO_RESPONSES_MODELS = new Set([
 ]);
 
 const OPENCODE_GO_FREE_MODELS = new Set(['ox-alpha-free']);
-
-const OPENCODE_RESPONSES_MODELS = new Set([
-  ...OPENCODE_ZEN_RESPONSES_MODELS,
-  ...OPENCODE_GO_RESPONSES_MODELS
-]);
 
 const OPENCODE_GO_MODEL_ALIASES: Record<string, string> = {
   'muse-spark-1.2': 'muse-spark-1.2-contributor',
@@ -188,8 +183,20 @@ interface ProviderEndpoint {
   usesResponsesApi: boolean;
 }
 
+type FetchResponse = Awaited<ReturnType<typeof fetch>>;
+
 interface ResponsesStreamState {
-  functionCallIndexes: Map<string, number>;
+  functionCallStates: Map<string, {
+    index: number;
+    emittedArgumentLength: number;
+  }>;
+  emittedTextLength: number;
+  emittedReasoningLength: number;
+}
+
+interface LLMStreamResult {
+  response: FetchResponse;
+  usesResponsesApi: boolean;
 }
 
 /**
@@ -238,7 +245,7 @@ function resolveProviderEndpoint(
       return {
         apiUrl: LLM_PROVIDERS.opencode.goApiUrl!,
         modelName: actualModelName,
-        usesResponsesApi: OPENCODE_RESPONSES_MODELS.has(actualModelName),
+        usesResponsesApi: true,
         responsesUrl: LLM_PROVIDERS.opencode.goResponsesUrl
       };
     }
@@ -247,20 +254,27 @@ function resolveProviderEndpoint(
     return {
       apiUrl: LLM_PROVIDERS.opencode.apiUrl,
       modelName,
-      usesResponsesApi: OPENCODE_RESPONSES_MODELS.has(modelName),
+      usesResponsesApi: true,
       responsesUrl: LLM_PROVIDERS.opencode.responsesUrl
     };
   }
 
   if (provider === 'cliproxy') {
+    const baseUrl = normalizeBaseUrl(cliproxyBaseUrl);
     return {
-      apiUrl: `${normalizeBaseUrl(cliproxyBaseUrl)}/chat/completions`,
+      apiUrl: `${baseUrl}/chat/completions`,
+      responsesUrl: `${baseUrl}/responses`,
       modelName: stripPrefix(model, 'cliproxy/'),
-      usesResponsesApi: false
+      usesResponsesApi: true
     };
   }
 
-  return { apiUrl: LLM_PROVIDERS[provider].apiUrl, modelName: model, usesResponsesApi: false };
+  return {
+    apiUrl: LLM_PROVIDERS[provider].apiUrl,
+    responsesUrl: LLM_PROVIDERS[provider].responsesUrl,
+    modelName: model,
+    usesResponsesApi: true
+  };
 }
 
 function buildHeaders(provider: LLMProvider, apiUrl: string, apiKey: string): Record<string, string> {
@@ -394,7 +408,14 @@ function convertToolsForResponses(tools?: unknown[]): Array<Record<string, unkno
   });
 }
 
+function toResponseOutput(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (content === undefined || content === null) return '';
+  return JSON.stringify(content);
+}
+
 function buildResponsesPayload(
+  provider: LLMProvider,
   modelName: string,
   messages: LLMChatMessage[],
   options: ChatStreamOptions
@@ -404,7 +425,7 @@ function buildResponsesPayload(
 
   for (const message of messages) {
     if (message.role === 'system') {
-      if (message.content) instructions.push(String(message.content));
+      if (message.content) instructions.push(toResponseOutput(message.content));
       continue;
     }
 
@@ -412,7 +433,7 @@ function buildResponsesPayload(
       input.push({
         type: 'function_call_output',
         call_id: message.tool_call_id || '',
-        output: message.content ?? ''
+        output: toResponseOutput(message.content)
       });
       continue;
     }
@@ -429,11 +450,14 @@ function buildResponsesPayload(
       }>;
 
       for (const toolCall of toolCalls) {
+        const toolArguments = toolCall.function?.arguments;
         input.push({
           type: 'function_call',
           call_id: toolCall.id || '',
           name: toolCall.function?.name || '',
-          arguments: toolCall.function?.arguments || '{}'
+          arguments: typeof toolArguments === 'string'
+            ? toolArguments
+            : JSON.stringify(toolArguments ?? {})
         });
       }
     }
@@ -443,9 +467,19 @@ function buildResponsesPayload(
   const payload: Record<string, unknown> = {
     model: modelName,
     input,
-    stream: true,
-    max_output_tokens: limitedMaxTokens(options.maxTokens)
+    stream: true
   };
+
+  if (provider === 'opencode' || provider === 'zai') {
+    payload.max_output_tokens = limitedMaxTokens(options.maxTokens);
+  } else if (options.maxTokens !== undefined) {
+    payload.max_output_tokens = options.maxTokens;
+  }
+
+  if (provider === 'deepseek' || provider === 'openrouter' || provider === 'cliproxy') {
+    if (options.temperature !== undefined) payload.temperature = options.temperature;
+    if (options.topP !== undefined) payload.top_p = options.topP;
+  }
 
   if (instructions.length > 0) {
     payload.instructions = instructions.join('\n\n');
@@ -454,6 +488,38 @@ function buildResponsesPayload(
   const tools = convertToolsForResponses(options.tools);
   if (tools) {
     payload.tools = tools;
+  }
+
+  if (provider === 'deepseek' && options.reasoning_effort) {
+    payload.reasoning = { effort: options.reasoning_effort };
+  }
+
+  if (provider === 'zai' && options.zaiReasoningEnabled) {
+    const effort = options.zaiReasoningEffort || 'max';
+    if (ZAI_REASONING_EFFORTS.has(effort)) {
+      payload.reasoning = { effort };
+    }
+  }
+
+  if (provider === 'opencode' && options.opencodeReasoningEnabled) {
+    const effort = options.opencodeReasoningEffort || 'none';
+    if (effort !== 'none') {
+      const effortMap: Record<string, string> = {
+        minimal: 'low',
+        low: 'low',
+        medium: 'high',
+        high: 'high',
+        max: 'high'
+      };
+      payload.reasoning = { effort: effortMap[effort] || effort };
+    }
+  }
+
+  if (provider === 'cliproxy' && options.cliproxyReasoningEnabled) {
+    const effort = options.cliproxyReasoningEffort || 'auto';
+    if (['none', 'low', 'medium', 'high', 'auto'].includes(effort)) {
+      payload.reasoning = { effort };
+    }
   }
 
   return payload;
@@ -488,6 +554,111 @@ function normalizeUsage(
   };
 }
 
+interface ResponsesFunctionCallItem {
+  type?: string;
+  id?: string;
+  call_id?: string;
+  name?: string;
+  arguments?: string;
+}
+
+function registerFunctionCall(
+  state: ResponsesStreamState,
+  item: ResponsesFunctionCallItem
+): string {
+  const itemKey = item.id || item.call_id || '';
+  if (!itemKey || state.functionCallStates.has(itemKey)) return '';
+
+  const index = state.functionCallStates.size;
+  state.functionCallStates.set(itemKey, {
+    index,
+    emittedArgumentLength: 0
+  });
+
+  return chatStreamChunk({
+    tool_calls: [{
+      id: item.call_id || item.id || '',
+      type: 'function',
+      index,
+      function: { name: item.name || '', arguments: '' }
+    }]
+  });
+}
+
+function emitFunctionCallArguments(
+  state: ResponsesStreamState,
+  itemKey: string,
+  argumentsText: string
+): string {
+  const callState = state.functionCallStates.get(itemKey);
+  if (!callState || argumentsText.length <= callState.emittedArgumentLength) return '';
+
+  const remainingArguments = argumentsText.slice(callState.emittedArgumentLength);
+  callState.emittedArgumentLength = argumentsText.length;
+  return chatStreamChunk({
+    tool_calls: [{
+      id: '',
+      type: 'function',
+      index: callState.index,
+      function: { name: '', arguments: remainingArguments }
+    }]
+  });
+}
+
+function appendFunctionCallArgumentDelta(
+  state: ResponsesStreamState,
+  itemKey: string,
+  argumentsDelta: string
+): string {
+  const callState = state.functionCallStates.get(itemKey);
+  if (!callState || !argumentsDelta) return '';
+
+  callState.emittedArgumentLength += argumentsDelta.length;
+  return chatStreamChunk({
+    tool_calls: [{
+      id: '',
+      type: 'function',
+      index: callState.index,
+      function: { name: '', arguments: argumentsDelta }
+    }]
+  });
+}
+
+function emitRemainingText(
+  text: string,
+  emittedLength: number
+): { content: string; length: number } | null {
+  if (text.length <= emittedLength) return null;
+  return {
+    content: text.slice(emittedLength),
+    length: text.length
+  };
+}
+
+function extractResponseItemText(item: Record<string, unknown>): string {
+  if (item.type === 'message') {
+    const content = Array.isArray(item.content) ? item.content : [];
+    return content
+      .map(part => {
+        const contentPart = part as { type?: string; text?: string };
+        return contentPart.type === 'output_text' ? String(contentPart.text || '') : '';
+      })
+      .join('');
+  }
+
+  if (item.type === 'reasoning') {
+    const summary = Array.isArray(item.summary) ? item.summary : [];
+    return summary
+      .map(part => {
+        const summaryPart = part as { type?: string; text?: string };
+        return summaryPart.type === 'summary_text' ? String(summaryPart.text || '') : '';
+      })
+      .join('');
+  }
+
+  return '';
+}
+
 function convertResponsesEvent(
   event: Record<string, unknown>,
   state: ResponsesStreamState
@@ -496,7 +667,9 @@ function convertResponsesEvent(
 
   if (type === 'response.output_text.delta') {
     const content = String(event.delta || '');
-    return content ? chatStreamChunk({ content }) : null;
+    if (!content) return null;
+    state.emittedTextLength += content.length;
+    return chatStreamChunk({ content });
   }
 
   if (
@@ -504,54 +677,173 @@ function convertResponsesEvent(
     type === 'response.reasoning_text.delta'
   ) {
     const reasoningContent = String(event.delta || '');
-    return reasoningContent ? chatStreamChunk({ reasoning_content: reasoningContent }) : null;
+    if (!reasoningContent) return null;
+    state.emittedReasoningLength += reasoningContent.length;
+    return chatStreamChunk({ reasoning_content: reasoningContent });
+  }
+
+  if (
+    type === 'response.output_text.done' ||
+    type === 'response.reasoning_summary_text.done' ||
+    type === 'response.reasoning_text.done'
+  ) {
+    const isReasoning = type !== 'response.output_text.done';
+    const text = String(event.text || event.delta || '');
+    const emitted = isReasoning
+      ? emitRemainingText(text, state.emittedReasoningLength)
+      : emitRemainingText(text, state.emittedTextLength);
+    if (!emitted) return null;
+
+    if (isReasoning) {
+      state.emittedReasoningLength = emitted.length;
+      return chatStreamChunk({ reasoning_content: emitted.content });
+    }
+
+    state.emittedTextLength = emitted.length;
+    return chatStreamChunk({ content: emitted.content });
   }
 
   if (type === 'response.output_item.added') {
-    const item = event.item as {
-      type?: string;
-      id?: string;
-      call_id?: string;
-      name?: string;
-    } | undefined;
-    if (item?.type !== 'function_call' || !item.id) return null;
+    const item = event.item as ResponsesFunctionCallItem | undefined;
+    if (item?.type !== 'function_call') return null;
 
-    const callId = item.call_id || item.id;
-    const index = state.functionCallIndexes.size;
-    state.functionCallIndexes.set(item.id, index);
-    return chatStreamChunk({
-      tool_calls: [{
-        id: callId,
-        type: 'function',
-        index,
-        function: { name: item.name || '', arguments: '' }
-      }]
-    });
+    const addedChunk = registerFunctionCall(state, item);
+    const itemKey = item.id || item.call_id || '';
+    const argumentsChunk = emitFunctionCallArguments(
+      state,
+      itemKey,
+      String(item.arguments || '')
+    );
+    return addedChunk + argumentsChunk || null;
+  }
+
+  if (type === 'response.output_item.done') {
+    const item = event.item as Record<string, unknown> | undefined;
+    if (!item) return null;
+
+    if (item.type === 'function_call') {
+      const functionCallItem = item as ResponsesFunctionCallItem;
+      const addedChunk = registerFunctionCall(state, functionCallItem);
+      const itemKey = functionCallItem.id || functionCallItem.call_id || '';
+      const argumentsChunk = emitFunctionCallArguments(
+        state,
+        itemKey,
+        String(functionCallItem.arguments || '')
+      );
+      return addedChunk + argumentsChunk || null;
+    }
+
+    const itemText = extractResponseItemText(item);
+    if (!itemText) return null;
+
+    if (item.type === 'reasoning') {
+      const emitted = emitRemainingText(itemText, state.emittedReasoningLength);
+      if (!emitted) return null;
+      state.emittedReasoningLength = emitted.length;
+      return chatStreamChunk({ reasoning_content: emitted.content });
+    }
+
+    const emitted = emitRemainingText(itemText, state.emittedTextLength);
+    if (!emitted) return null;
+    state.emittedTextLength = emitted.length;
+    return chatStreamChunk({ content: emitted.content });
   }
 
   if (type === 'response.function_call_arguments.delta') {
     const itemId = String(event.item_id || '');
-    const index = state.functionCallIndexes.get(itemId);
     const argumentsDelta = String(event.delta || '');
-    if (index === undefined || !argumentsDelta) return null;
-
-    return chatStreamChunk({
-      tool_calls: [{
-        id: '',
-        type: 'function',
-        index,
-        function: { name: '', arguments: argumentsDelta }
-      }]
-    });
+    const argumentsChunk = appendFunctionCallArgumentDelta(state, itemId, argumentsDelta);
+    return argumentsChunk || null;
   }
 
-  if (type === 'response.completed') {
+  if (type === 'response.function_call_arguments.done') {
+    const itemId = String(event.item_id || '');
+    const completeArguments = String(event.arguments || '');
+    const argumentsChunk = emitFunctionCallArguments(state, itemId, completeArguments);
+    return argumentsChunk || null;
+  }
+
+  if (type === 'response.content_part.done') {
+    const part = event.part as { type?: string; text?: string } | undefined;
+    if (part?.type !== 'output_text') return null;
+
+    const emitted = emitRemainingText(String(part.text || ''), state.emittedTextLength);
+    if (!emitted) return null;
+    state.emittedTextLength = emitted.length;
+    return chatStreamChunk({ content: emitted.content });
+  }
+
+  if (type === 'response.completed' || type === 'response.incomplete') {
     const response = event.response as { usage?: Record<string, unknown> } | undefined;
     const usage = normalizeUsage(response?.usage);
     return usage ? `data: ${JSON.stringify({ usage })}\n\n` : null;
   }
 
   return null;
+}
+
+/** 表示端点或模型不支持 Responses API、且尚未产生输出时可安全回退的状态码 */
+const RESPONSES_FALLBACK_STATUSES = new Set([400, 404, 405, 410, 415, 501]);
+
+function getResponsesUrl(endpoint: ProviderEndpoint): string {
+  return endpoint.responsesUrl || endpoint.apiUrl.replace(/\/chat\/completions$/, '/responses');
+}
+
+async function readErrorMessage(response: FetchResponse): Promise<string> {
+  const errorText = await response.text();
+  return errorText.slice(0, 2000);
+}
+
+async function fetchLLMStream(
+  provider: LLMProvider,
+  endpoint: ProviderEndpoint,
+  cleanedMessages: Array<Record<string, unknown>>,
+  messages: LLMChatMessage[],
+  options: ChatStreamOptions
+): Promise<LLMStreamResult> {
+  const responsesUrl = getResponsesUrl(endpoint);
+  const responsesResponse = await fetch(responsesUrl, {
+    method: 'POST',
+    headers: buildHeaders(provider, responsesUrl, options.apiKey),
+    body: JSON.stringify(buildResponsesPayload(
+      provider,
+      endpoint.modelName,
+      messages,
+      options
+    ))
+  });
+
+  if (responsesResponse.ok) {
+    return { response: responsesResponse, usesResponsesApi: true };
+  }
+
+  const responsesError = await readErrorMessage(responsesResponse);
+  if (!RESPONSES_FALLBACK_STATUSES.has(responsesResponse.status)) {
+    throw new Error(`LLM API error (${responsesResponse.status}): ${responsesError}`);
+  }
+
+  console.warn(
+    `[Responses API] ${PROVIDER_NAMES[provider]} ${endpoint.modelName} unavailable ` +
+    `(${responsesResponse.status}), falling back to Chat Completions`
+  );
+
+  const chatResponse = await fetch(endpoint.apiUrl, {
+    method: 'POST',
+    headers: buildHeaders(provider, endpoint.apiUrl, options.apiKey),
+    body: JSON.stringify(buildChatPayload(
+      provider,
+      endpoint.modelName,
+      cleanedMessages,
+      options
+    ))
+  });
+
+  if (!chatResponse.ok) {
+    const chatError = await readErrorMessage(chatResponse);
+    throw new Error(`LLM API error (${chatResponse.status}): ${chatError}`);
+  }
+
+  return { response: chatResponse, usesResponsesApi: false };
 }
 
 /**
@@ -582,22 +874,17 @@ export async function chatStream(
     options.cliproxyBaseUrl
   );
   const cleanedMessages = cleanMessages(messages);
-  const requestBody = endpoint.usesResponsesApi
-    ? buildResponsesPayload(endpoint.modelName, messages, options)
-    : buildChatPayload(provider, endpoint.modelName, cleanedMessages, options);
-  const requestUrl = endpoint.usesResponsesApi
-    ? endpoint.responsesUrl || endpoint.apiUrl.replace(/\/chat\/completions$/, '/responses')
-    : endpoint.apiUrl;
+  const streamResult = await fetchLLMStream(
+    provider,
+    endpoint,
+    cleanedMessages,
+    messages,
+    options
+  );
+  const { response, usesResponsesApi } = streamResult;
 
-  const response = await fetch(requestUrl, {
-    method: 'POST',
-    headers: buildHeaders(provider, endpoint.apiUrl, options.apiKey),
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`LLM API error (${response.status}): ${errorText}`);
+  if (!response.body) {
+    throw new Error('LLM API 未返回流式响应体');
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -606,7 +893,11 @@ export async function chatStream(
 
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
-  const responsesState: ResponsesStreamState = { functionCallIndexes: new Map() };
+  const responsesState: ResponsesStreamState = {
+    functionCallStates: new Map(),
+    emittedTextLength: 0,
+    emittedReasoningLength: 0
+  };
   let serverBuffer = '';
   let doneSent = false;
 
@@ -639,7 +930,7 @@ export async function chatStream(
           continue;
         }
 
-        if (endpoint.usesResponsesApi) {
+        if (usesResponsesApi) {
           if (parsed.type === 'error' || parsed.type === 'response.failed') {
             throw new Error(`LLM API stream error: ${JSON.stringify(parsed)}`);
           }
@@ -654,7 +945,7 @@ export async function chatStream(
       }
     }
 
-    if (endpoint.usesResponsesApi && !doneSent) {
+    if (usesResponsesApi && !doneSent) {
       res.write('data: [DONE]\n\n');
     }
   } catch (error) {
