@@ -17,6 +17,13 @@
 ### 测试
 当前未配置测试框架。添加测试时，请先查看 README 或询问合适的测试命令。
 
+### 模型真实调用测试限制
+- 未经用户明确确认，禁止对 OpenRouter 付费模型发起真实 LLM 调用；只允许测试免费模型（价格标记为免费，或 prompt/completion 单价均为 0）
+- 未经用户明确确认，禁止对 OpenCode Zen（`opencode/` 前缀）付费模型发起真实 LLM 调用；只允许测试免费模型
+- OpenCode Go（`opencode-go/` 前缀）、DeepSeek、Z.AI 不受上述两条限制
+- CLI Proxy API 的真实调用测试仅允许 `cliproxy/gpt-5.6-luna`
+- 获取模型列表、元数据或价格信息不算真实调用，但不得触发推理请求
+
 ## 代码风格指南
 
 ### 导入顺序
