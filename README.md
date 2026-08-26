@@ -150,7 +150,9 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 
 ## LLM 提供商配置
 
-所有提供商的流式请求都会优先使用 OpenAI Responses API，并在请求被端点或模型拒绝、且尚未开始输出时自动回退到 Chat Completions。Responses 请求会保留完整对话上下文，并把历史 `tool_calls` / `tool` 消息转换为 `function_call` / `function_call_output`；后端仍会把 Responses SSE 转换为前端已有的 Chat Completions SSE 格式。
+除官方文档标注仅支持 Chat Completions 的 OpenCode 模型会直连 Chat 外，其余模型默认优先使用 OpenAI Responses API。Responses 请求会保留完整对话上下文，并把历史 `tool_calls` / `tool` 消息转换为 `function_call` / `function_call_output`；后端仍会把 Responses SSE 转换为前端已有的 Chat Completions SSE 格式。
+
+Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次；重试耗尽后直接报错，不会把 5xx 当作“不支持”而自动回退。只有端点返回 `404/405/410/415/501`，或 `400` 且错误信息明确表示端点 / 模型不支持 Responses 时，才会改用 Chat Completions。
 
 ### DeepSeek
 - **模型**: `deepseek-v4-flash`, `deepseek-v4-pro`
@@ -165,7 +167,7 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 
 ### Z.AI Coding Plan
 - **模型**: `glm-5.3`, `glm-5.2`
-- **优先 Endpoint**: `https://api.z.ai/api/coding/paas/v4/responses`
+- **优先 Endpoint**: `https://api.z.ai/api/v1/responses`
 - **回退 Endpoint**: `https://api.z.ai/api/coding/paas/v4/chat/completions`
 - **请求特征**: 按 OpenCode 客户端方式发送会话亲和与 User-Agent，并默认开启 GLM thinking
 - **思考模式**: 可在设置中选择 `max/xhigh/high/medium/low/minimal/none`，默认 `max`
@@ -173,6 +175,7 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 
 ### OpenCode Zen / Go
 - **模型**: 从 Zen 与 Go 的 `/models` 接口动态获取，并分别使用 `opencode/`、`opencode-go/` 前缀路由
+- **协议路由**: 官方标注为 Chat-only 的模型（例如 `opencode-go/ox-alpha-free`）直接使用 Chat；未标注或新增模型默认先使用 Responses
 - **优先 Endpoint**:
   - Zen: `https://opencode.ai/zen/v1/responses`
   - Go: `https://opencode.ai/zen/go/v1/responses`

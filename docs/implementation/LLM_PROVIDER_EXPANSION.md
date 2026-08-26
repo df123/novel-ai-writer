@@ -16,12 +16,14 @@
 | --- | --- | --- | --- |
 | DeepSeek | `deepseek-v4-flash`、`deepseek-v4-pro` | `https://api.deepseek.com/responses` | `https://api.deepseek.com/v1/chat/completions` |
 | OpenRouter | `<vendor>/<model>` | `https://openrouter.ai/api/v1/responses` | `https://openrouter.ai/api/v1/chat/completions` |
-| Z.AI | `glm-5.3`、`glm-5.2` | `https://api.z.ai/api/coding/paas/v4/responses` | `https://api.z.ai/api/coding/paas/v4/chat/completions` |
+| Z.AI | `glm-5.3`、`glm-5.2` | `https://api.z.ai/api/v1/responses` | `https://api.z.ai/api/coding/paas/v4/chat/completions` |
 | OpenCode Zen | `opencode/<model>` | `https://opencode.ai/zen/v1/responses` | `https://opencode.ai/zen/v1/chat/completions` |
 | OpenCode Go | `opencode-go/<model>` | `https://opencode.ai/zen/go/v1/responses` | `https://opencode.ai/zen/go/v1/chat/completions` |
 | CLI Proxy API | `cliproxy/<model>` | `<CLIPROXY_BASE_URL>/responses` | `<CLIPROXY_BASE_URL>/chat/completions` |
 
-所有提供商先请求 Responses 端点。若端点或模型返回 `400/404/405/410/415/500/501/502/503/504`，且响应尚未开始输出，后端会记录警告并改用 Chat Completions；认证、额度、限流等错误不会触发重复请求。OpenCode 不再依赖静态协议模型集合决定请求格式，静态集合仅用于模型列表过滤。
+除官方文档标注为 Chat-only 的 OpenCode 模型直接请求 Chat Completions 外，其余模型默认先请求 Responses。Responses 的 `408/425/429/500/502/503/504` 会被视为瞬时错误并重试两次，重试耗尽后直接失败；这些状态码不会触发协议回退。只有 `404/405/410/415/501`，或 `400` 且错误文本明确包含端点 / 模型不支持语义时，才会回退 Chat。认证、额度、参数错误等同样不会触发回退。
+
+OpenCode 的静态模型集合用于 `/models` 展示过滤；请求路由使用官方 Chat-only 黑名单，官方新增或文档未标注的模型默认走 Responses。
 
 ## Responses API 转换
 
@@ -78,4 +80,11 @@ Responses 请求面向本项目的长上下文与高频工具调用场景保留�
 
 Z.AI 模型列表仅保留 GLM-5.2 及以上，当前包含 GLM-5.3 与 GLM-5.2。思考强度默认 `max`；Coding Plan 端点会把通用枚举映射为上游实际支持的强度。GLM-5.3 不支持关闭思考，`none/minimal/low` 会映射为 `low`；GLM-5.2 的 `none/minimal` 会停止思考。
 
-参考文档：[Z.AI Deep Thinking](https://docs.z.ai/guides/capabilities/thinking)
+参考文档：
+
+- [Z.AI Tool Integration](https://docs.z.ai/devpack/tool/others)
+- [Z.AI Deep Thinking](https://docs.z.ai/guides/capabilities/thinking)
+- [DeepSeek Responses API](https://api-docs.deepseek.com/guides/responses_api/)
+- [OpenRouter Responses API](https://openrouter.ai/docs/api_reference/responses/overview)
+- [OpenCode Zen](https://opencode.ai/docs/zen/)
+- [OpenCode Go](https://opencode.ai/docs/go/)

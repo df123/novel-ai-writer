@@ -72,7 +72,7 @@ export const LLM_PROVIDERS: LLMProviders = {
   },
   zai: {
     apiUrl: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
-    responsesUrl: 'https://api.z.ai/api/coding/paas/v4/responses',
+    responsesUrl: 'https://api.z.ai/api/v1/responses',
     models: [
       { id: 'glm-5.3', name: 'GLM-5.3' },
       { id: 'glm-5.2', name: 'GLM-5.2' },

@@ -81,37 +81,45 @@ const PROVIDER_NAMES: Record<LLMProvider, string> = {
   cliproxy: 'CLI Proxy API'
 };
 
-/** OpenCode Zen 允许展示的 Chat Completions 模型 */
-const OPENCODE_ZEN_CHAT_MODELS = new Set([
-  'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-flash-free',
+/** OpenCode Zen 官方仅支持 Chat Completions 的模型 */
+const OPENCODE_ZEN_CHAT_ONLY_MODELS = new Set([
+  'deepseek-v4-pro', 'deepseek-v4-flash',
   'minimax-m3', 'minimax-m2.7', 'minimax-m2.5',
   'glm-5.2', 'glm-5.1', 'glm-5',
   'kimi-k2.5', 'kimi-k2.6', 'kimi-k2.7-code', 'kimi-k3',
-  'big-pickle', 'mimo-v2.5-free', 'laguna-s-2.1-free',
-  'ling-3.0-flash-free', 'north-mini-code-free', 'nemotron-3-ultra-free'
+  'big-pickle', 'x-preview-f-free', 'mimo-v2.5-free', 'hy3-free',
+  'nemotron-3-ultra-free', 'nemotron-3.5-lightning-free'
 ]);
 
 const OPENCODE_ZEN_RESPONSES_MODELS = new Set([
-  'muse-spark-1.2', 'muse-spark-1.2-contributor', 'muse-spark-1.2-contributor-free'
+  'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna',
+  'gpt-5.5', 'gpt-5.5-pro',
+  'gpt-5.4', 'gpt-5.4-pro', 'gpt-5.4-mini', 'gpt-5.4-nano',
+  'gpt-5.3-codex', 'gpt-5.3-codex-spark',
+  'gpt-5.2', 'gpt-5.2-codex',
+  'gpt-5.1', 'gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5.1-codex-mini',
+  'gpt-5', 'gpt-5-codex', 'gpt-5-nano',
+  'grok-4.6', 'grok-4.5', 'grok-build-0.1',
+  'muse-spark-1.2', 'muse-spark-1.2-contributor-free'
 ]);
 
 const OPENCODE_ZEN_FREE_MODELS = new Set([
-  'big-pickle', 'mimo-v2.5-free', 'laguna-s-2.1-free',
-  'ling-3.0-flash-free', 'north-mini-code-free',
-  'nemotron-3-ultra-free', 'deepseek-v4-flash-free',
-  'muse-spark-1.2-contributor', 'muse-spark-1.2-contributor-free'
+  'big-pickle', 'x-preview-f-free', 'mimo-v2.5-free', 'hy3-free',
+  'nemotron-3-ultra-free', 'nemotron-3.5-lightning-free',
+  'muse-spark-1.2-contributor-free'
 ]);
 
-/** OpenCode Go 允许展示的 Chat Completions 模型 */
-const OPENCODE_GO_CHAT_MODELS = new Set([
+/** OpenCode Go 官方仅支持 Chat Completions 的模型 */
+const OPENCODE_GO_CHAT_ONLY_MODELS = new Set([
   'glm-5.3', 'glm-5.2', 'glm-5.1',
   'kimi-k3', 'kimi-k2.7-code', 'kimi-k2.6',
-  'deepseek-v4-pro', 'deepseek-v4-flash',
+  'longcat-2.0', 'deepseek-v4-pro', 'deepseek-v4-flash',
+  'deepseek-v4-flash-vision-exp',
   'mimo-v2.5', 'mimo-v2.5-pro', 'hy3', 'ox-alpha-free'
 ]);
 
 const OPENCODE_GO_RESPONSES_MODELS = new Set([
-  'grok-4.5', 'gpt-5.6-luna', 'muse-spark-1.2-contributor'
+  'grok-4.6', 'gpt-5.6-luna', 'muse-spark-1.2-contributor'
 ]);
 
 const OPENCODE_GO_FREE_MODELS = new Set(['ox-alpha-free']);
@@ -124,11 +132,13 @@ const OPENCODE_GO_MODEL_ALIASES: Record<string, string> = {
 const OPENCODE_MODEL_NAMES: Record<string, string> = {
   'big-pickle': 'Big Pickle',
   'mimo-v2.5-free': 'MiMo-V2.5 Free',
-  'laguna-s-2.1-free': 'Laguna S 2.1 Free',
-  'ling-3.0-flash-free': 'Ling-3.0-flash Free',
-  'north-mini-code-free': 'North Mini Code Free',
   'nemotron-3-ultra-free': 'Nemotron 3 Ultra Free',
-  'deepseek-v4-flash-free': 'DeepSeek V4 Flash Free',
+  'x-preview-f-free': 'Ox Alpha Free',
+  'hy3-free': 'Hy3 Free',
+  'nemotron-3.5-lightning-free': 'Nemotron 3.5 Lightning Free',
+  'longcat-2.0': 'LongCat 2.0',
+  'deepseek-v4-flash-vision-exp': 'DeepSeek V4 Flash Vision Exp',
+  'grok-4.6': 'Grok 4.6',
   'deepseek-v4-pro': 'DeepSeek V4 Pro',
   'deepseek-v4-flash': 'DeepSeek V4 Flash',
   'minimax-m3': 'MiniMax M3',
@@ -245,7 +255,7 @@ function resolveProviderEndpoint(
       return {
         apiUrl: LLM_PROVIDERS.opencode.goApiUrl!,
         modelName: actualModelName,
-        usesResponsesApi: OPENCODE_GO_RESPONSES_MODELS.has(actualModelName),
+        usesResponsesApi: !OPENCODE_GO_CHAT_ONLY_MODELS.has(actualModelName),
         responsesUrl: LLM_PROVIDERS.opencode.goResponsesUrl
       };
     }
@@ -254,7 +264,7 @@ function resolveProviderEndpoint(
     return {
       apiUrl: LLM_PROVIDERS.opencode.apiUrl,
       modelName,
-      usesResponsesApi: OPENCODE_ZEN_RESPONSES_MODELS.has(modelName),
+      usesResponsesApi: !OPENCODE_ZEN_CHAT_ONLY_MODELS.has(modelName),
       responsesUrl: LLM_PROVIDERS.opencode.responsesUrl
     };
   }
@@ -788,8 +798,17 @@ const CHAT_TRANSIENT_RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504
 /** Chat Completions 瞬时故障的重试间隔 */
 const CHAT_RETRY_DELAYS_MS = [750, 2000];
 
-/** 表示端点或模型不支持 Responses API、且尚未产生输出时可安全回退的状态码 */
-const RESPONSES_FALLBACK_STATUSES = new Set([400, 404, 405, 410, 415, 500, 501, 502, 503, 504]);
+/** Responses API 常见的瞬时故障状态码 */
+const RESPONSES_TRANSIENT_RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+/** Responses API 瞬时故障的重试间隔 */
+const RESPONSES_RETRY_DELAYS_MS = [750, 2000];
+
+/** 明确表示端点不支持 Responses API 的状态码 */
+const RESPONSES_UNSUPPORTED_STATUSES = new Set([404, 405, 410, 415, 501]);
+
+/** 400 响应中明确表示模型或端点不支持 Responses API 的错误语义 */
+const RESPONSES_UNSUPPORTED_ERROR_PATTERN = /(?:unsupported|not supported|does not support|model_not_supported|unsupported_endpoint|unknown endpoint|invalid endpoint|not found)/i;
 
 function getResponsesUrl(endpoint: ProviderEndpoint): string {
   return endpoint.responsesUrl || endpoint.apiUrl.replace(/\/chat\/completions$/, '/responses');
@@ -849,6 +868,39 @@ async function postChatLLMStreamWithRetry(
   throw new Error('LLM API 重试次数已耗尽');
 }
 
+async function postResponsesLLMStreamWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  body: string
+): Promise<FetchResponse> {
+  for (let attempt = 0; attempt <= RESPONSES_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await postLLMStream(url, headers, body);
+    const delay = RESPONSES_RETRY_DELAYS_MS[attempt];
+    if (
+      response.ok ||
+      delay === undefined ||
+      !RESPONSES_TRANSIENT_RETRY_STATUSES.has(response.status)
+    ) {
+      return response;
+    }
+
+    const errorMessage = await readErrorMessage(response);
+    console.warn(
+      `[LLM] Responses API transient error (${response.status}), retrying in ${delay}ms: ` +
+      `${errorMessage.slice(0, 300) || '<empty response>'}`
+    );
+    await wait(delay);
+  }
+
+  throw new Error('Responses API 重试次数已耗尽');
+}
+
+function shouldFallbackFromResponses(response: FetchResponse, errorMessage: string): boolean {
+  if (RESPONSES_UNSUPPORTED_STATUSES.has(response.status)) return true;
+
+  return response.status === 400 && RESPONSES_UNSUPPORTED_ERROR_PATTERN.test(errorMessage);
+}
+
 async function fetchLLMStream(
   provider: LLMProvider,
   endpoint: ProviderEndpoint,
@@ -881,7 +933,7 @@ async function fetchLLMStream(
   }
 
   const responsesUrl = getResponsesUrl(endpoint);
-  const responsesResponse = await postLLMStream(
+  const responsesResponse = await postResponsesLLMStreamWithRetry(
     responsesUrl,
     buildHeaders(provider, responsesUrl, options.apiKey),
     JSON.stringify(buildResponsesPayload(
@@ -897,7 +949,13 @@ async function fetchLLMStream(
   }
 
   const responsesError = await readErrorMessage(responsesResponse);
-  if (!RESPONSES_FALLBACK_STATUSES.has(responsesResponse.status)) {
+  if (RESPONSES_TRANSIENT_RETRY_STATUSES.has(responsesResponse.status)) {
+    throw new Error(
+      `LLM API error (${responsesResponse.status}) after Responses retries: ${responsesError}`
+    );
+  }
+
+  if (!shouldFallbackFromResponses(responsesResponse, responsesError)) {
     throw new Error(`LLM API error (${responsesResponse.status}): ${responsesError}`);
   }
 
@@ -1104,14 +1162,14 @@ export async function getModels(
       fetchOpenCodeModels(
         LLM_PROVIDERS.opencode.modelsUrl!,
         'opencode/',
-        OPENCODE_ZEN_CHAT_MODELS,
+        OPENCODE_ZEN_CHAT_ONLY_MODELS,
         OPENCODE_ZEN_RESPONSES_MODELS,
         OPENCODE_ZEN_FREE_MODELS
       ),
       fetchOpenCodeModels(
         LLM_PROVIDERS.opencode.goModelsUrl!,
         'opencode-go/',
-        OPENCODE_GO_CHAT_MODELS,
+        OPENCODE_GO_CHAT_ONLY_MODELS,
         OPENCODE_GO_RESPONSES_MODELS,
         OPENCODE_GO_FREE_MODELS
       )
