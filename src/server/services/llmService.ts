@@ -245,7 +245,7 @@ function resolveProviderEndpoint(
       return {
         apiUrl: LLM_PROVIDERS.opencode.goApiUrl!,
         modelName: actualModelName,
-        usesResponsesApi: true,
+        usesResponsesApi: OPENCODE_GO_RESPONSES_MODELS.has(actualModelName),
         responsesUrl: LLM_PROVIDERS.opencode.goResponsesUrl
       };
     }
@@ -254,7 +254,7 @@ function resolveProviderEndpoint(
     return {
       apiUrl: LLM_PROVIDERS.opencode.apiUrl,
       modelName,
-      usesResponsesApi: true,
+      usesResponsesApi: OPENCODE_ZEN_RESPONSES_MODELS.has(modelName),
       responsesUrl: LLM_PROVIDERS.opencode.responsesUrl
     };
   }
@@ -782,6 +782,12 @@ function convertResponsesEvent(
   return null;
 }
 
+/** Chat Completions 常见的瞬时故障状态码 */
+const CHAT_TRANSIENT_RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+/** Chat Completions 瞬时故障的重试间隔 */
+const CHAT_RETRY_DELAYS_MS = [750, 2000];
+
 /** 表示端点或模型不支持 Responses API、且尚未产生输出时可安全回退的状态码 */
 const RESPONSES_FALLBACK_STATUSES = new Set([400, 404, 405, 410, 415, 500, 501, 502, 503, 504]);
 
@@ -816,6 +822,33 @@ async function postLLMStream(
   }
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function postChatLLMStreamWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  body: string
+): Promise<FetchResponse> {
+  for (let attempt = 0; attempt <= CHAT_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await postLLMStream(url, headers, body);
+    const delay = CHAT_RETRY_DELAYS_MS[attempt];
+    if (response.ok || delay === undefined || !CHAT_TRANSIENT_RETRY_STATUSES.has(response.status)) {
+      return response;
+    }
+
+    const errorMessage = await readErrorMessage(response);
+    console.warn(
+      `[LLM] Chat Completions transient error (${response.status}), retrying in ${delay}ms: ` +
+      `${errorMessage.slice(0, 300) || '<empty response>'}`
+    );
+    await wait(delay);
+  }
+
+  throw new Error('LLM API 重试次数已耗尽');
+}
+
 async function fetchLLMStream(
   provider: LLMProvider,
   endpoint: ProviderEndpoint,
@@ -823,6 +856,30 @@ async function fetchLLMStream(
   messages: LLMChatMessage[],
   options: ChatStreamOptions
 ): Promise<LLMStreamResult> {
+  const requestChatStream = async (): Promise<LLMStreamResult> => {
+    const chatResponse = await postChatLLMStreamWithRetry(
+      endpoint.apiUrl,
+      buildHeaders(provider, endpoint.apiUrl, options.apiKey),
+      JSON.stringify(buildChatPayload(
+        provider,
+        endpoint.modelName,
+        cleanedMessages,
+        options
+      ))
+    );
+
+    if (!chatResponse.ok) {
+      const chatError = await readErrorMessage(chatResponse);
+      throw new Error(`LLM API error (${chatResponse.status}): ${chatError}`);
+    }
+
+    return { response: chatResponse, usesResponsesApi: false };
+  };
+
+  if (!endpoint.usesResponsesApi) {
+    return requestChatStream();
+  }
+
   const responsesUrl = getResponsesUrl(endpoint);
   const responsesResponse = await postLLMStream(
     responsesUrl,
@@ -849,23 +906,7 @@ async function fetchLLMStream(
     `(${responsesResponse.status}), falling back to Chat Completions`
   );
 
-  const chatResponse = await postLLMStream(
-    endpoint.apiUrl,
-    buildHeaders(provider, endpoint.apiUrl, options.apiKey),
-    JSON.stringify(buildChatPayload(
-      provider,
-      endpoint.modelName,
-      cleanedMessages,
-      options
-    ))
-  );
-
-  if (!chatResponse.ok) {
-    const chatError = await readErrorMessage(chatResponse);
-    throw new Error(`LLM API error (${chatResponse.status}): ${chatError}`);
-  }
-
-  return { response: chatResponse, usesResponsesApi: false };
+  return requestChatStream();
 }
 
 /**
