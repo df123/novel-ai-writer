@@ -309,13 +309,16 @@ async function callZaiMcpTool(endpoint: string, toolName: string, args: Record<s
   if (rpcResult.error) throw new Error(rpcResult.error.message || 'Z.AI MCP 调用失败');
 
   const result = rpcResult.result as McpToolResult | undefined;
-  if (result?.isError) throw new Error('Z.AI MCP 工具返回错误');
 
   const text = (result?.content || [])
     .filter(item => item.type === 'text' || item.text !== undefined)
     .map(item => item.text || '')
     .join('\n')
     .trim();
+
+  if (result?.isError) {
+    throw new Error(`Z.AI MCP 工具返回错误：${normalizeText(text, 300) || '未知原因'}`);
+  }
 
   if (!text) throw new Error('Z.AI MCP 返回内容为空');
   return text;
@@ -448,10 +451,20 @@ function parseZaiJsonText(text: string): unknown {
   return parsed;
 }
 
+function normalizeRepeatedPercentEncoding(url: string): string {
+  let normalized = url;
+  for (let depth = 0; depth < 3 && /%25(?:[0-9A-Fa-f]{2})/.test(normalized); depth += 1) {
+    normalized = normalized.replace(/%25([0-9A-Fa-f]{2})/g, '%$1');
+  }
+  return normalized;
+}
+
 function toResearchSource(item: unknown): ResearchSource | null {
   if (item === null || typeof item !== 'object') return null;
   const record = item as Record<string, unknown>;
-  const url = normalizeText(record.url || record.link || record.source || record.pageUrl, 1000);
+  const url = normalizeRepeatedPercentEncoding(
+    normalizeText(record.url || record.link || record.source || record.pageUrl, 1000)
+  );
   const title = normalizeText(record.title || record.name || record.pageTitle || record.heading, 300);
   if (!url || !title) return null;
 
@@ -485,7 +498,7 @@ function normalizeZaiSearch(text: string, limit: number): ResearchSource[] {
   for (const link of markdownLinks) {
     const match = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(link);
     if (!match) continue;
-    lineResults.push({ title: normalizeText(match[1], 300), url: match[2] });
+    lineResults.push({ title: normalizeText(match[1], 300), url: normalizeRepeatedPercentEncoding(match[2]) });
   }
 
   return lineResults.slice(0, limit);
@@ -541,7 +554,7 @@ export async function webSearch(queryText: string, maxResults?: number): Promise
 }
 
 export async function readWebPage(rawUrl: string, maxChars?: number): Promise<WebPageResult> {
-  const url = await assertPublicHttpUrl(rawUrl);
+  const url = await assertPublicHttpUrl(normalizeRepeatedPercentEncoding(rawUrl.trim()));
   const limit = Math.min(Math.max(Number(maxChars) || 4000, 500), MAX_WEB_PAGE_CHARS);
   const cacheKey = JSON.stringify(['zai-web-reader', url.toString(), limit]);
   const cached = getCache<WebPageResult>(cacheKey);

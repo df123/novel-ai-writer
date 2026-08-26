@@ -60,6 +60,7 @@ export const buildSystemPrompt = (
       systemPrompt += `当前可用研究工具：${researchToolNames.join(', ')}。\n`;
       systemPrompt += '写作中遇到必须可信的现实事实、专业知识、历史背景、地理文化、天气细节或参考书籍时，优先使用研究工具查证，不要凭空编造关键资料。\n';
       systemPrompt += '搜索时先用具体关键词获取结果；只有当摘要不足以支撑创作时，再选择最有价值的 URL 调用 read_web_page 或 read_wikipedia。\n';
+      systemPrompt += '如果 read_web_page 对某个 URL 返回错误，不要重复读取同一个 URL；应改读搜索结果中的另一个来源，或改用其他可用研究工具。\n';
       systemPrompt += '引用研究资料写作时，应在最终回答末尾用 Markdown 链接列出关键来源；事实与创作想象要清楚区分。\n';
       systemPrompt += '研究结果较长时，只提取与当前小说相关的信息，不要把全文或无关结果复述给用户。\n';
     }
