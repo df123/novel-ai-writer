@@ -97,7 +97,11 @@
             <div v-if="message.role === 'user'" class="user-message" v-html="highlightCommands(message.content)">
             </div>
             <div v-if="message.role === 'tool'">
-              <div class="tool-result">
+              <ResearchResultCard
+                v-if="researchResultViews[message.id]"
+                :result="researchResultViews[message.id]"
+              />
+              <div v-else class="tool-result">
                 <div class="tool-result-title">📋 工具结果</div>
                 <pre class="tool-result-content">{{ formatToolArguments(message.content) }}</pre>
               </div>
@@ -325,9 +329,11 @@ import { useCharacterStore } from '../stores/characterStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
+import ResearchResultCard from './ResearchResultCard.vue';
 import { formatTimestamp } from '../../shared/utils';
 import { marked } from 'marked';
 import { COMMANDS, COMMAND_GROUP_LABELS, CommandGroup, type Command } from '../utils/commands';
+import { createResearchResultView, type ResearchResultView } from '../utils/researchResults';
 import type { InputInstance } from 'element-plus';
 
 marked.setOptions({
@@ -352,6 +358,29 @@ const { theme: currentTheme } = storeToRefs(themeStore);
 const { loadModels, updateSettings } = settingsStore;
 
 const { createChat, sendMessage, cancelMessage, deleteMessage } = chatStore;
+
+/** 将资料研究工具结果转换成精美卡片使用的视图 */
+const researchResultViews = computed(() => {
+  const toolNameByCallId = new Map<string, string>();
+  const views: Record<string, ResearchResultView> = {};
+
+  for (const message of messages.value) {
+    if (message.role !== 'assistant' || !Array.isArray(message.tool_calls)) continue;
+    for (const toolCall of message.tool_calls) {
+      toolNameByCallId.set(toolCall.id, toolCall.function.name);
+    }
+  }
+
+  for (const message of messages.value) {
+    if (message.role !== 'tool' || !message.tool_call_id) continue;
+    const toolName = toolNameByCallId.get(message.tool_call_id);
+    if (!toolName) continue;
+    const view = createResearchResultView(message.content, toolName);
+    if (view) views[message.id] = view;
+  }
+
+  return views;
+});
 
 /** 累计 token 用量（基于有实际 tokenUsage 数据的 assistant 消息） */
 const accumulatedTokenUsage = computed(() => {

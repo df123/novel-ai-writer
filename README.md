@@ -196,6 +196,12 @@ Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次
 
 > 详细路由和请求参数说明见 [docs/implementation/LLM_PROVIDER_EXPANSION.md](docs/implementation/LLM_PROVIDER_EXPANSION.md)。
 
+## 资料研究工具
+
+内置 Z.AI Web Search / Web Reader、Wikipedia、Open-Meteo 历史天气和 Open Library 书籍搜索。模型可在写作时按需联网查证事实、历史背景、地理文化、天气细节和参考书；每个工具均可在「LLM设置 → 资料研究」中独立开关，并配有结果数量、正文长度和缓存限制，避免外部资料挤占小说上下文。
+
+> 详细说明见 [docs/guides/RESEARCH_TOOLS.md](docs/guides/RESEARCH_TOOLS.md)。
+
 ## 为什么要用pnpm
 
 - **节省磁盘空间**：pnpm使用硬链接，不重复下载相同版本的包

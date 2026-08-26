@@ -78,6 +78,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const opencodeReasoningEffort = ref('none');
   const cliproxyReasoningEnabled = ref(false);
   const cliproxyReasoningEffort = ref('auto');
+  const researchWebSearchEnabled = ref(true);
+  const researchWebReaderEnabled = ref(true);
+  const researchWikipediaEnabled = ref(true);
+  const researchWeatherEnabled = ref(true);
+  const researchBooksEnabled = ref(true);
   // 记录解密失败的 API 密钥 key 名称，供组件读取以显示提示
   const decryptFailedKeys = ref<string[]>([]);
 
@@ -155,6 +160,11 @@ export const useSettingsStore = defineStore('settings', () => {
       opencodeReasoningEffort.value = settings.opencode_reasoning_effort || 'none';
       cliproxyReasoningEnabled.value = settings.cliproxy_reasoning_enabled === 'true';
       cliproxyReasoningEffort.value = settings.cliproxy_reasoning_effort || 'auto';
+      researchWebSearchEnabled.value = settings.research_web_search_enabled !== 'false';
+      researchWebReaderEnabled.value = settings.research_web_reader_enabled !== 'false';
+      researchWikipediaEnabled.value = settings.research_wikipedia_enabled !== 'false';
+      researchWeatherEnabled.value = settings.research_weather_enabled !== 'false';
+      researchBooksEnabled.value = settings.research_books_enabled !== 'false';
       showThinkingContent.value = settings.show_thinking_content === 'true' || settings.show_thinking_content === true;
       showToolCalls.value = settings.show_tool_calls === 'true' || settings.show_tool_calls === true;
     } catch (error) {
@@ -183,6 +193,11 @@ export const useSettingsStore = defineStore('settings', () => {
     opencodeReasoningEffort?: string;
     cliproxyReasoningEnabled?: boolean;
     cliproxyReasoningEffort?: string;
+    researchWebSearchEnabled?: boolean;
+    researchWebReaderEnabled?: boolean;
+    researchWikipediaEnabled?: boolean;
+    researchWeatherEnabled?: boolean;
+    researchBooksEnabled?: boolean;
   }) => {
     isLoading.value = true;
     try {
@@ -256,6 +271,26 @@ export const useSettingsStore = defineStore('settings', () => {
         currentSettings.cliproxy_reasoning_effort = settings.cliproxyReasoningEffort;
       }
 
+      if (settings.researchWebSearchEnabled !== undefined) {
+        currentSettings.research_web_search_enabled = settings.researchWebSearchEnabled ? 'true' : 'false';
+      }
+
+      if (settings.researchWebReaderEnabled !== undefined) {
+        currentSettings.research_web_reader_enabled = settings.researchWebReaderEnabled ? 'true' : 'false';
+      }
+
+      if (settings.researchWikipediaEnabled !== undefined) {
+        currentSettings.research_wikipedia_enabled = settings.researchWikipediaEnabled ? 'true' : 'false';
+      }
+
+      if (settings.researchWeatherEnabled !== undefined) {
+        currentSettings.research_weather_enabled = settings.researchWeatherEnabled ? 'true' : 'false';
+      }
+
+      if (settings.researchBooksEnabled !== undefined) {
+        currentSettings.research_books_enabled = settings.researchBooksEnabled ? 'true' : 'false';
+      }
+
       if (settings.showToolCalls !== undefined) {
         currentSettings.show_tool_calls = settings.showToolCalls ? 'true' : 'false';
       }
@@ -298,6 +333,11 @@ export const useSettingsStore = defineStore('settings', () => {
       opencodeReasoningEffort.value = updated.opencode_reasoning_effort || 'none';
       cliproxyReasoningEnabled.value = updated.cliproxy_reasoning_enabled === 'true';
       cliproxyReasoningEffort.value = updated.cliproxy_reasoning_effort || 'auto';
+      researchWebSearchEnabled.value = updated.research_web_search_enabled !== 'false';
+      researchWebReaderEnabled.value = updated.research_web_reader_enabled !== 'false';
+      researchWikipediaEnabled.value = updated.research_wikipedia_enabled !== 'false';
+      researchWeatherEnabled.value = updated.research_weather_enabled !== 'false';
+      researchBooksEnabled.value = updated.research_books_enabled !== 'false';
       showThinkingContent.value = updated.show_thinking_content === 'true' || updated.show_thinking_content === true;
       showToolCalls.value = updated.show_tool_calls === 'true' || updated.show_tool_calls === true;
     } catch (error) {
@@ -428,6 +468,11 @@ export const useSettingsStore = defineStore('settings', () => {
     opencodeReasoningEffort,
     cliproxyReasoningEnabled,
     cliproxyReasoningEffort,
+    researchWebSearchEnabled,
+    researchWebReaderEnabled,
+    researchWikipediaEnabled,
+    researchWeatherEnabled,
+    researchBooksEnabled,
     decryptFailedKeys,
     loadSettings,
     updateSettings,

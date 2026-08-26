@@ -201,6 +201,59 @@
           </div>
         </div>
       </el-tab-pane>
+      <el-tab-pane label="资料研究" name="research">
+        <div class="tab-content">
+          <p class="param-description">
+            研究工具会按需联网查资料。Z.AI 工具使用已保存的 Z.AI API 密钥；其余工具免费、无需密钥。
+          </p>
+          <el-alert
+            v-if="!zaiApiKey"
+            title="未配置 Z.AI API 密钥时，网络搜索和网页阅读不会暴露给模型；维基百科、历史天气和书籍搜索仍可使用。"
+            type="info"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
+          />
+          <div class="research-option">
+            <div class="switch-item">
+              <el-switch v-model="researchWebSearchValue" />
+              <span class="switch-label">网络搜索（Z.AI Web Search）</span>
+            </div>
+            <p class="param-description">查证实时信息、事实、新闻和专业知识。</p>
+          </div>
+          <div class="research-option">
+            <div class="switch-item">
+              <el-switch v-model="researchWebReaderValue" />
+              <span class="switch-label">网页阅读（Z.AI Web Reader）</span>
+            </div>
+            <p class="param-description">读取公开网页正文，获取比摘要更完整的细节。</p>
+          </div>
+          <div class="research-option">
+            <div class="switch-item">
+              <el-switch v-model="researchWikipediaValue" />
+              <span class="switch-label">维基百科搜索与阅读</span>
+            </div>
+            <p class="param-description">查百科概念、历史事件、地理、科学和文化背景。</p>
+          </div>
+          <div class="research-option">
+            <div class="switch-item">
+              <el-switch v-model="researchWeatherValue" />
+              <span class="switch-label">历史天气（Open-Meteo）</span>
+            </div>
+            <p class="param-description">为真实地点和日期补充天气、雨雪、风速等细节。</p>
+          </div>
+          <div class="research-option">
+            <div class="switch-item">
+              <el-switch v-model="researchBooksValue" />
+              <span class="switch-label">书籍搜索（Open Library）</span>
+            </div>
+            <p class="param-description">查参考书、作者、出版年份、语言和主题标签。</p>
+          </div>
+          <el-button type="primary" @click="handleSaveResearch">
+            保存资料研究设置
+          </el-button>
+        </div>
+      </el-tab-pane>
       <el-tab-pane label="模型参数" name="params">
         <div class="tab-content">
           <div class="param-section">
@@ -255,7 +308,7 @@
         <div>
           <el-button @click="handleClose">关闭</el-button>
           <el-button
-            v-if="activeTab !== 'params'"
+            v-if="['deepseek', 'openrouter', 'zai', 'opencode', 'cliproxy'].includes(activeTab)"
             :disabled="isModelConfigDirty"
             :loading="isLoadingModels"
             @click="handleRefreshModels"
@@ -314,6 +367,11 @@ const {
   opencodeReasoningEffort,
   cliproxyReasoningEnabled,
   cliproxyReasoningEffort,
+  researchWebSearchEnabled,
+  researchWebReaderEnabled,
+  researchWikipediaEnabled,
+  researchWeatherEnabled,
+  researchBooksEnabled,
   decryptFailedKeys,
   isLoadingModels,
   modelCaches,
@@ -341,6 +399,11 @@ const opencodeReasoningValue = ref(false);
 const opencodeEffortValue = ref('none');
 const cliproxyReasoningValue = ref(false);
 const cliproxyEffortValue = ref('auto');
+const researchWebSearchValue = ref(true);
+const researchWebReaderValue = ref(true);
+const researchWikipediaValue = ref(true);
+const researchWeatherValue = ref(true);
+const researchBooksValue = ref(true);
 
 const isModelConfigDirty = computed(() => {
   switch (activeTab.value) {
@@ -402,6 +465,11 @@ watch(visible, async (val) => {
     opencodeEffortValue.value = opencodeReasoningEffort.value;
     cliproxyReasoningValue.value = cliproxyReasoningEnabled.value;
     cliproxyEffortValue.value = cliproxyReasoningEffort.value;
+    researchWebSearchValue.value = researchWebSearchEnabled.value;
+    researchWebReaderValue.value = researchWebReaderEnabled.value;
+    researchWikipediaValue.value = researchWikipediaEnabled.value;
+    researchWeatherValue.value = researchWeatherEnabled.value;
+    researchBooksValue.value = researchBooksEnabled.value;
   }
 });
 
@@ -463,6 +531,21 @@ const handleSaveCliproxy = async () => {
   }
 };
 
+const handleSaveResearch = async () => {
+  try {
+    await updateSettings({
+      researchWebSearchEnabled: researchWebSearchValue.value,
+      researchWebReaderEnabled: researchWebReaderValue.value,
+      researchWikipediaEnabled: researchWikipediaValue.value,
+      researchWeatherEnabled: researchWeatherValue.value,
+      researchBooksEnabled: researchBooksValue.value,
+    });
+    ElMessage.success('资料研究设置已保存');
+  } catch (error) {
+    ElMessage.error('保存失败: ' + (error as Error).message);
+  }
+};
+
 const handleSaveParams = async () => {
   try {
     await updateSettings({
@@ -492,6 +575,11 @@ const handleClose = () => {
   opencodeEffortValue.value = opencodeReasoningEffort.value;
   cliproxyReasoningValue.value = cliproxyReasoningEnabled.value;
   cliproxyEffortValue.value = cliproxyReasoningEffort.value;
+  researchWebSearchValue.value = researchWebSearchEnabled.value;
+  researchWebReaderValue.value = researchWebReaderEnabled.value;
+  researchWikipediaValue.value = researchWikipediaEnabled.value;
+  researchWeatherValue.value = researchWeatherEnabled.value;
+  researchBooksValue.value = researchBooksEnabled.value;
   visible.value = false;
 };
 </script>
@@ -520,6 +608,14 @@ const handleClose = () => {
 
 .param-section {
   margin-bottom: 24px;
+}
+
+.research-option {
+  margin-bottom: 16px;
+}
+
+.research-option .switch-item {
+  margin-bottom: 4px;
 }
 
 .param-label {

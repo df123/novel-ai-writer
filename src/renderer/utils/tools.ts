@@ -418,6 +418,182 @@ export const getMiscRecordTool: ToolDefinition = {
 };
 
 /**
+ * 网络搜索工具
+ */
+export const webSearchTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'web_search',
+    description: '联网搜索实时资料。适合查证事实、新闻、地域文化、行业知识、历史背景等写作参考信息。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: '搜索关键词，尽量具体，例如“明代南京漕运制度”',
+        },
+        maxResults: {
+          type: 'number',
+          description: '返回结果数量，1-10，默认 6',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 网页阅读工具
+ */
+export const readWebPageTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'read_web_page',
+    description: '读取一个公开网页的正文。应在 web_search 或 search_wikipedia 返回 URL 后，需要完整细节时使用。',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: '公开 http/https 网页 URL',
+        },
+        maxChars: {
+          type: 'number',
+          description: '返回正文字符数，500-12000，默认 4000',
+        },
+      },
+      required: ['url'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 维基百科搜索工具
+ */
+export const searchWikipediaTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'search_wikipedia',
+    description: '搜索维基百科词条，适合查百科概念、历史事件、地理、科学和文化背景。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: '搜索关键词',
+        },
+        language: {
+          type: 'string',
+          description: '语言代码，如 zh、en，默认 zh',
+        },
+        maxResults: {
+          type: 'number',
+          description: '返回结果数量，1-10，默认 6',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 维基百科阅读工具
+ */
+export const readWikipediaTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'read_wikipedia',
+    description: '读取维基百科词条摘要正文。可先搜索获取标题，再读取需要深入的概念。',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: '词条标题，与 URL 至少提供一个',
+        },
+        url: {
+          type: 'string',
+          description: '维基百科词条 URL，与标题至少提供一个',
+        },
+        language: {
+          type: 'string',
+          description: '语言代码，如 zh、en，默认 zh',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 历史天气查询工具
+ */
+export const getHistoricalWeatherTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'get_historical_weather',
+    description: '查询指定地点的历史天气，可用于让场景、季节、雨雪和出行细节更可信。仅支持历史日期。',
+    parameters: {
+      type: 'object',
+      properties: {
+        location: {
+          type: 'string',
+          description: '地点名称，如“巴黎”',
+        },
+        date: {
+          type: 'string',
+          description: '单个日期，格式 YYYY-MM-DD',
+        },
+        startDate: {
+          type: 'string',
+          description: '开始日期，格式 YYYY-MM-DD',
+        },
+        endDate: {
+          type: 'string',
+          description: '结束日期，格式 YYYY-MM-DD，一次最多 31 天',
+        },
+      },
+      required: ['location'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 书籍搜索工具
+ */
+export const searchBooksTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'search_books',
+    description: '搜索 Open Library 书籍元数据，可用于查参考书、作者、出版年份、语言和主题标签。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: '书名或主题关键词',
+        },
+        author: {
+          type: 'string',
+          description: '作者名',
+        },
+        maxResults: {
+          type: 'number',
+          description: '返回结果数量，1-10，默认 6',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
  * 所有可用工具
  */
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -434,4 +610,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
   updateMiscRecordTool,
   deleteMiscRecordTool,
   getMiscRecordTool,
+  webSearchTool,
+  readWebPageTool,
+  searchWikipediaTool,
+  readWikipediaTool,
+  getHistoricalWeatherTool,
+  searchBooksTool,
 ];

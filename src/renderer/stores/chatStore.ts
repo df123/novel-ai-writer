@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Message, Chat, TimelineNode, Character, Chapter, TokenUsage } from '../../shared/types';
-import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi, miscRecordApi } from '../utils/api';
+import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi, miscRecordApi, researchApi } from '../utils/api';
 import { generateId } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
 import { ALL_TOOLS } from '../utils/tools';
@@ -166,6 +166,24 @@ export const useChatStore = defineStore('chat', () => {
       throw new Error(`请先配置 ${providerLabels[providerName]} API 密钥`);
     }
 
+    const activeTools = ALL_TOOLS.filter(tool => {
+      switch (tool.function.name) {
+        case 'web_search':
+          return settingsStore.researchWebSearchEnabled && Boolean(settingsStore.zaiApiKey);
+        case 'read_web_page':
+          return settingsStore.researchWebReaderEnabled && Boolean(settingsStore.zaiApiKey);
+        case 'search_wikipedia':
+        case 'read_wikipedia':
+          return settingsStore.researchWikipediaEnabled;
+        case 'get_historical_weather':
+          return settingsStore.researchWeatherEnabled;
+        case 'search_books':
+          return settingsStore.researchBooksEnabled;
+        default:
+          return true;
+      }
+    });
+
     // 创建 AbortController 用于取消请求
     abortController.value = new AbortController();
     // 重置创建的消息 ID 数组
@@ -204,7 +222,7 @@ export const useChatStore = defineStore('chat', () => {
       themeStore.theme,
       [],
       [],
-      ALL_TOOLS
+      activeTools
     );
 
     // 如果有章节上下文，将章节内容添加到系统提示中
@@ -243,7 +261,89 @@ export const useChatStore = defineStore('chat', () => {
       const parsedArgs = JSON.parse(args);
 
       try {
+        const getResearchError = (error: unknown): string => {
+          const maybeAxiosError = error as { response?: { data?: { error?: string } }; message?: string };
+          return maybeAxiosError.response?.data?.error || maybeAxiosError.message || '资料研究请求失败，请稍后重试';
+        };
+
         switch (name) {
+          case 'web_search': {
+            try {
+              const response = await researchApi.webSearch({
+                query: parsedArgs.query,
+                maxResults: parsedArgs.maxResults,
+              });
+              return JSON.stringify(response.data);
+            } catch (error) {
+              console.error('[web_search] Failed to search web:', error);
+              return JSON.stringify({ success: false, message: getResearchError(error) });
+            }
+          }
+          case 'read_web_page': {
+            try {
+              const response = await researchApi.readWebPage({
+                url: parsedArgs.url,
+                maxChars: parsedArgs.maxChars,
+              });
+              return JSON.stringify(response.data);
+            } catch (error) {
+              console.error('[read_web_page] Failed to read web page:', error);
+              return JSON.stringify({ success: false, message: getResearchError(error) });
+            }
+          }
+          case 'search_wikipedia': {
+            try {
+              const response = await researchApi.searchWikipedia({
+                query: parsedArgs.query,
+                language: parsedArgs.language,
+                maxResults: parsedArgs.maxResults,
+              });
+              return JSON.stringify(response.data);
+            } catch (error) {
+              console.error('[search_wikipedia] Failed to search Wikipedia:', error);
+              return JSON.stringify({ success: false, message: getResearchError(error) });
+            }
+          }
+          case 'read_wikipedia': {
+            try {
+              const response = await researchApi.readWikipedia({
+                title: parsedArgs.title,
+                url: parsedArgs.url,
+                language: parsedArgs.language,
+              });
+              return JSON.stringify(response.data);
+            } catch (error) {
+              console.error('[read_wikipedia] Failed to read Wikipedia:', error);
+              return JSON.stringify({ success: false, message: getResearchError(error) });
+            }
+          }
+          case 'get_historical_weather': {
+            try {
+              const response = await researchApi.getWeather({
+                location: parsedArgs.location,
+                date: parsedArgs.date,
+                startDate: parsedArgs.startDate,
+                endDate: parsedArgs.endDate,
+              });
+              return JSON.stringify(response.data);
+            } catch (error) {
+              console.error('[get_historical_weather] Failed to get weather:', error);
+              return JSON.stringify({ success: false, message: getResearchError(error) });
+            }
+          }
+          case 'search_books': {
+            try {
+              const response = await researchApi.searchBooks({
+                query: parsedArgs.query,
+                author: parsedArgs.author,
+                maxResults: parsedArgs.maxResults,
+              });
+              return JSON.stringify(response.data);
+            } catch (error) {
+              console.error('[search_books] Failed to search books:', error);
+              return JSON.stringify({ success: false, message: getResearchError(error) });
+            }
+          }
           case 'create_timeline': {
             const existingTimeline = timelineStore.nodes.find(n => n.title === parsedArgs.title);
             if (existingTimeline) {
@@ -871,7 +971,7 @@ export const useChatStore = defineStore('chat', () => {
           model: options.modelName,
           temperature: settingsStore.temperature,
           apiKey,
-          tools: ALL_TOOLS,
+          tools: activeTools,
           thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
           reasoning_effort: providerName === 'deepseek' ? settingsStore.reasoningEffort : undefined,
           cliproxyBaseUrl: providerName === 'cliproxy' ? settingsStore.cliproxyBaseUrl : undefined,

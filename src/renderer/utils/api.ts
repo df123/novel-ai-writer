@@ -145,6 +145,22 @@ export const modelsApi = {
     api.post(`/llm/models/${provider}`, { apiKey, baseUrl }),
 };
 
+// 资料研究 API
+export const researchApi = {
+  webSearch: (data: { query: string; maxResults?: number }) =>
+    api.post('/research/web-search', data),
+  readWebPage: (data: { url: string; maxChars?: number }) =>
+    api.post('/research/web-reader', data),
+  searchWikipedia: (data: { query: string; language?: string; maxResults?: number }) =>
+    api.post('/research/wikipedia/search', data),
+  readWikipedia: (data: { title?: string; url?: string; language?: string }) =>
+    api.post('/research/wikipedia', data),
+  getWeather: (data: { location: string; date?: string; startDate?: string; endDate?: string }) =>
+    api.post('/research/weather', data),
+  searchBooks: (data: { query?: string; author?: string; maxResults?: number }) =>
+    api.post('/research/books', data),
+};
+
 // Prompts
 export const promptApi = {
   list: () => api.get('/prompts'),

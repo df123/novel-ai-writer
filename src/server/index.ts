@@ -22,6 +22,7 @@ import promptsRouter from './routes/prompts';
 import exportRouter from './routes/export';
 import databaseRouter from './routes/database';
 import miscRecordsRouter from './routes/miscRecords';
+import researchRouter from './routes/research';
 
 // 初始化 Express 应用
 const app: App = express();
@@ -72,6 +73,8 @@ console.log('13. 注册 exportRouter (路径: /api)');
 app.use('/api', exportRouter);
 console.log('14. 注册 miscRecordsRouter (路径: /api)');
 app.use('/api', miscRecordsRouter);
+console.log('15. 注册 researchRouter (路径: /api/research)');
+app.use('/api/research', researchRouter);
 console.log('=== 路由注册完成 ===');
 
 // 托管前端静态文件（生产模式）
@@ -130,6 +133,13 @@ initDB()
       console.log('  - POST /api/projects');
       console.log('  - PUT /api/projects/:id');
       console.log('  - DELETE /api/projects/:id');
+      console.log('\nresearchRouter 路由:');
+      console.log('  - POST /api/research/web-search');
+      console.log('  - POST /api/research/web-reader');
+      console.log('  - POST /api/research/wikipedia/search');
+      console.log('  - POST /api/research/wikipedia');
+      console.log('  - POST /api/research/weather');
+      console.log('  - POST /api/research/books');
       console.log('====================\n');
     });
   })
