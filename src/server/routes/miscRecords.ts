@@ -31,6 +31,7 @@ interface UpdateMiscRecordRequestBody {
  * 查询杂项记录参数接口
  */
 interface GetMiscRecordsQuery {
+  title?: string;
   search?: string;
   category?: string;
 }
@@ -40,10 +41,15 @@ interface GetMiscRecordsQuery {
  */
 router.get('/projects/:projectId/misc-records', asyncHandler(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { search, category } = req.query as GetMiscRecordsQuery;
+  const { title, search, category } = req.query as GetMiscRecordsQuery;
 
   let sql = 'SELECT * FROM misc_records WHERE project_id = ? AND deleted = 0';
   const params: (string | number)[] = [projectId];
+
+  if (title) {
+    sql += ' AND title LIKE ?';
+    params.push(`%${title}%`);
+  }
 
   if (search) {
     sql += ' AND (title LIKE ? OR content LIKE ?)';

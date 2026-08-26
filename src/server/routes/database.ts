@@ -27,7 +27,7 @@ interface GetTableDataQuery {
   page?: string;
   pageSize?: string;
   orderBy?: string;
-  order?: 'asc' | 'desc';
+  order?: 'asc' | 'ASC' | 'desc' | 'DESC';
 }
 
 /**
@@ -43,6 +43,9 @@ router.get('/tables', asyncHandler(async (_req: Request, res: Response) => {
     // 跳过 sqlite 系统表
     const tableName = table.name as string;
     if (tableName.startsWith('sqlite_')) {
+      continue;
+    }
+    if (!ALLOWED_TABLES.includes(tableName)) {
       continue;
     }
 
@@ -95,7 +98,7 @@ router.get('/tables/:tableName', asyncHandler(async (req: Request, res: Response
     orderByColumn = defaultOrderBy;
   }
 
-  const sortOrder = order === 'desc' ? 'DESC' : 'ASC';
+  const sortOrder = String(order || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
   // 验证分页参数
   const pageNum = page ? parseInt(page) : 1;
@@ -151,7 +154,7 @@ router.post('/query', asyncHandler(async (req: Request, res: Response) => {
   // 执行查询
   const result = query(sql, params || []);
 
-  res.json(result);
+  res.json({ results: result });
 }));
 
 /**
@@ -226,7 +229,14 @@ router.post('/tables/:tableName', asyncHandler(async (req: Request, res: Respons
   saveDB();
 
   // 返回插入的数据
-  const insertedData = query(`SELECT * FROM ${tableName} WHERE id = ?`, [data.id]);
+  const primaryColumn = columns.find(col => col.pk === 1);
+  const primaryColumnName = primaryColumn?.name;
+  const insertedData = primaryColumnName && data[primaryColumnName] !== undefined
+    ? query(
+        `SELECT * FROM ${tableName} WHERE ${primaryColumnName} = ?`,
+        [data[primaryColumnName]]
+      )
+    : [];
   if (insertedData.length > 0) {
     res.status(201).json(insertedData[0]);
   } else {

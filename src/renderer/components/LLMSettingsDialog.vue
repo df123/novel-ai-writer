@@ -360,6 +360,9 @@ const handleSaveDeepSeek = async () => {
 const handleSaveOpenRouter = async () => {
   try {
     await updateSettings({ openrouterApiKey: openrouterKey.value });
+    if (settingsStore.selectedProvider === 'openrouter') {
+      await loadModels('openrouter');
+    }
     ElMessage.success('OpenRouter API密钥已保存');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);

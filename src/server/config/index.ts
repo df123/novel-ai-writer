@@ -44,10 +44,15 @@ export const ALLOWED_TABLES: readonly string[] = [
   'messages',
   'timeline_nodes',
   'characters',
+  'chapters',
   'prompt_templates',
   'settings',
   'timeline_versions',
-  'character_versions'
+  'character_versions',
+  'themes',
+  'theme_history',
+  'misc_records',
+  'misc_record_versions'
 ] as const;
 
 /** LLM 提供商配置 */

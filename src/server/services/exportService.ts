@@ -20,10 +20,13 @@ export function exportProject(projectId: string, format: 'md' | 'txt'): ExportRe
 
   const chats = query<DbChat>('SELECT * FROM chats WHERE project_id = ?', [projectId]);
   const timeline = query<DbTimelineNode>(
-    'SELECT * FROM timeline_nodes WHERE project_id = ? ORDER BY order_index ASC',
+    'SELECT * FROM timeline_nodes WHERE project_id = ? AND deleted = 0 ORDER BY order_index ASC',
     [projectId]
   );
-  const characters = query<DbCharacter>('SELECT * FROM characters WHERE project_id = ?', [projectId]);
+  const characters = query<DbCharacter>(
+    'SELECT * FROM characters WHERE project_id = ? AND deleted = 0',
+    [projectId]
+  );
 
   // 一次性查询所有 messages，避免 N+1 查询问题
   const chatIds = chats.map(c => c.id);

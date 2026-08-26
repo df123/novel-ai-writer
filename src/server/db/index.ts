@@ -72,6 +72,9 @@ export async function initDB(): Promise<DatabaseConnection> {
   // 设置数据库实例
   setDatabase(dbInstance);
 
+  // SQLite 默认关闭外键约束，必须显式开启才能触发级联删除
+  dbInstance.run('PRAGMA foreign_keys = ON');
+
   // 始终创建表（如果不存在）
   const createTableSQLs = getCreateTablesSQL();
   for (const sql of createTableSQLs) {

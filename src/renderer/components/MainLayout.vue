@@ -106,6 +106,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useCharacterStore } from '../stores/characterStore';
 import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
+import { useMiscRecordStore } from '../stores/miscRecordStore';
 import ChapterPanel from './ChapterPanel.vue';
 import TimelinePanel from './TimelinePanel.vue';
 import ChatPanel from './ChatPanel.vue';
@@ -123,6 +124,7 @@ const timelineStore = useTimelineStore();
 const characterStore = useCharacterStore();
 const chapterStore = useChapterStore();
 const themeStore = useThemeStore();
+const miscRecordStore = useMiscRecordStore();
 
 const showSettings = ref(false);
 const showCreateProject = ref(false);
@@ -140,6 +142,7 @@ watch(
       await characterStore.loadCharacters(currentProject.id);
       await chapterStore.loadChapters(currentProject.id);
       await themeStore.loadTheme(currentProject.id);
+      await miscRecordStore.loadRecords(currentProject.id, {});
     } else {
       themeStore.clearTheme();
     }

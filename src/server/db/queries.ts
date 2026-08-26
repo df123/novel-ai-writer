@@ -63,4 +63,6 @@ export function saveDB(): void {
   const data = db.export();
   const buffer = Buffer.from(data);
   fs.writeFileSync(dbPath, buffer);
+  // sql.js 的 export() 会重置连接级 PRAGMA，保存后必须重新开启外键
+  db.run('PRAGMA foreign_keys = ON');
 }

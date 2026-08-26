@@ -377,6 +377,16 @@ router.put('/:chapterId/restore', asyncHandler(async (req: Request, res: Respons
     return;
   }
 
+  const duplicateChapters = query<DbChapter>(
+    'SELECT * FROM chapters WHERE project_id = ? AND chapter_number = ? AND deleted = 0 AND id != ?',
+    [projectId, chapters[0].chapter_number, chapterId]
+  );
+
+  if (duplicateChapters.length > 0) {
+    res.status(400).json({ error: '章节编号已存在，无法恢复' });
+    return;
+  }
+
   run('UPDATE chapters SET deleted = 0, deleted_at = NULL WHERE id = ?', [chapterId]);
   saveDB();
 

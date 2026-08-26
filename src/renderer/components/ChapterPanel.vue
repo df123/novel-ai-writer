@@ -297,6 +297,7 @@ const handleEmptyTrash = async () => {
 const handleExport = async () => {
   if (!projectStore.currentProject) return;
 
+  let format: 'txt' | 'md';
   try {
     await ElMessageBox.confirm(
       '请选择导出格式',
@@ -307,19 +308,19 @@ const handleExport = async () => {
         distinguishCancelAndClose: true,
         type: 'info',
       }
-    ).then(() => {
-      exportChapters(projectStore.currentProject!.id, 'txt');
-    }).catch((action) => {
-      if (action === 'cancel') {
-        exportChapters(projectStore.currentProject!.id, 'md');
-      }
-    });
+    );
+    format = 'txt';
+  } catch (action) {
+    if (action !== 'cancel') return;
+    format = 'md';
+  }
+
+  try {
+    await exportChapters(projectStore.currentProject.id, format);
     ElMessage.success('导出成功');
   } catch (error) {
-    if (error !== 'cancel' && error !== 'close') {
-      console.error('Failed to export chapters:', error);
-      ElMessage.error('导出失败');
-    }
+    console.error('Failed to export chapters:', error);
+    ElMessage.error('导出失败');
   }
 };
 

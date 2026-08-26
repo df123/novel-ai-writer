@@ -277,8 +277,9 @@ export const themeApi = {
 
 // 杂项记录 API
 export const miscRecordApi = {
-  list: (projectId: string, filters?: { search?: string; category?: string }) => {
+  list: (projectId: string, filters?: { title?: string; search?: string; category?: string }) => {
     const params = new URLSearchParams();
+    if (filters?.title) params.append('title', filters.title);
     if (filters?.search) params.append('search', filters.search);
     if (filters?.category) params.append('category', filters.category);
     const queryString = params.toString();

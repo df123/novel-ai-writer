@@ -18,13 +18,17 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
     return Array.from(categorySet).sort();
   });
 
-  const loadRecords = async (projectId: string) => {
+  const loadRecords = async (
+    projectId: string,
+    filters?: { search?: string; category?: string }
+  ) => {
     isLoading.value = true;
     try {
-      const response = await miscRecordApi.list(projectId, {
+      const effectiveFilters = filters ?? {
         search: searchQuery.value || undefined,
         category: selectedCategory.value || undefined,
-      });
+      };
+      const response = await miscRecordApi.list(projectId, effectiveFilters);
       records.value = response.data;
     } catch (error) {
       console.error('加载杂项记录失败:', error);

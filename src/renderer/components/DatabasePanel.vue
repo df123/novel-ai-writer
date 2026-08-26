@@ -58,7 +58,7 @@
               <el-button :icon="Edit" size="small" text @click="openEditDialog(row)">编辑</el-button>
               <el-popconfirm
                 title="确定要删除这条记录吗？"
-                @confirm="deleteData(row.id)"
+                @confirm="deleteData(getRowId(row))"
               >
                 <template #reference>
                   <el-button :icon="Delete" size="small" text type="danger">删除</el-button>
@@ -208,8 +208,22 @@ const queryResultColumns = ref<string[]>([]);
 const editableColumns = computed(() => {
   if (!selectedTable.value) return [];
   const excludedFields = ['id', 'created_at', 'updated_at', 'createdAt', 'updatedAt', 'key'];
-  return selectedTable.value.columns.filter(col => !excludedFields.includes(col.name));
+  return selectedTable.value.columns.filter(col => {
+    if (col.primaryKey) {
+      return dialogMode.value === 'create' && col.name !== 'id';
+    }
+    return !excludedFields.includes(col.name);
+  });
 });
+
+const getPrimaryKeyName = (): string => {
+  return selectedTable.value?.columns.find(col => col.primaryKey)?.name || 'id';
+};
+
+const getRowId = (row: Record<string, unknown>): string => {
+  const rowId = row[getPrimaryKeyName()];
+  return rowId === undefined || rowId === null ? '' : String(rowId);
+};
 
 // 判断是否为文本类型
 const isTextType = (type: string): boolean => {
@@ -335,7 +349,7 @@ const openCreateDialog = () => {
 // 打开编辑对话框
 const openEditDialog = (row: any) => {
   dialogMode.value = 'edit';
-  editingId.value = row.id;
+  editingId.value = getRowId(row);
   formData.value = { ...row };
   dialogVisible.value = true;
 };

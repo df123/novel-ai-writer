@@ -312,6 +312,7 @@ export const useChatStore = defineStore('chat', () => {
             
             await timelineStore.updateNode(parsedArgs.id, {
               title: parsedArgs.title,
+              date: parsedArgs.date,
               content: parsedArgs.description,
               createVersion: true,
             });
@@ -559,15 +560,11 @@ export const useChatStore = defineStore('chat', () => {
                 return JSON.stringify({ success: false, message: `未找到人物: ${parsedArgs.id}` });
               } else {
                 // 使用 API 进行服务器端筛选，避免重复筛选
-                const filters: { name?: string; description?: string; personality?: string; background?: string } = {};
+                const filters: { name?: string; personality?: string; background?: string } = {};
                 
                 // 验证并添加筛选条件（仅非空字符串）
                 if (parsedArgs.name && parsedArgs.name.trim()) {
                   filters.name = parsedArgs.name.trim();
-                }
-                
-                if (parsedArgs.description && parsedArgs.description.trim()) {
-                  filters.description = parsedArgs.description.trim();
                 }
                 
                 if (parsedArgs.personality && parsedArgs.personality.trim()) {
@@ -580,7 +577,16 @@ export const useChatStore = defineStore('chat', () => {
                 
                 // 从 API 获取筛选后的结果
                 const response = await characterApi.list(projectStore.currentProject.id, filters);
-                const characters = response.data.map((c: Character) => ({
+                const descriptionFilter = parsedArgs.description?.trim().toLowerCase();
+                const filteredCharacters = descriptionFilter
+                  ? response.data.filter((c: Character) => [
+                      c.name,
+                      c.personality,
+                      c.background,
+                      c.relationships
+                    ].some(field => field?.toLowerCase().includes(descriptionFilter)))
+                  : response.data;
+                const characters = filteredCharacters.map((c: Character) => ({
                   id: c.id,
                   name: c.name,
                   personality: c.personality || '',
@@ -594,7 +600,7 @@ export const useChatStore = defineStore('chat', () => {
                   count: characters.length,
                   filters: {
                     name: filters.name || null,
-                    description: filters.description || null,
+                    description: parsedArgs.description?.trim() || null,
                     personality: filters.personality || null,
                     background: filters.background || null,
                   },
@@ -983,7 +989,7 @@ export const useChatStore = defineStore('chat', () => {
                 const index = toolCall.index;
                 if (!accumulatedToolCalls[index]) {
                   accumulatedToolCalls[index] = {
-                    id: toolCall.id,
+                    id: toolCall.id || `fallback_call_${generateId()}`,
                     type: toolCall.type,
                     index: toolCall.index,
                     function: {
@@ -991,6 +997,12 @@ export const useChatStore = defineStore('chat', () => {
                       arguments: '',
                     },
                   };
+                }
+                if (toolCall.id && accumulatedToolCalls[index].id.startsWith('fallback_call_')) {
+                  accumulatedToolCalls[index].id = toolCall.id;
+                }
+                if (toolCall.function.name) {
+                  accumulatedToolCalls[index].function.name = toolCall.function.name;
                 }
                 if (toolCall.function.arguments) {
                   accumulatedToolCalls[index].function.arguments += toolCall.function.arguments;
