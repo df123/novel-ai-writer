@@ -351,7 +351,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     const apiKey = getProviderApiKey(provider);
-    if (['openrouter', 'zai', 'opencode', 'cliproxy'].includes(provider) && !apiKey) {
+    if (['deepseek', 'openrouter', 'zai', 'opencode', 'cliproxy'].includes(provider) && !apiKey) {
       lastModelError.value = `请先配置 ${providerLabels[provider]} API 密钥`;
       showModelsMessage(provider, lastModelError.value);
       return false;

@@ -80,7 +80,7 @@ Responses 请求面向本项目的长上下文与高频工具调用场景保留�
 
 Z.AI 模型列表从 Coding Plan `/models` 接口动态获取，并仅保留 GLM-5.2 及以上版本。思考强度默认 `max`；Coding Plan 端点会把通用枚举映射为上游实际支持的强度。GLM-5.3 不支持关闭思考，`none/minimal/low` 会映射为 `low`；GLM-5.2 的 `none/minimal` 会停止思考。
 
-前端会按提供商把模型列表缓存到 `localStorage`，切换提供商或打开模型下拉框时优先读取缓存。保存 API 密钥或 CLI Proxy Base URL 后对应缓存失效，需在设置弹窗底部手动刷新模型列表。
+DeepSeek、OpenRouter、Z.AI、OpenCode 与 CLI Proxy API 的模型列表均从对应 `/models` 接口动态获取。前端会按提供商把模型列表缓存到 `localStorage`，切换提供商或打开模型下拉框时优先读取缓存。保存 API 密钥或 CLI Proxy Base URL 后对应缓存失效，需在设置弹窗底部手动刷新模型列表。
 
 参考文档：
 

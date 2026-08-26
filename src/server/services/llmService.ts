@@ -181,6 +181,12 @@ const ZAI_MODEL_NAMES: Record<string, string> = {
   'glm-5.2': 'GLM-5.2'
 };
 
+const DEEPSEEK_MODEL_NAMES: Record<string, string> = {
+  'deepseek-v4-flash': 'DeepSeek V4 Flash',
+  'deepseek-v4-flash-vision-exp': 'DeepSeek V4 Flash Vision Exp',
+  'deepseek-v4-pro': 'DeepSeek V4 Pro'
+};
+
 /**
  * OpenRouter 模型响应接口
  */
@@ -1204,6 +1210,30 @@ async function fetchZaiModels(apiKey: string): Promise<Model[]> {
     }));
 }
 
+async function fetchDeepSeekModels(apiKey: string): Promise<Model[]> {
+  const modelsUrl = LLM_PROVIDERS.deepseek.modelsUrl!;
+  const response = await fetch(modelsUrl, {
+    headers: buildHeaders('deepseek', modelsUrl, apiKey)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`获取 DeepSeek 模型列表失败 (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as OpenAIModelsResponse;
+  return (data.data || [])
+    .map(model => String(model.id || ''))
+    .filter(Boolean)
+    .sort()
+    .map(modelId => ({
+      id: modelId,
+      name: DEEPSEEK_MODEL_NAMES[modelId] || modelId,
+      provider: 'DeepSeek',
+      contextWindow: getModelContextWindow(modelId)
+    }));
+}
+
 /**
  * 获取可用模型列表
  * @param provider - 提供商名称
@@ -1226,11 +1256,11 @@ export async function getModels(
   }
 
   if (provider === 'deepseek') {
-    return LLM_PROVIDERS.deepseek.models!.map(model => ({
-      id: model.id,
-      name: model.name,
-      contextWindow: getModelContextWindow(model.id)
-    }));
+    if (!apiKey) {
+      throw new Error('请先配置 DeepSeek API 密钥');
+    }
+
+    return fetchDeepSeekModels(apiKey);
   }
 
   if (provider === 'zai') {

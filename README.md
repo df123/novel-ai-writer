@@ -157,7 +157,7 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次；重试耗尽后直接报错，不会把 5xx 当作“不支持”而自动回退。只有端点返回 `404/405/410/415/501`，或 `400` 且错误信息明确表示端点 / 模型不支持 Responses 时，才会改用 Chat Completions。
 
 ### DeepSeek
-- **模型**: `deepseek-v4-flash`, `deepseek-v4-pro`
+- **模型**: 从 API `/models` 接口动态获取
 - **优先 Endpoint**: `https://api.deepseek.com/responses`
 - **回退 Endpoint**: `https://api.deepseek.com/v1/chat/completions`
 

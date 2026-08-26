@@ -60,6 +60,7 @@ export const LLM_PROVIDERS: LLMProviders = {
   deepseek: {
     apiUrl: 'https://api.deepseek.com/v1/chat/completions',
     responsesUrl: 'https://api.deepseek.com/responses',
+    modelsUrl: 'https://api.deepseek.com/models',
     models: [
       { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash' },
       { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }
