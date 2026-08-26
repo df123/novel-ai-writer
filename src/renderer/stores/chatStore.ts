@@ -797,30 +797,35 @@ export const useChatStore = defineStore('chat', () => {
               let currentTheme;
               try {
                 const response = await themeApi.list(projectStore.currentProject.id);
-                currentTheme = response.data;
+                currentTheme = response.data ?? null;
               } catch (error: any) {
-                // 仅在404时创建新主旨，其他错误继续抛出
+                // 兼容旧接口未返回 404、而是返回 null 的情况
                 if (error?.response?.status === 404) {
-                  const createResponse = await themeApi.create(projectStore.currentProject.id, {
-                    title: parsedArgs.title,
-                    content: parsedArgs.content,
-                    created_by: 'llm',
-                  });
-                  const newTheme = createResponse.data;
-                  // 重新加载当前主旨到store
-                  await themeStore.loadTheme(projectStore.currentProject.id);
-                  return JSON.stringify({
-                    success: true,
-                    message: `已创建新主旨: ${parsedArgs.title}`,
-                    data: {
-                      id: newTheme.id,
-                      title: newTheme.title,
-                      content: newTheme.content,
-                      version: newTheme.version,
-                    },
-                  });
+                  currentTheme = null;
+                } else {
+                  throw error;
                 }
-                throw error;
+              }
+
+              if (!currentTheme) {
+                const createResponse = await themeApi.create(projectStore.currentProject.id, {
+                  title: parsedArgs.title,
+                  content: parsedArgs.content,
+                  created_by: 'llm',
+                });
+                const newTheme = createResponse.data;
+                // 重新加载当前主旨到store
+                await themeStore.loadTheme(projectStore.currentProject.id);
+                return JSON.stringify({
+                  success: true,
+                  message: `已创建新主旨: ${parsedArgs.title}`,
+                  data: {
+                    id: newTheme.id,
+                    title: newTheme.title,
+                    content: newTheme.content,
+                    version: newTheme.version,
+                  },
+                });
               }
 
               // 更新现有主旨，标记created_by为'llm'
