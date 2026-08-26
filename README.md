@@ -175,7 +175,7 @@ Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次
 
 ### OpenCode Zen / Go
 - **模型**: 从 Zen 与 Go 的 `/models` 接口动态获取，并分别使用 `opencode/`、`opencode-go/` 前缀路由
-- **协议路由**: 官方标注为 Chat-only 的模型（例如 `opencode-go/ox-alpha-free`）直接使用 Chat；未标注或新增模型默认先使用 Responses
+- **协议路由**: 官方标注为 Chat-only 的模型（例如 `opencode-go/glm-5.3-flash`）直接使用 Chat；未标注或新增模型默认先使用 Responses
 - **优先 Endpoint**:
   - Zen: `https://opencode.ai/zen/v1/responses`
   - Go: `https://opencode.ai/zen/go/v1/responses`

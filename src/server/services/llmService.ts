@@ -111,7 +111,7 @@ const OPENCODE_ZEN_FREE_MODELS = new Set([
 
 /** OpenCode Go 官方仅支持 Chat Completions 的模型 */
 const OPENCODE_GO_CHAT_ONLY_MODELS = new Set([
-  'glm-5.3', 'glm-5.2', 'glm-5.1',
+  'glm-5.3-flash', 'glm-5.3', 'glm-5.2', 'glm-5.1',
   'kimi-k3', 'kimi-k2.7-code', 'kimi-k2.6',
   'longcat-2.0', 'deepseek-v4-pro', 'deepseek-v4-flash',
   'deepseek-v4-flash-vision-exp',
@@ -122,7 +122,7 @@ const OPENCODE_GO_RESPONSES_MODELS = new Set([
   'grok-4.6', 'gpt-5.6-luna', 'muse-spark-1.2-contributor'
 ]);
 
-const OPENCODE_GO_FREE_MODELS = new Set(['ox-alpha-free']);
+const OPENCODE_GO_FREE_MODELS = new Set<string>([]);
 
 const OPENCODE_GO_MODEL_ALIASES: Record<string, string> = {
   'muse-spark-1.2': 'muse-spark-1.2-contributor',
@@ -145,6 +145,7 @@ const OPENCODE_MODEL_NAMES: Record<string, string> = {
   'minimax-m2.7': 'MiniMax M2.7',
   'minimax-m2.5': 'MiniMax M2.5',
   'glm-5.3': 'GLM-5.3',
+  'glm-5.3-flash': 'GLM-5.3 Flash',
   'glm-5.2': 'GLM-5.2',
   'glm-5.1': 'GLM-5.1',
   'glm-5': 'GLM-5',
@@ -157,7 +158,6 @@ const OPENCODE_MODEL_NAMES: Record<string, string> = {
   'mimo-v2.5': 'MiMo-V2.5',
   'mimo-v2.5-pro': 'MiMo-V2.5-Pro',
   'hy3': 'Hy3',
-  'ox-alpha-free': 'Ox Alpha Free',
   'muse-spark-1.2': 'Muse Spark 1.2',
   'muse-spark-1.2-contributor': 'Muse Spark 1.2 Contributor',
   'muse-spark-1.2-contributor-free': 'Muse Spark 1.2 Contributor Free'
@@ -170,7 +170,6 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'glm-5.2': 1_000_000,
   'glm-5.3': 1_000_000,
   'gpt-5.6-luna': 1_050_000,
-  'ox-alpha-free': 1_048_576,
   'x-preview-f-free': 1_048_576
 };
 
