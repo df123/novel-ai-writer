@@ -4,6 +4,54 @@ import { settingsApi, modelsApi } from '../utils/api';
 import { ElMessage } from 'element-plus';
 import type { Model } from '../../shared/types';
 
+interface ModelCacheEntry {
+  models: Model[];
+  fetchedAt: number;
+  signature: string;
+}
+
+const MODEL_CACHE_STORAGE_KEY = 'novel-ai:model-caches:v1';
+
+function createProviderSignature(input: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x01000193;
+
+  for (let i = 0; i < input.length; i += 1) {
+    const code = input.charCodeAt(i);
+    first = (first ^ code) * 0x01000193 >>> 0;
+    second = (second + code * (i + 1)) >>> 0;
+  }
+
+  return `${first.toString(36)}-${second.toString(36)}`;
+}
+
+function readModelCaches(): Record<string, ModelCacheEntry> {
+  try {
+    const raw = localStorage.getItem(MODEL_CACHE_STORAGE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as Record<string, ModelCacheEntry>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, entry]) =>
+        Array.isArray(entry.models) &&
+        typeof entry.fetchedAt === 'number' &&
+        typeof entry.signature === 'string'
+      )
+    );
+  } catch (error) {
+    console.error('Failed to read model cache:', error);
+    return {};
+  }
+}
+
+function writeModelCaches(caches: Record<string, ModelCacheEntry>): void {
+  try {
+    localStorage.setItem(MODEL_CACHE_STORAGE_KEY, JSON.stringify(caches));
+  } catch (error) {
+    console.error('Failed to write model cache:', error);
+  }
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const deepseekApiKey = ref('');
   const openrouterApiKey = ref('');
@@ -15,8 +63,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const selectedProvider = ref('deepseek');
   const selectedModel = ref('deepseek-v4-flash');
   const models = ref<Model[]>([]);
+  const modelCaches = ref<Record<string, ModelCacheEntry>>(readModelCaches());
   const isLoading = ref(false);
   const isLoadingModels = ref(false);
+  const modelRequestSequence = ref(0);
+  const lastModelError = ref('');
   const showThinkingContent = ref(false);
   const showToolCalls = ref(false);
   /** DeepSeek 推理努力程度（可选值：high/max，默认 high） */
@@ -64,6 +115,15 @@ export const useSettingsStore = defineStore('settings', () => {
       duration: 8000,
       showClose: true,
     });
+  };
+
+  const clearModelCache = (provider: string) => {
+    if (!modelCaches.value[provider]) return;
+
+    const nextCaches = { ...modelCaches.value };
+    delete nextCaches[provider];
+    modelCaches.value = nextCaches;
+    writeModelCaches(nextCaches);
   };
 
   const loadSettings = async () => {
@@ -203,6 +263,14 @@ export const useSettingsStore = defineStore('settings', () => {
       const response = await settingsApi.update(currentSettings);
       const updated = response.data;
 
+      if (settings.deepseekApiKey !== undefined) clearModelCache('deepseek');
+      if (settings.openrouterApiKey !== undefined) clearModelCache('openrouter');
+      if (settings.zaiApiKey !== undefined) clearModelCache('zai');
+      if (settings.opencodeApiKey !== undefined) clearModelCache('opencode');
+      if (settings.cliproxyApiKey !== undefined || settings.cliproxyBaseUrl !== undefined) {
+        clearModelCache('cliproxy');
+      }
+
       // 检查是否有解密失败的 API 密钥
       const decryptFailed = updated._decryptFailed as string[] | undefined;
       if (decryptFailed) {
@@ -240,47 +308,101 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   };
 
-  const loadModels = async (provider: string) => {
+  const getProviderApiKey = (provider: string): string => ({
+    deepseek: deepseekApiKey.value,
+    openrouter: openrouterApiKey.value,
+    zai: zaiApiKey.value,
+    opencode: opencodeApiKey.value,
+    cliproxy: cliproxyApiKey.value
+  })[provider] || '';
+
+  const getProviderSignature = (provider: string): string => createProviderSignature(
+    `${provider}:${getProviderApiKey(provider)}:${provider === 'cliproxy' ? cliproxyBaseUrl.value : ''}`
+  );
+
+  const applyModels = (provider: string, nextModels: Model[]) => {
+    if (selectedProvider.value !== provider) return;
+
+    models.value = nextModels;
+    if (!selectedModel.value || !nextModels.some(model => model.id === selectedModel.value)) {
+      selectedModel.value = nextModels[0]?.id || '';
+    }
+  };
+
+  const showModelsMessage = (provider: string, message: string) => {
+    if (selectedProvider.value !== provider) return;
+
+    models.value = [{ id: '', name: message }];
+    selectedModel.value = '';
+  };
+
+  const loadModels = async (
+    provider: string,
+    options: { force?: boolean } = {}
+  ): Promise<boolean> => {
+    const requestId = ++modelRequestSequence.value;
+    const signature = getProviderSignature(provider);
+    const cached = modelCaches.value[provider];
+
+    if (cached?.signature === signature && !options.force) {
+      lastModelError.value = '';
+      applyModels(provider, cached.models);
+      return true;
+    }
+
+    const apiKey = getProviderApiKey(provider);
+    if (['openrouter', 'zai', 'opencode', 'cliproxy'].includes(provider) && !apiKey) {
+      lastModelError.value = `请先配置 ${providerLabels[provider]} API 密钥`;
+      showModelsMessage(provider, lastModelError.value);
+      return false;
+    }
+
     isLoadingModels.value = true;
     try {
-      const apiKeyMap: Record<string, string> = {
-        deepseek: deepseekApiKey.value,
-        openrouter: openrouterApiKey.value,
-        zai: zaiApiKey.value,
-        opencode: opencodeApiKey.value,
-        cliproxy: cliproxyApiKey.value,
-      };
-      const apiKey = apiKeyMap[provider] || '';
-
-      if ((provider === 'opencode' || provider === 'cliproxy') && !apiKey) {
-        models.value = [{ id: '', name: `请先配置 ${providerLabels[provider]} API 密钥` }];
-        selectedModel.value = '';
-        return;
-      }
-      
       const response = await modelsApi.list(
         provider,
         apiKey || 'dummy',
         provider === 'cliproxy' ? cliproxyBaseUrl.value : undefined
       );
-      models.value = response.data.models || [];
-      
-      if (!selectedModel.value || !models.value.find(m => m.id === selectedModel.value)) {
-        selectedModel.value = models.value[0]?.id || '';
-      }
+      const nextModels = response.data.models || [];
+      if (requestId !== modelRequestSequence.value) return false;
+
+      const nextCaches = {
+        ...modelCaches.value,
+        [provider]: {
+          models: nextModels,
+          fetchedAt: Date.now(),
+          signature
+        }
+      };
+      modelCaches.value = nextCaches;
+      writeModelCaches(nextCaches);
+      lastModelError.value = '';
+      applyModels(provider, nextModels);
+      return true;
     } catch (error) {
       console.error(`Failed to load ${provider} models:`, error);
-      
-      const errorMessage = ['openrouter', 'opencode', 'cliproxy'].includes(provider)
+      if (requestId !== modelRequestSequence.value) return false;
+
+      lastModelError.value = ['openrouter', 'opencode', 'cliproxy'].includes(provider)
         ? '加载模型失败，请检查 API 密钥和 Base URL'
         : '加载模型失败，请稍后重试';
-      
-      models.value = [{ id: '', name: errorMessage }];
-      selectedModel.value = '';
+
+      if (cached?.signature === signature) {
+        applyModels(provider, cached.models);
+      } else {
+        showModelsMessage(provider, lastModelError.value);
+      }
+      return false;
     } finally {
-      isLoadingModels.value = false;
+      if (requestId === modelRequestSequence.value) {
+        isLoadingModels.value = false;
+      }
     }
   };
+
+  const refreshModels = async (provider: string): Promise<boolean> =>
+    loadModels(provider, { force: true });
 
   return {
     deepseekApiKey,
@@ -293,8 +415,10 @@ export const useSettingsStore = defineStore('settings', () => {
     selectedProvider,
     selectedModel,
     models,
+    modelCaches,
     isLoading,
     isLoadingModels,
+    lastModelError,
     showThinkingContent,
     showToolCalls,
     reasoningEffort,
@@ -308,5 +432,6 @@ export const useSettingsStore = defineStore('settings', () => {
     loadSettings,
     updateSettings,
     loadModels,
+    refreshModels,
   };
 });

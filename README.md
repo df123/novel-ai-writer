@@ -150,6 +150,8 @@ API 密钥使用 AES-256-CBC 加密存储，确保安全性。
 
 ## LLM 提供商配置
 
+模型列表会按提供商缓存在浏览器本地；保存新的 API 密钥或 CLI Proxy Base URL 后缓存会失效，需要在 LLM 设置弹窗底部点击“刷新模型列表”手动更新。切换提供商或打开模型下拉框时会优先使用缓存，不会重复请求远端模型列表。
+
 除官方文档标注仅支持 Chat Completions 的 OpenCode 模型会直连 Chat 外，其余模型默认优先使用 OpenAI Responses API。Responses 请求会保留完整对话上下文，并把历史 `tool_calls` / `tool` 消息转换为 `function_call` / `function_call_output`；后端仍会把 Responses SSE 转换为前端已有的 Chat Completions SSE 格式。
 
 Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次；重试耗尽后直接报错，不会把 5xx 当作“不支持”而自动回退。只有端点返回 `404/405/410/415/501`，或 `400` 且错误信息明确表示端点 / 模型不支持 Responses 时，才会改用 Chat Completions。
@@ -166,10 +168,10 @@ Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次
 - **思考模式**: 使用上游模型默认行为；返回 `reasoning_content` 时可在界面展示
 
 ### Z.AI Coding Plan
-- **模型**: `glm-5.3`, `glm-5.2`
+- **模型**: 从 Coding Plan `/models` 接口动态获取，仅保留 GLM-5.2 及以上版本
 - **优先 Endpoint**: `https://api.z.ai/api/v1/responses`
 - **回退 Endpoint**: `https://api.z.ai/api/coding/paas/v4/chat/completions`
-- **请求特征**: 按 OpenCode 客户端方式发送会话亲和与 User-Agent，并默认开启 GLM thinking
+- **请求特征**: 按 OpenCode `1.18.23` 客户端方式发送会话亲和与 User-Agent，并默认开启 GLM thinking
 - **思考模式**: 可在设置中选择 `max/xhigh/high/medium/low/minimal/none`，默认 `max`
 - **说明**: Coding Plan 端点仅适用于编码/Agent 场景
 

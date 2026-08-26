@@ -67,7 +67,7 @@ const OPENCODE_MAX_TOKENS = 32000;
 const DEFAULT_MAX_TOKENS = 4096;
 
 /** Z.AI Coding Plan 需要伪装为 opencode 客户端 */
-const OPENCODE_USER_AGENT = 'opencode/1.17.7';
+const OPENCODE_USER_AGENT = 'opencode/1.18.23';
 
 const ZAI_REASONING_EFFORTS = new Set([
   'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none'
@@ -174,6 +174,12 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 };
 
 const OPENCODE_SESSION_ID = createSessionId();
+
+const ZAI_MODEL_NAMES: Record<string, string> = {
+  'glm-5.3': 'GLM-5.3',
+  'glm-5.3-flash': 'GLM-5.3 Flash',
+  'glm-5.2': 'GLM-5.2'
+};
 
 /**
  * OpenRouter 模型响应接口
@@ -1146,6 +1152,58 @@ async function fetchOpenCodeModels(
     }));
 }
 
+function getZaiModelVersion(modelId: string): number | null {
+  const match = /^glm-(\d+)(?:\.(\d+))?/.exec(modelId);
+  if (!match) return null;
+
+  const major = Number(match[1]);
+  const minor = match[2] ? Number(match[2]) : 0;
+  return major * 100 + minor;
+}
+
+function isSupportedZaiModel(modelId: string): boolean {
+  const version = getZaiModelVersion(modelId);
+  return version !== null && version >= 502;
+}
+
+function compareZaiModels(a: string, b: string): number {
+  const versionDifference = (getZaiModelVersion(b) ?? 0) - (getZaiModelVersion(a) ?? 0);
+  if (versionDifference !== 0) return versionDifference;
+
+  const isBaseModel = (id: string) => /^glm-\d+(?:\.\d+)?$/.test(id);
+  if (isBaseModel(a) !== isBaseModel(b)) return isBaseModel(a) ? -1 : 1;
+
+  return a.localeCompare(b);
+}
+
+function formatZaiModelName(modelId: string): string {
+  return ZAI_MODEL_NAMES[modelId] || modelId.toUpperCase();
+}
+
+async function fetchZaiModels(apiKey: string): Promise<Model[]> {
+  const modelsUrl = LLM_PROVIDERS.zai.modelsUrl!;
+  const response = await fetch(modelsUrl, {
+    headers: buildHeaders('zai', modelsUrl, apiKey)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`获取 Z.AI 模型列表失败 (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as OpenAIModelsResponse;
+  return (data.data || [])
+    .map(model => String(model.id || ''))
+    .filter(modelId => isSupportedZaiModel(modelId))
+    .sort(compareZaiModels)
+    .map(modelId => ({
+      id: modelId,
+      name: formatZaiModelName(modelId),
+      provider: 'Z.AI',
+      contextWindow: getModelContextWindow(modelId)
+    }));
+}
+
 /**
  * 获取可用模型列表
  * @param provider - 提供商名称
@@ -1176,11 +1234,11 @@ export async function getModels(
   }
 
   if (provider === 'zai') {
-    return LLM_PROVIDERS.zai.models!.map(model => ({
-      id: model.id,
-      name: model.name,
-      contextWindow: getModelContextWindow(model.id)
-    }));
+    if (!apiKey) {
+      throw new Error('请先配置 Z.AI API 密钥');
+    }
+
+    return fetchZaiModels(apiKey);
   }
 
   if (provider === 'opencode') {

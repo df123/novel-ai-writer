@@ -250,22 +250,35 @@
     </el-tabs>
 
     <template #footer>
-      <el-button @click="handleClose">关闭</el-button>
-      <el-button v-if="activeTab === 'deepseek'" type="primary" @click="handleSaveDeepSeek">
-        保存DeepSeek密钥
-      </el-button>
-      <el-button v-if="activeTab === 'openrouter'" type="primary" @click="handleSaveOpenRouter">
-        保存OpenRouter密钥
-      </el-button>
-      <el-button v-if="activeTab === 'zai'" type="primary" @click="handleSaveZai">
-        保存Z.AI设置
-      </el-button>
-      <el-button v-if="activeTab === 'opencode'" type="primary" @click="handleSaveOpencode">
-        保存OpenCode设置
-      </el-button>
-      <el-button v-if="activeTab === 'cliproxy'" type="primary" @click="handleSaveCliproxy">
-        保存CLI Proxy API设置
-      </el-button>
+      <div class="dialog-footer">
+        <span class="model-cache-status">{{ modelCacheText }}</span>
+        <div>
+          <el-button @click="handleClose">关闭</el-button>
+          <el-button
+            v-if="activeTab !== 'params'"
+            :disabled="isModelConfigDirty"
+            :loading="isLoadingModels"
+            @click="handleRefreshModels"
+          >
+            刷新模型列表
+          </el-button>
+          <el-button v-if="activeTab === 'deepseek'" type="primary" @click="handleSaveDeepSeek">
+            保存DeepSeek密钥
+          </el-button>
+          <el-button v-if="activeTab === 'openrouter'" type="primary" @click="handleSaveOpenRouter">
+            保存OpenRouter密钥
+          </el-button>
+          <el-button v-if="activeTab === 'zai'" type="primary" @click="handleSaveZai">
+            保存Z.AI设置
+          </el-button>
+          <el-button v-if="activeTab === 'opencode'" type="primary" @click="handleSaveOpencode">
+            保存OpenCode设置
+          </el-button>
+          <el-button v-if="activeTab === 'cliproxy'" type="primary" @click="handleSaveCliproxy">
+            保存CLI Proxy API设置
+          </el-button>
+        </div>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -302,8 +315,10 @@ const {
   cliproxyReasoningEnabled,
   cliproxyReasoningEffort,
   decryptFailedKeys,
+  isLoadingModels,
+  modelCaches,
 } = storeToRefs(settingsStore);
-const { loadSettings, updateSettings, loadModels } = settingsStore;
+const { loadSettings, updateSettings, refreshModels } = settingsStore;
 
 const visible = computed({
   get: () => props.modelValue,
@@ -326,6 +341,48 @@ const opencodeReasoningValue = ref(false);
 const opencodeEffortValue = ref('none');
 const cliproxyReasoningValue = ref(false);
 const cliproxyEffortValue = ref('auto');
+
+const isModelConfigDirty = computed(() => {
+  switch (activeTab.value) {
+    case 'deepseek':
+      return deepseekKey.value !== deepseekApiKey.value;
+    case 'openrouter':
+      return openrouterKey.value !== openrouterApiKey.value;
+    case 'zai':
+      return zaiKey.value !== zaiApiKey.value;
+    case 'opencode':
+      return opencodeKey.value !== opencodeApiKey.value;
+    case 'cliproxy':
+      return cliproxyKey.value !== cliproxyApiKey.value ||
+        cliproxyBaseUrlValue.value !== cliproxyBaseUrl.value;
+    default:
+      return false;
+  }
+});
+
+const modelCacheText = computed(() => {
+  if (activeTab.value === 'params') return '';
+
+  const cache = modelCaches.value[activeTab.value];
+  if (!cache) return '模型列表未缓存';
+
+  const time = new Date(cache.fetchedAt).toLocaleString();
+  return `已缓存 ${cache.models.length} 个模型 · ${time}`;
+});
+
+const handleRefreshModels = async () => {
+  if (isModelConfigDirty.value) {
+    ElMessage.warning('请先保存当前提供商配置，再刷新模型列表');
+    return;
+  }
+
+  const success = await refreshModels(activeTab.value);
+  if (success) {
+    ElMessage.success('模型列表已刷新并缓存');
+  } else {
+    ElMessage.error(settingsStore.lastModelError || '刷新模型列表失败');
+  }
+};
 
 watch(visible, async (val) => {
   if (val) {
@@ -351,7 +408,7 @@ watch(visible, async (val) => {
 const handleSaveDeepSeek = async () => {
   try {
     await updateSettings({ deepseekApiKey: deepseekKey.value });
-    ElMessage.success('DeepSeek API密钥已保存');
+    ElMessage.success('DeepSeek API密钥已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
   }
@@ -360,10 +417,7 @@ const handleSaveDeepSeek = async () => {
 const handleSaveOpenRouter = async () => {
   try {
     await updateSettings({ openrouterApiKey: openrouterKey.value });
-    if (settingsStore.selectedProvider === 'openrouter') {
-      await loadModels('openrouter');
-    }
-    ElMessage.success('OpenRouter API密钥已保存');
+    ElMessage.success('OpenRouter API密钥已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
   }
@@ -376,10 +430,7 @@ const handleSaveZai = async () => {
       zaiReasoningEnabled: zaiReasoningValue.value,
       zaiReasoningEffort: zaiEffortValue.value,
     });
-    if (settingsStore.selectedProvider === 'zai') {
-      await loadModels('zai');
-    }
-    ElMessage.success('Z.AI设置已保存');
+    ElMessage.success('Z.AI设置已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
   }
@@ -392,10 +443,7 @@ const handleSaveOpencode = async () => {
       opencodeReasoningEnabled: opencodeReasoningValue.value,
       opencodeReasoningEffort: opencodeEffortValue.value,
     });
-    if (settingsStore.selectedProvider === 'opencode') {
-      await loadModels('opencode');
-    }
-    ElMessage.success('OpenCode设置已保存');
+    ElMessage.success('OpenCode设置已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
   }
@@ -409,10 +457,7 @@ const handleSaveCliproxy = async () => {
       cliproxyReasoningEnabled: cliproxyReasoningValue.value,
       cliproxyReasoningEffort: cliproxyEffortValue.value,
     });
-    if (settingsStore.selectedProvider === 'cliproxy') {
-      await loadModels('cliproxy');
-    }
-    ElMessage.success('CLI Proxy API设置已保存');
+    ElMessage.success('CLI Proxy API设置已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
   }
@@ -528,5 +573,29 @@ const handleClose = () => {
 
 .effort-select {
   width: 110px;
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.model-cache-status {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: #909399;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .dialog-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>
