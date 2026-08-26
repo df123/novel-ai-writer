@@ -32,7 +32,7 @@ interface ToolCall {
 interface StreamChunk {
   error?: string;
   details?: string;
-  choices: Array<{
+  choices?: Array<{
     delta: {
       role?: string;
       content?: string;
@@ -961,7 +961,9 @@ export const useChatStore = defineStore('chat', () => {
               break;
             }
 
-            const delta = parsed.choices[0]?.delta;
+            const delta = Array.isArray(parsed.choices)
+              ? parsed.choices[0]?.delta
+              : undefined;
             if (delta?.content) {
               fullContent += delta.content;
               currentStreamContent.value = fullContent;

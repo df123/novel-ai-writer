@@ -813,7 +813,7 @@ function convertResponsesEvent(
   if (type === 'response.completed' || type === 'response.incomplete') {
     const response = event.response as { usage?: Record<string, unknown> } | undefined;
     const usage = normalizeUsage(response?.usage);
-    return usage ? `data: ${JSON.stringify({ usage })}\n\n` : null;
+    return usage ? `data: ${JSON.stringify({ choices: [], usage })}\n\n` : null;
   }
 
   return null;
