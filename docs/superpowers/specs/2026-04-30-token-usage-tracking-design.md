@@ -13,7 +13,7 @@
 - `LLMUsage` 类型已在 `src/server/types/service.types.ts` 中定义，但从未在流式处理中使用
 - 服务器端 `llmService.chatStream()` 是纯 SSE 透传代理，不提取 `usage` 字段
 - 前端 `StreamChunk` 接口没有 `usage` 字段，`runLLMTurn()` 完全忽略 `usage`
-- 当前 UI 展示的 token 数是基于字符的粗略估算值（`estimateConversationTokens()`）
+- 旧版 UI 曾基于字符粗略估算 token；该方案已废弃，运行时只允许使用模型返回的真实 `usage`
 - `Message` 和 `DbMessage` 类型中没有 token 相关字段
 
 ### DeepSeek API 行为
@@ -43,6 +43,7 @@ interface TokenUsage {
   promptCacheHitTokens?: number;  // 缓存命中 token（DeepSeek 专有）
   promptCacheMissTokens?: number; // 缓存未命中 token（DeepSeek 专有）
   reasoningTokens?: number;       // 思考 token 数（DeepSeek 专有）
+  modelId?: string;               // 产生该用量的模型 ID
 }
 ```
 
@@ -159,9 +160,10 @@ if (parsed.usage) {
 ### 2. 聊天顶部 - 累计 Token 用量
 
 - 替换现有的估算值标签
-- 格式：`累计: 输入 {sum} | 输出 {sum} | 总计 {sum} tokens`
-- 仅统计有实际 tokenUsage 数据的消息
-- 对于没有 usage 数据的历史消息，回退到估算
+- 格式：`上下文 {最近一次 totalTokens} / {模型上下文窗口} · {占比} · {状态}`
+- 占比只使用最近一次真实 `usage.totalTokens` 与模型元数据中的上下文窗口
+- 上下文占用取最近一条有实际 tokenUsage 数据的 assistant 消息；累计请求另行汇总所有实际 usage
+- 对于没有 usage 数据的历史消息，显示等待下一次请求实测，不做估算回退
 
 ### 3. 流式过程中
 

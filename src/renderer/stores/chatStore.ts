@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { Message, Chat, TimelineNode, Character, Chapter, TokenUsage } from '../../shared/types';
 import { chatApi, messageApi, llmApi, timelineApi, characterApi, themeApi, miscRecordApi } from '../utils/api';
-import { generateId, estimateConversationTokens } from '../../shared/utils';
+import { generateId } from '../../shared/utils';
 import { buildSystemPrompt } from '../utils/prompts';
 import { ALL_TOOLS } from '../utils/tools';
 import { ChatOptions, type LLMProviderName } from './chatStoreTypes';
@@ -60,7 +60,6 @@ export const useChatStore = defineStore('chat', () => {
   const isStreaming = ref(false);
   const currentStreamContent = ref('');
   const currentStreamReasoning = ref('');
-  const totalTokens = ref(0);
   const chapterContext = ref<Chapter | null>(null);
   const abortController = ref<AbortController | null>(null);
   const createdMessageIds = ref<string[]>([]);
@@ -84,7 +83,6 @@ export const useChatStore = defineStore('chat', () => {
       } else {
         currentChat.value = null;
         messages.value = [];
-        totalTokens.value = 0;
       }
     } catch (error) {
       console.error('Failed to load chats:', error);
@@ -100,15 +98,6 @@ export const useChatStore = defineStore('chat', () => {
       reasoning_content: m.reasoning_content ?? undefined,
       tokenUsage: m.token_usage ? (typeof m.token_usage === 'string' ? JSON.parse(m.token_usage) : m.token_usage) : undefined,
     }));
-    updateTokenCount();
-  };
-
-  const updateTokenCount = () => {
-    const messagesForTokens = messages.value.map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
-    totalTokens.value = estimateConversationTokens(messagesForTokens);
   };
 
   const createChat = async (title: string) => {
@@ -121,7 +110,6 @@ export const useChatStore = defineStore('chat', () => {
       chats.value.unshift(chat);
       currentChat.value = chat;
       messages.value = [];
-      totalTokens.value = 0;
 
       return chat;
     } catch (error) {
@@ -134,7 +122,6 @@ export const useChatStore = defineStore('chat', () => {
     if (!chatId) {
       currentChat.value = null;
       messages.value = [];
-      updateTokenCount();
       return;
     }
 
@@ -200,7 +187,6 @@ export const useChatStore = defineStore('chat', () => {
     };
 
     messages.value.push(userMessage);
-    updateTokenCount();
 
     const userResponse = await messageApi.create(currentChat.value.id, {
       role: 'user',
@@ -1017,6 +1003,7 @@ export const useChatStore = defineStore('chat', () => {
                 promptCacheHitTokens: parsed.usage.prompt_cache_hit_tokens,
                 promptCacheMissTokens: parsed.usage.prompt_cache_miss_tokens,
                 reasoningTokens: parsed.usage.completion_tokens_details?.reasoning_tokens,
+                modelId: options.modelName,
               };
             }
           }
@@ -1114,15 +1101,12 @@ export const useChatStore = defineStore('chat', () => {
           }
           
           await runLLMTurn(newMessages, true);
-        } else {
-          updateTokenCount();
         }
       } else {
         const msgIndex = messages.value.findIndex(m => m.id === assistantMessageId);
         if (msgIndex !== -1) {
           messages.value = messages.value.filter(m => m.id !== assistantMessageId);
         }
-        updateTokenCount();
       }
     };
 
@@ -1184,7 +1168,6 @@ export const useChatStore = defineStore('chat', () => {
       try {
         await messageApi.batchDelete(idsToDelete);
         messages.value = messages.value.filter(m => !idsToDelete.includes(m.id));
-        updateTokenCount();
       } catch (error) {
         console.error('批量删除消息失败:', error);
         throw error;
@@ -1192,7 +1175,6 @@ export const useChatStore = defineStore('chat', () => {
     } else {
       await messageApi.delete(messageId);
       messages.value = messages.value.filter(m => m.id !== messageId);
-      updateTokenCount();
     }
   };
 
@@ -1204,7 +1186,6 @@ export const useChatStore = defineStore('chat', () => {
         messages.value.map(m => messageApi.delete(m.id))
       );
       messages.value = [];
-      updateTokenCount();
     } catch (error) {
       console.error('Failed to clear history:', error);
       throw error;
@@ -1227,7 +1208,6 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     currentStreamContent,
     currentStreamReasoning,
-    totalTokens,
     chapterContext,
     loadChats,
     loadMessages,

@@ -163,6 +163,17 @@ const OPENCODE_MODEL_NAMES: Record<string, string> = {
   'muse-spark-1.2-contributor-free': 'Muse Spark 1.2 Contributor Free'
 };
 
+/** 官方公开过上下文窗口的模型；未知模型保持 undefined，避免编造数据 */
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  'deepseek-v4-flash': 1_048_576,
+  'deepseek-v4-pro': 1_048_576,
+  'glm-5.2': 1_000_000,
+  'glm-5.3': 1_000_000,
+  'gpt-5.6-luna': 1_050_000,
+  'ox-alpha-free': 1_048_576,
+  'x-preview-f-free': 1_048_576
+};
+
 const OPENCODE_SESSION_ID = createSessionId();
 
 /**
@@ -176,6 +187,7 @@ interface OpenRouterModel {
     completion?: string;
   };
   output_modalities?: string[];
+  context_length?: number;
 }
 
 interface OpenRouterModelsResponse {
@@ -385,6 +397,10 @@ function buildChatPayload(
     if (options.reasoning_effort) {
       requestBody.reasoning_effort = options.reasoning_effort;
     }
+    requestBody.stream_options = { include_usage: true };
+  }
+
+  if (provider === 'openrouter' || provider === 'cliproxy') {
     requestBody.stream_options = { include_usage: true };
   }
 
@@ -1095,6 +1111,14 @@ function getDefaultModel(provider: LLMProvider): string {
   return defaults[provider];
 }
 
+function getModelContextWindow(modelId: string): number | undefined {
+  const normalizedModelId = modelId.replace(
+    /^(?:opencode-go\/|opencode\/|cliproxy\/)/,
+    ''
+  );
+  return MODEL_CONTEXT_WINDOWS[normalizedModelId];
+}
+
 async function fetchOpenCodeModels(
   url: string,
   prefix: string,
@@ -1118,7 +1142,8 @@ async function fetchOpenCodeModels(
       id: `${prefix}${modelId}`,
       name: OPENCODE_MODEL_NAMES[modelId] || modelId,
       provider: prefix === 'opencode-go/' ? 'OpenCode Go' : 'OpenCode Zen',
-      price: freeModels.has(modelId) ? '免费' : ''
+      price: freeModels.has(modelId) ? '免费' : '',
+      contextWindow: getModelContextWindow(modelId)
     }));
 }
 
@@ -1146,14 +1171,16 @@ export async function getModels(
   if (provider === 'deepseek') {
     return LLM_PROVIDERS.deepseek.models!.map(model => ({
       id: model.id,
-      name: model.name
+      name: model.name,
+      contextWindow: getModelContextWindow(model.id)
     }));
   }
 
   if (provider === 'zai') {
     return LLM_PROVIDERS.zai.models!.map(model => ({
       id: model.id,
-      name: model.name
+      name: model.name,
+      contextWindow: getModelContextWindow(model.id)
     }));
   }
 
@@ -1208,7 +1235,8 @@ export async function getModels(
       .map(modelId => ({
         id: `cliproxy/${modelId}`,
         name: modelId,
-        provider: 'CLI Proxy API'
+        provider: 'CLI Proxy API',
+        contextWindow: getModelContextWindow(modelId)
       }));
   }
 
@@ -1252,6 +1280,10 @@ export async function getModels(
         id: model.id,
         name: model.name || model.id,
         price: priceDisplay,
+        contextWindow:
+          typeof model.context_length === 'number' && model.context_length > 0
+            ? model.context_length
+            : undefined,
         pricing: {
           prompt: promptPrice,
           completion: completionPrice

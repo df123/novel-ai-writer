@@ -34,6 +34,8 @@ export interface TokenUsage {
   promptCacheMissTokens?: number;
   /** 思考 token 数 */
   reasoningTokens?: number;
+  /** 产生该用量的模型 ID */
+  modelId?: string;
 }
 
 /**
@@ -270,6 +272,9 @@ export interface Model {
     /** 补全价格 */
     completion: number | null;
   };
+
+  /** 模型上下文窗口 token 数 */
+  contextWindow?: number;
 }
 
 /**

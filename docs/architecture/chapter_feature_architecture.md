@@ -938,50 +938,19 @@ flowchart TD
 
 ### 5.2 Token管理
 
-#### 5.2.1 章节内容截断
+#### 5.2.1 上下文占比
 
-章节内容可能很长，需要根据LLM的token限制进行截断：
+章节内容注入上下文后，应用不在前端按字符估算 token，也不基于估算值截断内容。写作区顶部显示：
 
-```typescript
-const truncateChapterContent = (
-  content: string,
-  maxTokens: number,
-  model: string
-): string => {
-  const estimatedTokens = estimateTokens(content);
-  
-  if (estimatedTokens <= maxTokens) {
-    return content;
-  }
+- 最近一次请求的真实 `usage.totalTokens`
+- 模型元数据提供的上下文窗口
+- 两者占比和状态提示
 
-  // 按比例截断
-  const ratio = maxTokens / estimatedTokens;
-  const truncatedLength = Math.floor(content.length * ratio);
-  
-  return content.slice(0, truncatedLength) + '\n\n...（内容已截断）';
-};
-```
+如果模型没有可靠窗口数据，或历史 usage 缺少模型信息，界面显示“窗口未知 / 待新请求实测”，不做估算回退。
 
-#### 5.2.2 Token估算
+#### 5.2.2 长章节处理
 
-使用现有的`estimateConversationTokens`函数，添加章节内容的token估算：
-
-```typescript
-const updateTokenCount = () => {
-  const messagesForTokens = messages.value.map(m => ({
-    role: m.role,
-    content: m.content,
-  }));
-
-  // 添加章节上下文的token估算
-  if (chapterContext.value) {
-    const chapterTokens = estimateTokens(chapterContext.value.content);
-    totalTokens.value = estimateConversationTokens(messagesForTokens) + chapterTokens;
-  } else {
-    totalTokens.value = estimateConversationTokens(messagesForTokens);
-  }
-};
-```
+发送请求前不猜测章节 token 数。用户应根据上一次实测占比决定缩减章节上下文、切换更大窗口模型，或清理对话历史；下一次请求返回后，界面会更新真实占比。
 
 ### 5.3 用户体验优化
 

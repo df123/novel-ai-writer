@@ -15,17 +15,20 @@
             <span>{{ model.name }}</span>
             <span v-if="model.provider" class="model-provider">{{ model.provider }}</span>
             <span v-if="model.price" class="model-price">{{ model.price }}</span>
+            <span v-if="model.contextWindow" class="model-context">{{ formatTokenCount(model.contextWindow) }} ctx</span>
           </el-option>
         </el-select>
         <el-select v-if="selectedProvider === 'deepseek'" v-model="reasoningEffort" size="small" class="effort-select" @change="handleReasoningEffortChange">
           <el-option label="高" value="high" />
           <el-option label="最大" value="max" />
         </el-select>
+        <el-tooltip :content="contextIndicator.tooltip" placement="bottom">
+          <el-tag size="small" :type="contextIndicator.type" class="context-tag">
+            {{ contextIndicator.label }}
+          </el-tag>
+        </el-tooltip>
         <el-tag v-if="accumulatedTokenUsage.totalTokens > 0" size="small" type="info">
-          累计: {{ formatTokenCount(accumulatedTokenUsage.totalTokens) }} tokens
-        </el-tag>
-        <el-tag v-else size="small" type="info">
-          ~{{ totalTokens }} tokens
+          累计请求 {{ formatTokenCount(accumulatedTokenUsage.totalTokens) }}
         </el-tag>
       </div>
     </el-header>
@@ -69,9 +72,6 @@
             </div>
             <span class="message-time">
               {{ formatTimestamp(message.timestamp) }}
-            </span>
-            <span class="message-tokens">
-              ~{{ estimateMessageTokens(message) }} tokens
             </span>
             <el-dropdown
               trigger="click"
@@ -325,7 +325,7 @@ import { useCharacterStore } from '../stores/characterStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
-import { formatTimestamp, estimateMessageTokens } from '../../shared/utils';
+import { formatTimestamp } from '../../shared/utils';
 import { marked } from 'marked';
 import { COMMANDS, COMMAND_GROUP_LABELS, CommandGroup, type Command } from '../utils/commands';
 import type { InputInstance } from 'element-plus';
@@ -343,7 +343,7 @@ const settingsStore = useSettingsStore();
 const chapterStore = useChapterStore();
 const themeStore = useThemeStore();
 
-const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning, totalTokens } = storeToRefs(chatStore);
+const { chats, currentChat, messages, isLoading, isStreaming, currentStreamContent, currentStreamReasoning } = storeToRefs(chatStore);
 const { currentProject } = storeToRefs(projectStore);
 const { nodes: timelineNodes, selectedNode } = storeToRefs(timelineStore);
 const { characters } = storeToRefs(characterStore);
@@ -368,11 +368,118 @@ const accumulatedTokenUsage = computed(() => {
 
 /** 格式化 token 数量显示 */
 const formatTokenCount = (count: number): string => {
+  if (count >= 1_000_000) {
+    return (count / 1_000_000).toFixed(2) + 'M';
+  }
   if (count >= 1000) {
     return (count / 1000).toFixed(1) + 'k';
   }
   return String(count);
 };
+
+const formatContextPercentage = (ratio: number): string => {
+  if (ratio > 0 && ratio < 0.001) return '<0.1%';
+  return `${(ratio * 100).toFixed(1)}%`;
+};
+
+/** 最近一次模型返回的真实上下文用量 */
+const latestTokenUsage = computed(() => {
+  for (let i = messages.value.length - 1; i >= 0; i -= 1) {
+    const message = messages.value[i];
+    if (message.role === 'assistant' && message.tokenUsage?.totalTokens) {
+      return message.tokenUsage;
+    }
+  }
+  return null;
+});
+
+const selectedModelInfo = computed(() =>
+  models.value.find(model => model.id === selectedModel.value)
+);
+
+const contextWindow = computed(() => {
+  const window = selectedModelInfo.value?.contextWindow;
+  return typeof window === 'number' && window > 0 ? window : undefined;
+});
+
+const contextRatio = computed(() => {
+  const usage = latestTokenUsage.value;
+  if (!usage || !contextWindow.value || !usage.totalTokens) return null;
+  if (!usage.modelId || usage.modelId !== selectedModel.value) return null;
+  return usage.totalTokens / contextWindow.value;
+});
+
+interface ContextIndicator {
+  label: string;
+  type: 'success' | 'warning' | 'danger' | 'info';
+  tooltip: string;
+}
+
+const contextIndicator = computed<ContextIndicator>(() => {
+  const usage = latestTokenUsage.value;
+  const measuredText = usage
+    ? `上次实测 ${formatTokenCount(usage.totalTokens)}`
+    : '待首次请求返回真实用量';
+
+  if (!usage) {
+    return {
+      label: measuredText,
+      type: 'info',
+      tooltip: '上下文占比只使用模型响应中的 usage 数据，不做字符估算。发送第一条消息后才会显示。'
+    };
+  }
+
+  if (usage.modelId && selectedModel.value && usage.modelId !== selectedModel.value) {
+    return {
+      label: '模型已切换，待新请求实测',
+      type: 'info',
+      tooltip: '最近一次真实用量属于其他模型。切换模型后，需要一次新请求才能得到可比的上下文占比。'
+    };
+  }
+
+  if (!usage.modelId) {
+    return {
+      label: `${measuredText} · 待新请求确认`,
+      type: 'info',
+      tooltip: '历史用量缺少模型信息，无法确认是否适用于当前模型。发送一次新请求后会显示占比。'
+    };
+  }
+
+  if (!contextWindow.value) {
+    return {
+      label: `${measuredText} · 窗口未知`,
+      type: 'info',
+      tooltip: '模型未返回可靠的上下文窗口信息，因此只显示上次实测 token，不显示比例。'
+    };
+  }
+
+  const ratio = contextRatio.value;
+  if (ratio === null) {
+    return {
+      label: `${measuredText} · 窗口未知`,
+      type: 'info',
+      tooltip: '当前缺少足够的真实 usage 或窗口信息，无法计算占比。'
+    };
+  }
+
+  let state = '上下文偏少';
+  let type: ContextIndicator['type'] = 'warning';
+  if (ratio >= 0.9) {
+    state = '接近上限';
+    type = 'danger';
+  } else if (ratio >= 0.7) {
+    state = '上下文偏高';
+  } else if (ratio >= 0.05) {
+    state = '上下文适中';
+    type = 'success';
+  }
+
+  return {
+    label: `上下文 ${formatTokenCount(usage.totalTokens)} / ${formatTokenCount(contextWindow.value)} · ${formatContextPercentage(ratio)} · ${state}`,
+    type,
+    tooltip: '上次请求的真实 usage（输入 + 输出）即为当时会话占用；正在输入的内容要等下一次请求返回后才能实测。参考区间：<5% 偏少，5%-70% 适中，70%-90% 偏高，>90% 接近上限。'
+  };
+});
 
 const currentModel = computed(() => selectedModel.value || 'deepseek-v4-flash');
 
@@ -904,6 +1011,13 @@ onMounted(async () => {
   width: 80px;
 }
 
+.context-tag {
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .model-price {
   float: right;
   color: #909399;
@@ -913,6 +1027,13 @@ onMounted(async () => {
 .model-provider {
   margin-left: 8px;
   color: #67c23a;
+  font-size: 12px;
+}
+
+.model-context {
+  float: right;
+  margin-left: 8px;
+  color: #909399;
   font-size: 12px;
 }
 
@@ -1088,12 +1209,6 @@ onMounted(async () => {
   margin-left: 8px;
   font-size: 12px;
   color: #666;
-}
-
-.message-tokens {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #999;
 }
 
 .message-dropdown {
