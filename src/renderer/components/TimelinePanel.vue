@@ -16,7 +16,7 @@
               v-for="node in nodes"
               :key="node.id"
               :class="['node-item', { 'node-selected': selectedNode?.id === node.id, 'is-deleted': node.deleted }]"
-              @click="handleSelect(node.id)"
+              @click="handleViewNode(node)"
             >
               <div class="node-header">
                 <span class="node-title">{{ node.title }}</span>
@@ -58,6 +58,7 @@
               v-for="node in trashNodes"
               :key="node.id"
               :class="['node-item', 'is-deleted']"
+              @click="handleViewNode(node)"
             >
               <div class="node-header">
                 <span class="node-title">{{ node.title }}</span>
@@ -82,6 +83,27 @@
         </el-tabs>
       </div>
     </el-scrollbar>
+
+    <ContentViewerDialog
+      v-model="viewerOpen"
+      :title="viewingNode?.title || '时间节点'"
+      subtitle="时间线"
+      :tags="viewingNode?.date ? [viewingNode.date] : []"
+      :sections="viewerSections"
+      :deleted-text="viewingNode?.deletedAt ? `删除于 ${formatDeletedAt(viewingNode.deletedAt)}` : ''"
+      :editable="!viewingNode?.deleted"
+      @edit="handleEditFromViewer"
+    >
+      <template #actions>
+        <el-button
+          :icon="Clock"
+          :disabled="!viewingNode || viewingNode.deleted"
+          @click="handleVersionsFromViewer"
+        >
+          版本历史
+        </el-button>
+      </template>
+    </ContentViewerDialog>
 
     <el-dialog
       v-model="dialogOpen"
@@ -175,12 +197,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, CircleCheck, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useProjectStore } from '../stores/projectStore';
 import { timelineApi } from '../utils/api';
 import { formatDeletedAt } from '@shared/utils';
+import ContentViewerDialog from './ContentViewerDialog.vue';
+import type { TimelineNode } from '@shared/types';
 
 const timelineStore = useTimelineStore();
 const projectStore = useProjectStore();
@@ -205,6 +229,8 @@ const versionNodeId = ref<string | null>(null);
 const activeTab = ref('timeline');
 const trashNodes = ref<any[]>([]);
 const isLoadingTrash = ref(false);
+const viewerOpen = ref(false);
+const viewingNode = ref<TimelineNode | null>(null);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -251,12 +277,39 @@ const handleSubmit = async () => {
   }
 };
 
-const handleSelect = (id: string) => {
-  if (selectedNode.value?.id === id) {
-    selectNode(null);
-  } else {
-    selectNode(id);
+const viewerSections = computed(() => {
+  if (!viewingNode.value) return [];
+
+  return [
+    {
+      label: '时间',
+      content: viewingNode.value.date || ''
+    },
+    {
+      label: '描述',
+      content: viewingNode.value.description || viewingNode.value.content || '',
+      markdown: true
+    }
+  ];
+});
+
+const handleViewNode = (node: TimelineNode) => {
+  viewingNode.value = node;
+  viewerOpen.value = true;
+  if (!node.deleted) {
+    selectNode(node.id);
   }
+};
+
+const handleEditFromViewer = () => {
+  if (!viewingNode.value) return;
+  handleOpenEditDialog(viewingNode.value);
+};
+
+const handleVersionsFromViewer = async () => {
+  if (!viewingNode.value) return;
+  viewerOpen.value = false;
+  await handleOpenVersionsDialog(viewingNode.value.id);
 };
 
 const handleOpenVersionsDialog = async (nodeId: string) => {

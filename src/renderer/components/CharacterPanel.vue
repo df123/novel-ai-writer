@@ -16,6 +16,7 @@
               v-for="character in characters"
               :key="character.id"
               :class="['character-item', { 'is-deleted': character.deleted }]"
+              @click="handleViewCharacter(character)"
             >
               <el-avatar :size="32" class="avatar-green">
                 <el-icon><User /></el-icon>
@@ -59,6 +60,7 @@
               v-for="character in trashCharacters"
               :key="character.id"
               class="character-item is-deleted"
+              @click="handleViewCharacter(character)"
             >
               <el-avatar :size="32" class="avatar-gray">
                 <el-icon><User /></el-icon>
@@ -85,6 +87,26 @@
         </el-tabs>
       </div>
     </el-scrollbar>
+
+    <ContentViewerDialog
+      v-model="viewerOpen"
+      :title="viewingCharacter?.name || '人物'"
+      subtitle="人物档案"
+      :deleted-text="viewingCharacter?.deletedAt ? `删除于 ${formatDeletedAt(viewingCharacter.deletedAt)}` : ''"
+      :editable="!viewingCharacter?.deleted"
+      :sections="viewerSections"
+      @edit="handleEditFromViewer"
+    >
+      <template #actions>
+        <el-button
+          :icon="Clock"
+          :disabled="!viewingCharacter || viewingCharacter.deleted"
+          @click="handleVersionsFromViewer"
+        >
+          版本历史
+        </el-button>
+      </template>
+    </ContentViewerDialog>
 
     <el-dialog
       v-model="dialogOpen"
@@ -196,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -204,6 +226,8 @@ import { useCharacterStore } from '../stores/characterStore';
 import { useProjectStore } from '../stores/projectStore';
 import { characterApi } from '../utils/api';
 import { formatDeletedAt } from '@shared/utils';
+import ContentViewerDialog from './ContentViewerDialog.vue';
+import type { Character } from '@shared/types';
 
 const characterStore = useCharacterStore();
 const projectStore = useProjectStore();
@@ -223,6 +247,8 @@ const versionCharacterId = ref<string | null>(null);
 const activeTab = ref('characters');
 const trashCharacters = ref<any[]>([]);
 const isLoadingTrash = ref(false);
+const viewerOpen = ref(false);
+const viewingCharacter = ref<Character | null>(null);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -235,6 +261,54 @@ const handleOpenCreateDialog = () => {
   background.value = '';
   relationships.value = '';
   dialogOpen.value = true;
+};
+
+const formatRelationships = (relationships?: string): string => {
+  if (!relationships) return '';
+  try {
+    return JSON.stringify(JSON.parse(relationships), null, 2);
+  } catch {
+    return relationships;
+  }
+};
+
+const viewerSections = computed(() => {
+  if (!viewingCharacter.value) return [];
+
+  return [
+    {
+      label: '性格',
+      content: viewingCharacter.value.personality || '',
+      emptyText: '暂未记录性格'
+    },
+    {
+      label: '背景',
+      content: viewingCharacter.value.background || '',
+      markdown: true,
+      emptyText: '暂未记录背景'
+    },
+    {
+      label: '关系',
+      content: formatRelationships(viewingCharacter.value.relationships),
+      emptyText: '暂未记录关系'
+    }
+  ];
+});
+
+const handleViewCharacter = (character: Character) => {
+  viewingCharacter.value = character;
+  viewerOpen.value = true;
+};
+
+const handleEditFromViewer = () => {
+  if (!viewingCharacter.value) return;
+  handleOpenEditDialog(viewingCharacter.value);
+};
+
+const handleVersionsFromViewer = async () => {
+  if (!viewingCharacter.value) return;
+  viewerOpen.value = false;
+  await handleOpenVersionsDialog(viewingCharacter.value.id);
 };
 
 const handleOpenEditDialog = (character: any) => {

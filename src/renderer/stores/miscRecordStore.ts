@@ -57,6 +57,7 @@ export const useMiscRecordStore = defineStore('miscRecord', () => {
       });
       const updated = response.data;
       records.value = records.value.map(r => (r.id === id ? updated : r));
+      return updated;
     } catch (error) {
       console.error('更新杂项记录失败:', error);
       throw error;

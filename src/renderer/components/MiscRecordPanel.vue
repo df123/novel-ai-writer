@@ -60,6 +60,7 @@
                 v-for="record in trashRecords"
                 :key="record.id"
                 class="record-item is-deleted"
+                @click="handleSelectRecord(record)"
               >
                 <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
                   <span style="font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -77,37 +78,97 @@
         </el-tabs>
       </el-aside>
 
-      <!-- 右侧：编辑区 -->
+      <!-- 右侧：内容查看与编辑区 -->
       <el-main style="padding: 16px; overflow-y: auto;">
         <template v-if="store.selectedRecord">
-          <el-form label-width="60px" style="margin-bottom: 12px;">
-            <el-form-item label="标题">
-              <el-input v-model="editForm.title" placeholder="请输入标题" />
-            </el-form-item>
-            <el-form-item label="分类">
-              <el-autocomplete
-                v-model="editForm.category"
-                :fetch-suggestions="queryCategorySuggestions"
-                placeholder="输入或选择分类"
-                clearable
-                style="width: 100%;"
-              />
-            </el-form-item>
-          </el-form>
-          <el-input
-            v-model="editForm.content"
-            type="textarea"
-            :rows="10"
-            placeholder="请输入内容"
-            style="margin-bottom: 12px;"
-          />
-          <div style="display: flex; justify-content: space-between;">
-            <div style="display: flex; gap: 8px;">
-              <el-button type="primary" @click="handleSave">保存</el-button>
-              <el-button @click="handleShowVersions">版本历史</el-button>
+          <div v-if="!isEditingRecord" class="record-viewer">
+            <div class="viewer-header">
+              <div class="viewer-title-group">
+                <p class="viewer-eyebrow">杂项记录</p>
+                <h3 class="viewer-title">
+                  {{ store.selectedRecord.title || '无标题' }}
+                </h3>
+              </div>
+              <el-tag v-if="store.selectedRecord.category" size="small">
+                {{ store.selectedRecord.category }}
+              </el-tag>
             </div>
-            <el-button type="danger" @click="handleDelete">删除</el-button>
+
+            <div
+              v-if="store.selectedRecord.deletedAt"
+              class="viewer-deleted"
+            >
+              删除于 {{ formatTimestamp(store.selectedRecord.deletedAt) }}
+            </div>
+
+            <el-scrollbar class="viewer-content-scroll">
+              <div
+                v-if="store.selectedRecord.content"
+                class="viewer-content markdown-content"
+                v-html="renderedRecordContent"
+              />
+              <div v-else class="viewer-empty">
+                这条记录还没有内容
+              </div>
+            </el-scrollbar>
+
+            <div class="viewer-actions">
+              <div class="viewer-primary-actions">
+                <el-button
+                  v-if="!store.selectedRecord.deleted"
+                  type="primary"
+                  @click="handleStartEdit"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                  :disabled="store.selectedRecord.deleted"
+                  @click="handleShowVersions"
+                >
+                  版本历史
+                </el-button>
+              </div>
+              <el-button
+                v-if="!store.selectedRecord.deleted"
+                type="danger"
+                plain
+                @click="handleDelete"
+              >
+                删除
+              </el-button>
+            </div>
           </div>
+
+          <template v-else>
+            <el-form label-width="60px" style="margin-bottom: 12px;">
+              <el-form-item label="标题">
+                <el-input v-model="editForm.title" placeholder="请输入标题" />
+              </el-form-item>
+              <el-form-item label="分类">
+                <el-autocomplete
+                  v-model="editForm.category"
+                  :fetch-suggestions="queryCategorySuggestions"
+                  placeholder="输入或选择分类"
+                  clearable
+                  style="width: 100%;"
+                />
+              </el-form-item>
+            </el-form>
+            <el-input
+              v-model="editForm.content"
+              type="textarea"
+              :rows="10"
+              placeholder="请输入内容"
+              style="margin-bottom: 12px;"
+            />
+            <div style="display: flex; justify-content: space-between;">
+              <div style="display: flex; gap: 8px;">
+                <el-button type="primary" @click="handleSave">保存</el-button>
+                <el-button @click="handleCancelEdit">取消</el-button>
+              </div>
+              <el-button type="danger" @click="handleDelete">删除</el-button>
+            </div>
+          </template>
         </template>
         <template v-else>
           <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 16px;">
@@ -168,6 +229,7 @@
 import { ref, reactive, watch, computed } from 'vue';
 import { Loading } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { marked } from 'marked';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
 import { useProjectStore } from '../stores/projectStore';
 import { formatTimestamp } from '@shared/utils';
@@ -187,6 +249,7 @@ const projectStore = useProjectStore();
 const activeTab = ref('records');
 const trashRecords = ref<MiscRecord[]>([]);
 const showVersionDialog = ref(false);
+const isEditingRecord = ref(false);
 
 const editForm = reactive({
   title: '',
@@ -199,10 +262,21 @@ const currentVersions = computed<MiscRecordVersion[]>(() => {
   return store.getVersions(store.selectedRecord.id);
 });
 
+const renderedRecordContent = computed(() => {
+  if (!store.selectedRecord?.content) return '';
+  try {
+    return marked(store.selectedRecord.content);
+  } catch (error) {
+    console.error('Markdown渲染失败:', error);
+    return store.selectedRecord.content;
+  }
+});
+
 // 弹窗打开时加载记录
 const handleDialogOpen = () => {
   if (projectStore.currentProject) {
     store.selectRecord(null);
+    isEditingRecord.value = false;
     activeTab.value = 'records';
     store.loadRecords(projectStore.currentProject.id);
   }
@@ -223,6 +297,7 @@ watch(() => store.searchQuery, () => {
 watch(() => store.selectedCategory, () => {
   store.selectRecord(null);
   resetEditForm();
+  isEditingRecord.value = false;
   if (projectStore.currentProject) {
     store.loadRecords(projectStore.currentProject.id);
   }
@@ -250,6 +325,7 @@ const handleSelectRecord = (record: MiscRecord) => {
   editForm.title = record.title || '';
   editForm.category = record.category || '';
   editForm.content = record.content || '';
+  isEditingRecord.value = false;
 };
 
 const handleCreateRecord = async () => {
@@ -261,6 +337,7 @@ const handleCreateRecord = async () => {
       content: '',
     });
     store.selectRecord(newRecord);
+    isEditingRecord.value = true;
     editForm.title = '';
     editForm.category = '';
     editForm.content = '';
@@ -273,16 +350,37 @@ const handleCreateRecord = async () => {
 const handleSave = async () => {
   if (!store.selectedRecord) return;
   try {
-    await store.updateRecord(store.selectedRecord.id, {
+    const updated = await store.updateRecord(store.selectedRecord.id, {
       title: editForm.title,
       category: editForm.category,
       content: editForm.content,
     });
+    store.selectRecord(updated);
+    editForm.title = updated.title || '';
+    editForm.category = updated.category || '';
+    editForm.content = updated.content || '';
+    isEditingRecord.value = false;
     ElMessage.success('保存成功');
   } catch (error) {
     console.error('保存记录失败:', error);
     ElMessage.error('保存失败');
   }
+};
+
+const handleStartEdit = () => {
+  isEditingRecord.value = true;
+};
+
+const handleCancelEdit = () => {
+  if (!store.selectedRecord) {
+    isEditingRecord.value = false;
+    return;
+  }
+
+  editForm.title = store.selectedRecord.title || '';
+  editForm.category = store.selectedRecord.category || '';
+  editForm.content = store.selectedRecord.content || '';
+  isEditingRecord.value = false;
 };
 
 const handleDelete = async () => {
@@ -300,6 +398,7 @@ const handleDelete = async () => {
     await store.deleteRecord(store.selectedRecord.id);
     store.selectRecord(null);
     resetEditForm();
+    isEditingRecord.value = false;
     ElMessage.success('已删除');
   } catch (error) {
     if (error !== 'cancel') {
@@ -361,10 +460,12 @@ const handleRestoreVersion = async (versionId: string) => {
   if (!store.selectedRecord) return;
   try {
     const updated = await store.restoreVersion(store.selectedRecord.id, versionId);
+    store.selectRecord(updated);
     // 用恢复后的数据更新编辑表单
     editForm.title = updated.title || '';
     editForm.category = updated.category || '';
     editForm.content = updated.content || '';
+    isEditingRecord.value = false;
     // 刷新版本列表
     await store.loadVersions(store.selectedRecord.id);
     ElMessage.success('版本已恢复');
@@ -392,6 +493,145 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
 </script>
 
 <style scoped>
+.record-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.viewer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fbff 0%, #f5f7fa 100%);
+}
+
+.viewer-title-group {
+  min-width: 0;
+}
+
+.viewer-eyebrow {
+  margin: 0 0 6px;
+  color: #409eff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.viewer-title {
+  margin: 0;
+  color: #303133;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.viewer-deleted {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid #f3d19e;
+  border-radius: 8px;
+  background: #fdf6ec;
+  color: #b25e00;
+  font-size: 13px;
+}
+
+.viewer-content-scroll {
+  flex: 1;
+  min-height: 0;
+  margin-top: 16px;
+}
+
+.viewer-content {
+  padding: 18px 20px;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(48, 49, 51, 0.04);
+  color: #303133;
+  font-size: 14px;
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.viewer-content :deep(p) {
+  margin: 0.7em 0;
+}
+
+.viewer-content :deep(h1),
+.viewer-content :deep(h2),
+.viewer-content :deep(h3),
+.viewer-content :deep(h4) {
+  margin: 1.2em 0 0.5em;
+  color: #303133;
+  font-weight: 700;
+}
+
+.viewer-content :deep(ul),
+.viewer-content :deep(ol) {
+  margin: 0.7em 0;
+  padding-left: 1.8em;
+}
+
+.viewer-content :deep(blockquote) {
+  margin: 1em 0;
+  padding: 10px 14px;
+  border-left: 3px solid #409eff;
+  border-radius: 6px;
+  background: #f5f9ff;
+  color: #606266;
+}
+
+.viewer-content :deep(code) {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #f4f4f5;
+  color: #c7254e;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.9em;
+}
+
+.viewer-content :deep(pre) {
+  margin: 1em 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: #282c34;
+  color: #abb2bf;
+  overflow-x: auto;
+}
+
+.viewer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 220px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 12px;
+  background: #fafafa;
+  color: #909399;
+  font-size: 14px;
+}
+
+.viewer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.viewer-primary-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .record-item {
   display: flex;
   align-items: center;
