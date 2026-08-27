@@ -50,9 +50,9 @@ Responses 请求面向本项目的长上下文与高频工具调用场景保留�
   - 生成并复用进程级 `ses_<ULID>` 会话亲和 ID
   - Responses 请求使用 `reasoning: { effort }`；Chat 回退请求默认开启 `thinking`
   - GLM-5.2 及以上可配置 `max/xhigh/high/medium/low/minimal/none`
-  - 单次输出上限 32000 tokens
+  - 默认并最多输出 32000 tokens
 - OpenCode Zen / Go：
-  - 单次输出上限 32000 tokens
+  - 默认并最多输出 32000 tokens
   - Responses 请求使用标准 `reasoning: { effort: low/high }`，`none` 不发送 reasoning
   - Chat 回退请求使用 `reasoning_effort`，Hy3 会映射为 `no_think/low/high`
 - CLI Proxy API：

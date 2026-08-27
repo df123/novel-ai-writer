@@ -63,8 +63,8 @@ export type LLMProvider = 'deepseek' | 'openrouter' | 'zai' | 'opencode' | 'clip
 /** OpenCode / Z.AI Coding Plan 的单次输出上限 */
 const OPENCODE_MAX_TOKENS = 32000;
 
-/** 未显式传预算时的默认输出上限 */
-const DEFAULT_MAX_TOKENS = 4096;
+/** OpenCode / Z.AI 未显式传预算时直接使用单次输出上限 */
+const DEFAULT_MAX_TOKENS = OPENCODE_MAX_TOKENS;
 
 /** Z.AI Coding Plan 需要伪装为 opencode 客户端 */
 const OPENCODE_USER_AGENT = 'opencode/1.18.23';

@@ -185,7 +185,7 @@ Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次
   - Zen: `https://opencode.ai/zen/v1/chat/completions`
   - Go: `https://opencode.ai/zen/go/v1/chat/completions`
 - **思考模式**: 可在设置中启用推理强度；Responses 使用标准 `low/high`，Chat 回退请求中的 Hy3 会映射为 `no_think/low/high`
-- **输出上限**: 单次请求最多 32000 tokens
+- **输出上限**: 默认并最多 32000 tokens
 
 ### CLI Proxy API
 - **模型**: 从本地 CLI Proxy API 的 `/models` 接口动态获取，模型 ID 使用 `cliproxy/` 前缀
