@@ -227,6 +227,11 @@ interface ResponsesStreamState {
   emittedReasoningLength: number;
 }
 
+interface ResponsesStreamFailure {
+  code: string;
+  message: string;
+}
+
 interface LLMStreamResult {
   response: FetchResponse;
   usesResponsesApi: boolean;
@@ -831,6 +836,20 @@ const RESPONSES_TRANSIENT_RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503
 /** Responses API 瞬时故障的重试间隔 */
 const RESPONSES_RETRY_DELAYS_MS = [750, 2000];
 
+/** Responses API 在 HTTP 200 的 SSE 事件内返回的瞬时错误码 */
+const RESPONSES_STREAM_TRANSIENT_ERROR_CODES = new Set([
+  'rate_limit_exceeded',
+  'timeout',
+  'api_timeout',
+  'server_error',
+  'internal_error',
+  'temporarily_overloaded',
+  'overloaded'
+]);
+
+/** Responses API SSE 事件内瞬时错误的重试间隔 */
+const RESPONSES_STREAM_RETRY_DELAYS_MS = [750, 2500, 6000];
+
 /** 明确表示端点不支持 Responses API 的状态码 */
 const RESPONSES_UNSUPPORTED_STATUSES = new Set([404, 405, 410, 415, 501]);
 
@@ -928,6 +947,118 @@ function shouldFallbackFromResponses(response: FetchResponse, errorMessage: stri
   return response.status === 400 && RESPONSES_UNSUPPORTED_ERROR_PATTERN.test(errorMessage);
 }
 
+function getResponsesStreamFailure(event: Record<string, unknown>): ResponsesStreamFailure | null {
+  if (event.type !== 'error' && event.type !== 'response.failed') return null;
+
+  const response = event.response as Record<string, unknown> | undefined;
+  const failure = (event.error ?? response?.error) as Record<string, unknown> | undefined;
+  if (!failure && !event.message) return null;
+
+  return {
+    code: String(failure?.code || event.code || 'unknown'),
+    message: String(failure?.message || event.message || JSON.stringify(event)).slice(0, 1000)
+  };
+}
+
+function formatResponsesStreamFailure(failure: ResponsesStreamFailure): string {
+  return `LLM API stream error (${failure.code}): ${failure.message}`;
+}
+
+async function pipeLLMStreamToClient(
+  streamResult: LLMStreamResult,
+  res: Response,
+  canRetryTransientFailure: boolean
+): Promise<boolean> {
+  const { response, usesResponsesApi } = streamResult;
+  if (!response.body) {
+    throw new Error('LLM API 未返回流式响应体');
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const responsesState: ResponsesStreamState = {
+    functionCallStates: new Map(),
+    emittedTextLength: 0,
+    emittedReasoningLength: 0
+  };
+  let serverBuffer = '';
+  let doneSent = false;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      serverBuffer += decoder.decode(value, { stream: true });
+      const lines = serverBuffer.split('\n');
+      serverBuffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') {
+          if (!doneSent) {
+            res.write('data: [DONE]\n\n');
+            doneSent = true;
+          }
+          continue;
+        }
+
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(data) as Record<string, unknown>;
+        } catch (error) {
+          console.error('[SSE] Skipping malformed line:', (error as Error).message);
+          continue;
+        }
+
+        if (usesResponsesApi) {
+          const failure = getResponsesStreamFailure(parsed);
+          if (failure) {
+            if (
+              canRetryTransientFailure &&
+              !res.headersSent &&
+              RESPONSES_STREAM_TRANSIENT_ERROR_CODES.has(failure.code)
+            ) {
+              await reader.cancel();
+              return true;
+            }
+            throw new Error(formatResponsesStreamFailure(failure));
+          }
+
+          const converted = convertResponsesEvent(parsed, responsesState);
+          if (converted) {
+            res.write(converted);
+          }
+        } else {
+          res.write(`data: ${JSON.stringify(parsed)}\n\n`);
+        }
+      }
+    }
+
+    if (!doneSent) {
+      res.write('data: [DONE]\n\n');
+    }
+  } catch (error) {
+    console.error('[SSE] Stream error:', error);
+    const details = error instanceof Error ? error.message.slice(0, 2000) : String(error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'LLM 流式响应失败', details });
+    } else {
+      res.write(`data: ${JSON.stringify({ error: 'LLM 流式响应失败', details })}\n\n`);
+      if (!doneSent) res.write('data: [DONE]\n\n');
+    }
+  }
+
+  res.end();
+  return false;
+}
+
 async function fetchLLMStream(
   provider: LLMProvider,
   endpoint: ProviderEndpoint,
@@ -1022,92 +1153,28 @@ export async function chatStream(
     options.cliproxyBaseUrl
   );
   const cleanedMessages = cleanMessages(messages);
-  const streamResult = await fetchLLMStream(
-    provider,
-    endpoint,
-    cleanedMessages,
-    messages,
-    options
-  );
-  const { response, usesResponsesApi } = streamResult;
 
-  if (!response.body) {
-    throw new Error('LLM API 未返回流式响应体');
+  for (let attempt = 0; attempt <= RESPONSES_STREAM_RETRY_DELAYS_MS.length; attempt += 1) {
+    const streamResult = await fetchLLMStream(
+      provider,
+      endpoint,
+      cleanedMessages,
+      messages,
+      options
+    );
+    const canRetry = streamResult.usesResponsesApi && attempt < RESPONSES_STREAM_RETRY_DELAYS_MS.length;
+    const shouldRetry = await pipeLLMStreamToClient(streamResult, res, canRetry);
+    if (!shouldRetry) return;
+
+    const delay = RESPONSES_STREAM_RETRY_DELAYS_MS[attempt];
+    console.warn(
+      `[Responses API] Stream transient error, retrying in ${delay}ms ` +
+      `(attempt ${attempt + 1}/${RESPONSES_STREAM_RETRY_DELAYS_MS.length})`
+    );
+    await wait(delay);
   }
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  const responsesState: ResponsesStreamState = {
-    functionCallStates: new Map(),
-    emittedTextLength: 0,
-    emittedReasoningLength: 0
-  };
-  let serverBuffer = '';
-  let doneSent = false;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      serverBuffer += decoder.decode(value, { stream: true });
-      const lines = serverBuffer.split('\n');
-      serverBuffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') {
-          if (!doneSent) {
-            res.write('data: [DONE]\n\n');
-            doneSent = true;
-          }
-          continue;
-        }
-
-        let parsed: Record<string, unknown>;
-        try {
-          parsed = JSON.parse(data) as Record<string, unknown>;
-        } catch (error) {
-          console.error('[SSE] Skipping malformed line:', (error as Error).message);
-          continue;
-        }
-
-        if (usesResponsesApi) {
-          if (parsed.type === 'error' || parsed.type === 'response.failed') {
-            throw new Error(`LLM API stream error: ${JSON.stringify(parsed)}`);
-          }
-
-          const converted = convertResponsesEvent(parsed, responsesState);
-          if (converted) {
-            res.write(converted);
-          }
-        } else {
-          res.write(`data: ${JSON.stringify(parsed)}\n\n`);
-        }
-      }
-    }
-
-    if (usesResponsesApi && !doneSent) {
-      res.write('data: [DONE]\n\n');
-    }
-  } catch (error) {
-    console.error('[SSE] Stream error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: '流传输中断' });
-    } else {
-      const details = error instanceof Error ? error.message.slice(0, 2000) : String(error);
-      res.write(`data: ${JSON.stringify({ error: '流传输中断', details })}\n\n`);
-      if (!doneSent) res.write('data: [DONE]\n\n');
-    }
-  } finally {
-    res.end();
-  }
+  throw new Error('Responses API 流内错误重试次数已耗尽');
 }
 
 function getDefaultModel(provider: LLMProvider): string {
