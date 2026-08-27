@@ -2,40 +2,42 @@
   <el-dialog
     :model-value="modelValue"
     title="杂项记录"
-    width="900px"
+    width="94%"
+    top="4vh"
+    class="misc-record-dialog"
     :close-on-click-modal="false"
     destroy-on-close
     @update:model-value="emit('update:modelValue', $event)"
     @open="handleDialogOpen"
   >
-    <el-container style="height: 600px">
+    <el-container class="record-layout">
       <!-- 左侧：搜索、筛选、列表 -->
-      <el-aside width="300px" style="border-right: 1px solid #e4e7ed; display: flex; flex-direction: column; padding: 12px;">
+      <el-aside v-if="!isFocusedView" class="record-sidebar">
         <el-input
           v-model="store.searchQuery"
           placeholder="搜索记录..."
           clearable
-          style="margin-bottom: 8px;"
+          class="sidebar-search"
         />
         <el-autocomplete
           v-model="store.selectedCategory"
           :fetch-suggestions="queryFilterCategorySuggestions"
           placeholder="输入分类筛选"
           clearable
-          style="margin-bottom: 12px; width: 100%;"
+          class="sidebar-category"
         />
 
-        <el-tabs v-model="activeTab" style="flex: 1; display: flex; flex-direction: column;" @tab-change="handleTabChange">
+        <el-tabs v-model="activeTab" class="record-tabs" @tab-change="handleTabChange">
           <el-tab-pane label="记录" name="records">
             <el-button
               type="primary"
               size="small"
-              style="margin-bottom: 8px; width: 100%;"
+              class="create-record-button"
               @click="handleCreateRecord"
             >
               新建记录
             </el-button>
-            <el-scrollbar style="height: 420px;">
+            <el-scrollbar class="record-list-scroll">
               <div
                 v-for="record in store.records"
                 :key="record.id"
@@ -55,7 +57,7 @@
             </el-scrollbar>
           </el-tab-pane>
           <el-tab-pane label="回收站" name="trash">
-            <el-scrollbar style="height: 450px;">
+            <el-scrollbar class="record-list-scroll">
               <div
                 v-for="record in trashRecords"
                 :key="record.id"
@@ -79,9 +81,12 @@
       </el-aside>
 
       <!-- 右侧：内容查看与编辑区 -->
-      <el-main style="padding: 16px; overflow-y: auto;">
+      <el-main class="record-main">
         <template v-if="store.selectedRecord">
-          <div v-if="!isEditingRecord" class="record-viewer">
+          <div
+            v-if="!isEditingRecord"
+            :class="['record-viewer', { 'is-focused': isFocusedView }]"
+          >
             <div class="viewer-header">
               <div class="viewer-title-group">
                 <p class="viewer-eyebrow">杂项记录</p>
@@ -89,9 +94,17 @@
                   {{ store.selectedRecord.title || '无标题' }}
                 </h3>
               </div>
-              <el-tag v-if="store.selectedRecord.category" size="small">
-                {{ store.selectedRecord.category }}
-              </el-tag>
+              <div class="viewer-header-actions">
+                <el-tag v-if="store.selectedRecord.category" size="small">
+                  {{ store.selectedRecord.category }}
+                </el-tag>
+                <el-button
+                  circle
+                  :icon="isFocusedView ? Close : FullScreen"
+                  :title="isFocusedView ? '退出沉浸查看' : '沉浸查看'"
+                  @click="isFocusedView = !isFocusedView"
+                />
+              </div>
             </div>
 
             <div
@@ -171,7 +184,7 @@
           </template>
         </template>
         <template v-else>
-          <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 16px;">
+          <div class="viewer-empty is-page-empty">
             选择或创建一条记录
           </div>
         </template>
@@ -227,7 +240,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue';
-import { Loading } from '@element-plus/icons-vue';
+import { Close, FullScreen, Loading } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { marked } from 'marked';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
@@ -250,6 +263,7 @@ const activeTab = ref('records');
 const trashRecords = ref<MiscRecord[]>([]);
 const showVersionDialog = ref(false);
 const isEditingRecord = ref(false);
+const isFocusedView = ref(false);
 
 const editForm = reactive({
   title: '',
@@ -277,6 +291,7 @@ const handleDialogOpen = () => {
   if (projectStore.currentProject) {
     store.selectRecord(null);
     isEditingRecord.value = false;
+    isFocusedView.value = false;
     activeTab.value = 'records';
     store.loadRecords(projectStore.currentProject.id);
   }
@@ -493,6 +508,82 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
 </script>
 
 <style scoped>
+:global(.misc-record-dialog) {
+  max-width: min(1500px, 94vw);
+  margin-top: 4vh;
+}
+
+:global(.misc-record-dialog .el-dialog__body) {
+  padding-top: 0;
+}
+
+.record-layout {
+  height: calc(100vh - 148px);
+  min-height: 520px;
+  max-height: 980px;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.record-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  border-right: 1px solid #e4e7ed;
+  background: #fafbfc;
+}
+
+.sidebar-search {
+  margin-bottom: 8px;
+}
+
+.sidebar-category {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.record-tabs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.record-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+}
+
+.record-tabs :deep(.el-tab-pane) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.create-record-button {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.record-list-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.record-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+  overflow: hidden;
+  background: #f7f8fa;
+}
+
 .record-viewer {
   display: flex;
   flex-direction: column;
@@ -511,8 +602,17 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
   background: linear-gradient(135deg, #f8fbff 0%, #f5f7fa 100%);
 }
 
+.record-viewer.is-focused .viewer-header,
+.record-viewer.is-focused .viewer-content,
+.record-viewer.is-focused .viewer-actions {
+  max-width: 1120px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
 .viewer-title-group {
   min-width: 0;
+  flex: 1;
 }
 
 .viewer-eyebrow {
@@ -532,6 +632,13 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
   word-break: break-word;
 }
 
+.viewer-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
 .viewer-deleted {
   margin-top: 12px;
   padding: 10px 14px;
@@ -548,15 +655,22 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
   margin-top: 16px;
 }
 
+.viewer-content-scroll :deep(.el-scrollbar__view) {
+  min-height: 100%;
+}
+
 .viewer-content {
-  padding: 18px 20px;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 26px 32px;
   border: 1px solid #ebeef5;
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 4px 14px rgba(48, 49, 51, 0.04);
   color: #303133;
-  font-size: 14px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.9;
   word-break: break-word;
 }
 
@@ -619,12 +733,23 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
   font-size: 14px;
 }
 
+.viewer-empty.is-page-empty {
+  width: 100%;
+}
+
 .viewer-actions {
+  width: 100%;
+  max-width: 960px;
+  margin: 16px auto 0;
+  padding: 14px 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(48, 49, 51, 0.04);
 }
 
 .viewer-primary-actions {
@@ -721,5 +846,34 @@ const queryFilterCategorySuggestions = (queryString: string, cb: (results: { val
   padding-top: 8px;
   border-top: 1px dashed #e4e7ed;
   margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  :global(.misc-record-dialog) {
+    width: 96vw;
+    margin-top: 2vh;
+  }
+
+  .record-layout {
+    height: calc(100vh - 72px);
+    max-height: none;
+  }
+
+  .record-sidebar {
+    width: 248px;
+    padding: 12px 8px;
+  }
+
+  .record-main {
+    padding: 12px;
+  }
+
+  .viewer-header {
+    padding: 14px;
+  }
+
+  .viewer-content {
+    padding: 18px;
+  }
 }
 </style>
