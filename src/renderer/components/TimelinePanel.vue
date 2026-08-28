@@ -20,6 +20,11 @@
             >
               <div class="node-header">
                 <span class="node-title">{{ node.title }}</span>
+                <span
+                  v-if="changeFlagStore.hasFlag('timeline', node.id)"
+                  class="llm-change-dot"
+                  title="AI 修改过此内容，点击查看后红点消失"
+                ></span>
                 <el-tag v-if="node.deleted" type="info" size="small">已删除</el-tag>
               </div>
               <div class="node-date">
@@ -201,6 +206,7 @@ import { Plus, Edit, Delete, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft 
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useChangeFlagStore } from '../stores/changeFlagStore';
 import { timelineApi } from '../utils/api';
 import { formatDeletedAt } from '@shared/utils';
 import ContentViewerDialog from './ContentViewerDialog.vue';
@@ -208,6 +214,7 @@ import type { TimelineNode } from '@shared/types';
 
 const timelineStore = useTimelineStore();
 const projectStore = useProjectStore();
+const changeFlagStore = useChangeFlagStore();
 const { nodes, selectedNode, versions, isLoadingVersions } = storeToRefs(timelineStore);
 const { createNode, updateNode, deleteNode, selectNode, loadVersions, restoreVersion } = timelineStore;
 
@@ -296,6 +303,7 @@ const viewerSections = computed(() => {
 const handleViewNode = (node: TimelineNode) => {
   viewingNode.value = node;
   viewerOpen.value = true;
+  changeFlagStore.clearFlag('timeline', node.id);
   if (!node.deleted) {
     selectNode(node.id);
   }

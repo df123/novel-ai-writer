@@ -12,6 +12,7 @@ import { useCharacterStore } from './characterStore';
 import { useSettingsStore } from './settingsStore';
 import { useThemeStore } from './themeStore';
 import { useMiscRecordStore } from './miscRecordStore';
+import { useChangeFlagStore } from './changeFlagStore';
 
 /**
  * 工具调用接口
@@ -137,8 +138,9 @@ export const useChatStore = defineStore('chat', () => {
     const timelineStore = useTimelineStore();
     const characterStore = useCharacterStore();
     const settingsStore = useSettingsStore();
-    const themeStore = useThemeStore();
-    const miscRecordStore = useMiscRecordStore();
+  const themeStore = useThemeStore();
+  const miscRecordStore = useMiscRecordStore();
+  const changeFlagStore = useChangeFlagStore();
     let assistantMessageId: string | null = null;
 
     if (!currentChat.value || !projectStore.currentProject) {
@@ -358,7 +360,8 @@ export const useChatStore = defineStore('chat', () => {
                 suggestion: '使用 update_timeline 工具，传入上述 id 来更新此时间线节点'
               });
             }
-            await timelineStore.createNode(parsedArgs.title, parsedArgs.description, { date: parsedArgs.date });
+            const node = await timelineStore.createNode(parsedArgs.title, parsedArgs.description, { date: parsedArgs.date });
+            changeFlagStore.markChanged('timeline', node.id);
             return JSON.stringify({ success: true, message: `已创建时间线节点: ${parsedArgs.title}` });
           }
           case 'update_timeline': {
@@ -402,6 +405,7 @@ export const useChatStore = defineStore('chat', () => {
               content: parsedArgs.description,
               createVersion: true,
             });
+            changeFlagStore.markChanged('timeline', parsedArgs.id);
             return JSON.stringify({ success: true, message: `已更新时间线节点: ${parsedArgs.title || node.title}` });
           }
           case 'delete_timeline': {
@@ -456,12 +460,13 @@ export const useChatStore = defineStore('chat', () => {
                 suggestion: '使用 update_character 工具，传入上述 id 来更新此人物'
               });
             }
-            await characterStore.createCharacter({
+            const character = await characterStore.createCharacter({
               name: parsedArgs.name,
               personality: parsedArgs.personality,
               background: parsedArgs.background,
               relationships: parsedArgs.relationships,
             });
+            changeFlagStore.markChanged('character', character.id);
             return JSON.stringify({ success: true, message: `已创建人物: ${parsedArgs.name}` });
           }
           case 'update_character': {
@@ -510,6 +515,7 @@ export const useChatStore = defineStore('chat', () => {
               relationships: parsedArgs.relationships,
               createVersion: true,
             });
+            changeFlagStore.markChanged('character', parsedArgs.id);
             return JSON.stringify({ success: true, message: `已更新人物: ${parsedArgs.name || character.name}` });
           }
           case 'delete_character': {
@@ -788,11 +794,12 @@ export const useChatStore = defineStore('chat', () => {
                 suggestion: '使用 update_misc_record 工具，传入上述 id 来更新此记录'
               });
             }
-            await miscRecordStore.createRecord(projectStore.currentProject.id, {
+            const record = await miscRecordStore.createRecord(projectStore.currentProject.id, {
               title: parsedArgs.title,
               category: parsedArgs.category,
               content: parsedArgs.content,
             });
+            changeFlagStore.markChanged('miscRecord', record.id);
             return JSON.stringify({ success: true, message: `已创建杂项记录: ${parsedArgs.title}` });
           }
           case 'update_misc_record': {
@@ -835,6 +842,7 @@ export const useChatStore = defineStore('chat', () => {
               category: parsedArgs.category,
               content: parsedArgs.content,
             });
+            changeFlagStore.markChanged('miscRecord', parsedArgs.id);
             return JSON.stringify({ success: true, message: `已更新杂项记录: ${parsedArgs.title || record.title}` });
           }
           case 'delete_misc_record': {
@@ -906,6 +914,7 @@ export const useChatStore = defineStore('chat', () => {
                   created_by: 'llm',
                 });
                 const newTheme = createResponse.data;
+                changeFlagStore.markChanged('theme', newTheme.id);
                 // 重新加载当前主旨到store
                 await themeStore.loadTheme(projectStore.currentProject.id);
                 return JSON.stringify({
@@ -927,7 +936,8 @@ export const useChatStore = defineStore('chat', () => {
                 created_by: 'llm',
               });
               const updatedTheme = updateResponse.data;
-              
+              changeFlagStore.markChanged('theme', updatedTheme.id);
+
               // 重新加载当前主旨到store
               await themeStore.loadTheme(projectStore.currentProject.id);
               

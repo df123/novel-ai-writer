@@ -14,20 +14,24 @@
           @click="showChapterDialog = true"
           title="章节管理"
         />
-        <el-button
-          :icon="Document"
-          circle
-          class="action-button theme-button"
-          @click="showThemeDialog = true"
-          title="主旨管理"
-        />
-        <el-button
-          :icon="Notebook"
-          circle
-          class="action-button misc-record-button"
-          @click="showMiscRecord = true"
-          title="杂项记录"
-        />
+        <el-badge is-dot :hidden="!changeFlagStore.hasAny('theme')" class="action-badge">
+          <el-button
+            :icon="Document"
+            circle
+            class="action-button theme-button"
+            @click="handleOpenThemeDialog"
+            title="主旨管理"
+          />
+        </el-badge>
+        <el-badge is-dot :hidden="!changeFlagStore.hasAny('miscRecord')" class="action-badge">
+          <el-button
+            :icon="Notebook"
+            circle
+            class="action-button misc-record-button"
+            @click="showMiscRecord = true"
+            title="杂项记录"
+          />
+        </el-badge>
         <el-button
           :icon="Plus"
           circle
@@ -107,6 +111,7 @@ import { useCharacterStore } from '../stores/characterStore';
 import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
+import { useChangeFlagStore } from '../stores/changeFlagStore';
 import ChapterPanel from './ChapterPanel.vue';
 import TimelinePanel from './TimelinePanel.vue';
 import ChatPanel from './ChatPanel.vue';
@@ -125,6 +130,7 @@ const characterStore = useCharacterStore();
 const chapterStore = useChapterStore();
 const themeStore = useThemeStore();
 const miscRecordStore = useMiscRecordStore();
+const changeFlagStore = useChangeFlagStore();
 
 const showSettings = ref(false);
 const showCreateProject = ref(false);
@@ -137,18 +143,33 @@ watch(
   () => projectStore.currentProject,
   async (currentProject) => {
     if (currentProject) {
+      changeFlagStore.switchProject(currentProject.id);
       await chatStore.loadChats(currentProject.id);
       await timelineStore.loadNodes(currentProject.id);
       await characterStore.loadCharacters(currentProject.id);
       await chapterStore.loadChapters(currentProject.id);
       await themeStore.loadTheme(currentProject.id);
       await miscRecordStore.loadRecords(currentProject.id, {});
+      // 清理已不存在实体上的遗留标记
+      changeFlagStore.retainOnly('timeline', timelineStore.nodes.map(n => n.id));
+      changeFlagStore.retainOnly('character', characterStore.characters.map(c => c.id));
+      changeFlagStore.retainOnly('miscRecord', miscRecordStore.records.map(r => r.id));
+      changeFlagStore.retainOnly('theme', themeStore.theme ? [themeStore.theme.id] : []);
     } else {
       themeStore.clearTheme();
+      changeFlagStore.switchProject(null);
     }
   },
   { immediate: true }
 );
+
+// 打开主旨面板即视为已查看内容，清除红点
+const handleOpenThemeDialog = () => {
+  showThemeDialog.value = true;
+  if (themeStore.theme) {
+    changeFlagStore.clearFlag('theme', themeStore.theme.id);
+  }
+};
 
 const handleMenuCommand = (command: string) => {
   if (command === 'settings') {
@@ -205,6 +226,14 @@ const handleMenuCommand = (command: string) => {
 .action-button:hover {
   background-color: rgba(255, 255, 255, 0.25);
   transform: scale(1.05);
+}
+
+.action-badge {
+  margin-left: 8px;
+}
+
+.action-badge .action-button {
+  margin-left: 0;
 }
 
 .chapter-button {

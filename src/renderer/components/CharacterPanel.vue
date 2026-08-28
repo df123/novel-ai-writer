@@ -24,6 +24,11 @@
               <div class="character-info">
                 <div class="character-header">
                   <span class="character-name">{{ character.name }}</span>
+                  <span
+                    v-if="changeFlagStore.hasFlag('character', character.id)"
+                    class="llm-change-dot"
+                    title="AI 修改过此内容，点击查看后红点消失"
+                  ></span>
                   <el-tag v-if="character.deleted" type="info" size="small">已删除</el-tag>
                 </div>
                 <div v-if="character.personality" class="personality-text">
@@ -224,6 +229,7 @@ import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading, Refres
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useCharacterStore } from '../stores/characterStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useChangeFlagStore } from '../stores/changeFlagStore';
 import { characterApi } from '../utils/api';
 import { formatDeletedAt } from '@shared/utils';
 import ContentViewerDialog from './ContentViewerDialog.vue';
@@ -231,6 +237,7 @@ import type { Character } from '@shared/types';
 
 const characterStore = useCharacterStore();
 const projectStore = useProjectStore();
+const changeFlagStore = useChangeFlagStore();
 const { characters, currentVersions, isLoadingVersions } = storeToRefs(characterStore);
 const { createCharacter, updateCharacter, deleteCharacter, loadVersions, restoreVersion } = characterStore;
 
@@ -298,6 +305,7 @@ const viewerSections = computed(() => {
 const handleViewCharacter = (character: Character) => {
   viewingCharacter.value = character;
   viewerOpen.value = true;
+  changeFlagStore.clearFlag('character', character.id);
 };
 
 const handleEditFromViewer = () => {

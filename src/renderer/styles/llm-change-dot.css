@@ -1,0 +1,22 @@
+/* LLM 修改内容红点提示 */
+.llm-change-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f56c6c;
+  flex-shrink: 0;
+  animation: llm-change-dot-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes llm-change-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(245, 108, 108, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 108, 108, 0);
+  }
+}

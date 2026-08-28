@@ -48,6 +48,11 @@
                   <span style="font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     {{ record.title || '无标题' }}
                   </span>
+                  <span
+                    v-if="changeFlagStore.hasFlag('miscRecord', record.id)"
+                    class="llm-change-dot"
+                    title="AI 修改过此内容，点击查看后红点消失"
+                  ></span>
                 </div>
                 <el-tag v-if="record.category" size="small" style="flex-shrink: 0;">
                   {{ record.category }}
@@ -245,6 +250,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { marked } from 'marked';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useChangeFlagStore } from '../stores/changeFlagStore';
 import { formatTimestamp } from '@shared/utils';
 import type { MiscRecord, MiscRecordVersion } from '@shared/types';
 
@@ -258,6 +264,7 @@ const emit = defineEmits<{
 
 const store = useMiscRecordStore();
 const projectStore = useProjectStore();
+const changeFlagStore = useChangeFlagStore();
 
 const activeTab = ref('records');
 const trashRecords = ref<MiscRecord[]>([]);
@@ -337,6 +344,7 @@ const resetEditForm = () => {
 
 const handleSelectRecord = (record: MiscRecord) => {
   store.selectRecord(record);
+  changeFlagStore.clearFlag('miscRecord', record.id);
   editForm.title = record.title || '';
   editForm.category = record.category || '';
   editForm.content = record.content || '';
