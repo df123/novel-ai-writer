@@ -27,8 +27,9 @@ function loadAllFromStorage(): Record<string, ProjectChangeFlags> {
 }
 
 /**
- * 追踪 LLM 工具调用修改过的实体，供界面显示红点提示。
- * 标记按项目隔离并持久化到 localStorage，用户点击查看后清除。
+ * 追踪 LLM 工具调用修改过的实体 ID，供界面显示红点提示。
+ * 修改内容对比由数据库中的版本历史提供，这里只记录"尚未查看"的标记；
+ * 标记按项目隔离并持久化到 localStorage，用户查看修改对比后清除。
  */
 export const useChangeFlagStore = defineStore('changeFlag', () => {
   const projectId = ref<string | null>(null);
@@ -67,7 +68,7 @@ export const useChangeFlagStore = defineStore('changeFlag', () => {
     persist();
   };
 
-  // 清理已不存在的实体标记（如实体被删除），避免红点计数失真
+  // 清理已不存在实体上的标记（如实体被删除），避免红点计数失真
   const retainOnly = (target: ChangeFlagTarget, existingIds: string[]) => {
     const retained = flags.value[target].filter(id => existingIds.includes(id));
     if (retained.length === flags.value[target].length) return;

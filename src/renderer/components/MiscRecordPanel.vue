@@ -51,7 +51,8 @@
                   <span
                     v-if="changeFlagStore.hasFlag('miscRecord', record.id)"
                     class="llm-change-dot"
-                    title="AI 修改过此内容，点击查看后红点消失"
+                    title="AI 修改过此内容，点击查看修改对比"
+                    @click.stop="handleViewChangeDiff(record.id)"
                   ></span>
                 </div>
                 <el-tag v-if="record.category" size="small" style="flex-shrink: 0;">
@@ -234,6 +235,7 @@
           {{ version.content || '无内容' }}
         </div>
         <div class="version-actions">
+          <el-button size="small" @click="handleCompareVersion(index)">对比</el-button>
           <el-button type="primary" size="small" plain @click="handleRestoreVersion(version.id)">
             恢复此版本
           </el-button>
@@ -241,6 +243,13 @@
       </div>
     </div>
   </el-dialog>
+
+  <ChangeDiffDialog
+    v-model="diffDialogOpen"
+    :title="diffTitle"
+    :sections="diffSections"
+    :kind="diffKind"
+  />
 </template>
 
 <script setup lang="ts">
@@ -251,6 +260,8 @@ import { marked } from 'marked';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useChangeFlagStore } from '../stores/changeFlagStore';
+import ChangeDiffDialog from './ChangeDiffDialog.vue';
+import type { DiffSection } from '../utils/diff';
 import { formatTimestamp } from '@shared/utils';
 import type { MiscRecord, MiscRecordVersion } from '@shared/types';
 
@@ -271,6 +282,72 @@ const trashRecords = ref<MiscRecord[]>([]);
 const showVersionDialog = ref(false);
 const isEditingRecord = ref(false);
 const isFocusedView = ref(false);
+const diffDialogOpen = ref(false);
+const diffTitle = ref('');
+const diffSections = ref<DiffSection[]>([]);
+const diffKind = ref<'create' | 'update'>('update');
+
+// 版本快照存的是修改前内容，与相邻版本或当前内容对照即为该次修改的变化
+const buildRecordSections = (
+  before?: { title?: string; category?: string; content?: string } | null,
+  after?: { title?: string; category?: string; content?: string } | null
+): DiffSection[] => {
+  return [
+    { label: '标题', before: before?.title ?? '', after: after?.title ?? '' },
+    { label: '分类', before: before?.category ?? '', after: after?.category ?? '' },
+    { label: '内容', before: before?.content ?? '', after: after?.content ?? '' },
+  ].filter(section => section.before !== section.after);
+};
+
+const openDiffDialog = (title: string, sections: DiffSection[], kind: 'create' | 'update') => {
+  diffTitle.value = title;
+  diffSections.value = sections;
+  diffKind.value = kind;
+  diffDialogOpen.value = true;
+};
+
+// 红点点击：展示最近一次修改（最新版本快照 vs 当前内容）
+const handleViewChangeDiff = async (recordId: string) => {
+  const record = store.records.find(r => r.id === recordId)
+    ?? (store.selectedRecord?.id === recordId ? store.selectedRecord : null);
+  if (!record) return;
+  try {
+    await store.loadVersions(recordId);
+  } catch (error) {
+    console.error('加载版本失败:', error);
+  }
+  const latest = store.getVersions(recordId)[0];
+  openDiffDialog(
+    `${record.title || '无标题'} · ${latest ? `v${latest.version} → 当前` : '新增内容'}`,
+    buildRecordSections(latest ?? null, record),
+    latest ? 'update' : 'create'
+  );
+  changeFlagStore.clearFlag('miscRecord', recordId);
+};
+
+// 版本历史：与上一个更新的版本（或当前内容）对照
+const handleCompareVersion = (index: number) => {
+  const current = store.selectedRecord;
+  if (!current) return;
+  const list = store.getVersions(current.id);
+  const before = list[index];
+  if (!before) return;
+  let afterLabel = '';
+  let sections: DiffSection[] = [];
+  if (index === 0) {
+    afterLabel = '当前';
+    sections = buildRecordSections(before, current);
+  } else {
+    const newer = list[index - 1];
+    if (!newer) return;
+    afterLabel = `v${newer.version}`;
+    sections = buildRecordSections(before, newer);
+  }
+  openDiffDialog(`${before.title || '无标题'} · v${before.version} → ${afterLabel}`, sections, 'update');
+  if (index === 0) {
+    changeFlagStore.clearFlag('miscRecord', current.id);
+  }
+};
 
 const editForm = reactive({
   title: '',
@@ -344,7 +421,6 @@ const resetEditForm = () => {
 
 const handleSelectRecord = (record: MiscRecord) => {
   store.selectRecord(record);
-  changeFlagStore.clearFlag('miscRecord', record.id);
   editForm.title = record.title || '';
   editForm.category = record.category || '';
   editForm.content = record.content || '';

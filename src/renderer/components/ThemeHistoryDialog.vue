@@ -40,11 +40,21 @@
             {{ history.content.substring(0, 200) }}{{ history.content.length > 200 ? '...' : '' }}
           </div>
         </div>
+        <div class="history-actions">
+          <el-button size="small" @click="handleCompareHistory(index)">对比</el-button>
+        </div>
       </div>
     </div>
     <template #footer>
       <el-button @click="handleClose">关闭</el-button>
     </template>
+
+    <ChangeDiffDialog
+      v-model="diffDialogOpen"
+      :title="diffTitle"
+      :sections="diffSections"
+      kind="update"
+    />
   </el-dialog>
 </template>
 
@@ -52,6 +62,9 @@
 import { ref, watch, computed } from 'vue';
 import { Loading } from '@element-plus/icons-vue';
 import { useThemeStore } from '../stores/themeStore';
+import { useChangeFlagStore } from '../stores/changeFlagStore';
+import ChangeDiffDialog from './ChangeDiffDialog.vue';
+import type { DiffSection } from '../utils/diff';
 import { formatTimestamp } from '@shared/utils';
 
 interface Props {
@@ -67,11 +80,44 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const themeStore = useThemeStore();
+const changeFlagStore = useChangeFlagStore();
 
 const dialogVisible = ref(false);
 const isLoading = ref(false);
+const diffDialogOpen = ref(false);
+const diffTitle = ref('');
+const diffSections = ref<DiffSection[]>([]);
 
 const historyList = computed(() => themeStore.themeHistory);
+
+// 历史快照存的是修改前内容，与相邻历史（或当前内容）对照即为该次修改的变化
+const handleCompareHistory = (index: number) => {
+  const list = historyList.value;
+  const before = list[index];
+  if (!before) return;
+  let afterLabel = '';
+  let afterContent = '';
+  if (index === 0) {
+    const current = themeStore.theme;
+    if (!current) return;
+    afterLabel = '当前';
+    afterContent = current.content;
+  } else {
+    const newer = list[index - 1];
+    if (!newer) return;
+    afterLabel = `v${newer.version}`;
+    afterContent = newer.content;
+  }
+  const sections: DiffSection[] = [
+    { label: '内容', before: before.content, after: afterContent },
+  ].filter(section => section.before !== section.after);
+  diffTitle.value = `主旨 · v${before.version} → ${afterLabel}`;
+  diffSections.value = sections;
+  diffDialogOpen.value = true;
+  if (index === 0 && props.themeId) {
+    changeFlagStore.clearFlag('theme', props.themeId);
+  }
+};
 
 watch(
   () => props.modelValue,
@@ -209,6 +255,13 @@ const handleClose = () => {
 
 .history-content {
   margin-bottom: 12px;
+}
+
+.history-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px dashed #e4e7ed;
 }
 
 .content-preview {

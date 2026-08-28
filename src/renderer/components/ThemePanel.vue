@@ -8,6 +8,13 @@
     </div>
 
     <div class="panel-content">
+      <div v-if="theme && changeFlagStore.hasFlag('theme', theme.id)" class="ai-change-banner">
+        <span class="llm-change-dot"></span>
+        <span class="ai-change-banner-text">AI 修改过主旨，尚未查看</span>
+        <el-button type="primary" link size="small" @click="handleViewThemeDiff">
+          查看修改对比
+        </el-button>
+      </div>
       <div v-if="theme" class="theme-container">
         <div class="theme-header">
           <h3 class="theme-title">{{ theme.title }}</h3>
@@ -46,6 +53,13 @@
       v-model="historyDialogOpen"
       :theme-id="historyThemeId"
     />
+
+    <ChangeDiffDialog
+      v-model="diffDialogOpen"
+      :title="diffTitle"
+      :sections="diffSections"
+      :kind="diffKind"
+    />
   </div>
 </template>
 
@@ -57,8 +71,11 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { marked } from 'marked';
 import { useThemeStore } from '../stores/themeStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useChangeFlagStore } from '../stores/changeFlagStore';
 import ThemeEditDialog from './ThemeEditDialog.vue';
 import ThemeHistoryDialog from './ThemeHistoryDialog.vue';
+import ChangeDiffDialog from './ChangeDiffDialog.vue';
+import type { DiffSection } from '../utils/diff';
 import type { Theme } from '@shared/types';
 
 marked.setOptions({
@@ -68,13 +85,38 @@ marked.setOptions({
 
 const themeStore = useThemeStore();
 const projectStore = useProjectStore();
+const changeFlagStore = useChangeFlagStore();
 const { theme } = storeToRefs(themeStore);
-const { loadTheme, updateTheme, deleteTheme } = themeStore;
+const { loadTheme, loadThemeHistory, updateTheme, deleteTheme } = themeStore;
 
 const editDialogOpen = ref(false);
 const historyDialogOpen = ref(false);
 const editingTheme = ref<Theme | null>(null);
 const historyThemeId = ref<string | null>(null);
+const diffDialogOpen = ref(false);
+const diffTitle = ref('');
+const diffSections = ref<DiffSection[]>([]);
+const diffKind = ref<'create' | 'update'>('update');
+
+// 横幅入口：展示最近一次修改（最新历史快照 vs 当前内容）
+const handleViewThemeDiff = async () => {
+  const current = theme.value;
+  if (!current) return;
+  try {
+    await loadThemeHistory(current.id);
+  } catch (error) {
+    console.error('加载主旨历史记录失败:', error);
+  }
+  const latest = themeStore.themeHistory[0];
+  const sections: DiffSection[] = [
+    { label: '内容', before: latest?.content ?? '', after: current.content },
+  ].filter(section => section.before !== section.after);
+  diffTitle.value = `${current.title} · ${latest ? `v${latest.version} → 当前` : '新增内容'}`;
+  diffSections.value = sections;
+  diffKind.value = latest ? 'update' : 'create';
+  diffDialogOpen.value = true;
+  changeFlagStore.clearFlag('theme', current.id);
+};
 
 const renderedContent = computed(() => {
   if (!theme.value) return '';
@@ -158,6 +200,22 @@ const handleDeleteTheme = async (theme: Theme) => {
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+}
+
+.ai-change-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  border: 1px solid #f3d19e;
+  background-color: #fdf6ec;
+  border-radius: 6px;
+}
+
+.ai-change-banner-text {
+  font-size: 13px;
+  color: #b88230;
 }
 
 .theme-container {

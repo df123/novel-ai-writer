@@ -19,7 +19,7 @@
             :icon="Document"
             circle
             class="action-button theme-button"
-            @click="handleOpenThemeDialog"
+            @click="showThemeDialog = true"
             title="主旨管理"
           />
         </el-badge>
@@ -162,14 +162,6 @@ watch(
   },
   { immediate: true }
 );
-
-// 打开主旨面板即视为已查看内容，清除红点
-const handleOpenThemeDialog = () => {
-  showThemeDialog.value = true;
-  if (themeStore.theme) {
-    changeFlagStore.clearFlag('theme', themeStore.theme.id);
-  }
-};
 
 const handleMenuCommand = (command: string) => {
   if (command === 'settings') {

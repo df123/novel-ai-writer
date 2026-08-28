@@ -3,9 +3,13 @@
   display: inline-block;
   width: 8px;
   height: 8px;
+  padding: 3px;
+  box-sizing: content-box;
   border-radius: 50%;
   background-color: #f56c6c;
+  background-clip: content-box;
   flex-shrink: 0;
+  cursor: pointer;
   animation: llm-change-dot-pulse 1.6s ease-in-out infinite;
 }
 

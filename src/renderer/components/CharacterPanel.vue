@@ -27,7 +27,8 @@
                   <span
                     v-if="changeFlagStore.hasFlag('character', character.id)"
                     class="llm-change-dot"
-                    title="AI 修改过此内容，点击查看后红点消失"
+                    title="AI 修改过此内容，点击查看修改对比"
+                    @click.stop="handleViewChangeDiff(character.id)"
                   ></span>
                   <el-tag v-if="character.deleted" type="info" size="small">已删除</el-tag>
                 </div>
@@ -207,6 +208,7 @@
             </div>
           </div>
           <div class="version-actions">
+            <el-button size="small" @click="handleCompareVersion(index)">对比</el-button>
             <el-button
               type="primary"
               size="small"
@@ -219,6 +221,13 @@
         </div>
       </div>
     </el-dialog>
+
+    <ChangeDiffDialog
+      v-model="diffDialogOpen"
+      :title="diffTitle"
+      :sections="diffSections"
+      :kind="diffKind"
+    />
   </el-aside>
 </template>
 
@@ -233,6 +242,8 @@ import { useChangeFlagStore } from '../stores/changeFlagStore';
 import { characterApi } from '../utils/api';
 import { formatDeletedAt } from '@shared/utils';
 import ContentViewerDialog from './ContentViewerDialog.vue';
+import ChangeDiffDialog from './ChangeDiffDialog.vue';
+import type { DiffSection } from '../utils/diff';
 import type { Character } from '@shared/types';
 
 const characterStore = useCharacterStore();
@@ -256,6 +267,76 @@ const trashCharacters = ref<any[]>([]);
 const isLoadingTrash = ref(false);
 const viewerOpen = ref(false);
 const viewingCharacter = ref<Character | null>(null);
+const diffDialogOpen = ref(false);
+const diffTitle = ref('');
+const diffSections = ref<DiffSection[]>([]);
+const diffKind = ref<'create' | 'update'>('update');
+
+// 版本快照存的是修改前内容，与相邻版本或当前内容对照即为该次修改的变化
+const buildCharacterSections = (
+  before?: { name?: string; personality?: string; background?: string; relationships?: string } | null,
+  after?: { name?: string; personality?: string; background?: string; relationships?: string } | null
+): DiffSection[] => {
+  return [
+    { label: '姓名', before: before?.name ?? '', after: after?.name ?? '' },
+    { label: '性格', before: before?.personality ?? '', after: after?.personality ?? '' },
+    { label: '背景', before: before?.background ?? '', after: after?.background ?? '' },
+    { label: '关系', before: before?.relationships ?? '', after: after?.relationships ?? '' },
+  ].filter(section => section.before !== section.after);
+};
+
+const openDiffDialog = (title: string, sections: DiffSection[], kind: 'create' | 'update') => {
+  diffTitle.value = title;
+  diffSections.value = sections;
+  diffKind.value = kind;
+  diffDialogOpen.value = true;
+};
+
+const currentCharacterForVersions = computed(() => {
+  return characters.value.find(c => c.id === versionCharacterId.value);
+});
+
+// 红点点击：展示最近一次修改（最新版本快照 vs 当前内容）
+const handleViewChangeDiff = async (characterId: string) => {
+  const character = characters.value.find(c => c.id === characterId);
+  if (!character) return;
+  try {
+    await loadVersions(characterId);
+  } catch (error) {
+    console.error('Failed to load versions for diff:', error);
+  }
+  const latest = characterStore.getVersions(characterId)[0];
+  openDiffDialog(
+    `${character.name} · ${latest ? `v${latest.version} → 当前` : '新增内容'}`,
+    buildCharacterSections(latest ?? null, character),
+    latest ? 'update' : 'create'
+  );
+  changeFlagStore.clearFlag('character', characterId);
+};
+
+// 版本历史：与上一个更新的版本（或当前内容）对照
+const handleCompareVersion = (index: number) => {
+  const list = currentVersions.value;
+  const before = list[index];
+  if (!before) return;
+  let afterLabel = '';
+  let sections: DiffSection[] = [];
+  if (index === 0) {
+    const current = currentCharacterForVersions.value;
+    if (!current) return;
+    afterLabel = '当前';
+    sections = buildCharacterSections(before, current);
+  } else {
+    const newer = list[index - 1];
+    if (!newer) return;
+    afterLabel = `v${newer.version}`;
+    sections = buildCharacterSections(before, newer);
+  }
+  openDiffDialog(`${before.name} · v${before.version} → ${afterLabel}`, sections, 'update');
+  if (index === 0 && versionCharacterId.value) {
+    changeFlagStore.clearFlag('character', versionCharacterId.value);
+  }
+};
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -305,7 +386,6 @@ const viewerSections = computed(() => {
 const handleViewCharacter = (character: Character) => {
   viewingCharacter.value = character;
   viewerOpen.value = true;
-  changeFlagStore.clearFlag('character', character.id);
 };
 
 const handleEditFromViewer = () => {

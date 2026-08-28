@@ -23,7 +23,8 @@
                 <span
                   v-if="changeFlagStore.hasFlag('timeline', node.id)"
                   class="llm-change-dot"
-                  title="AI 修改过此内容，点击查看后红点消失"
+                  title="AI 修改过此内容，点击查看修改对比"
+                  @click.stop="handleViewChangeDiff(node.id)"
                 ></span>
                 <el-tag v-if="node.deleted" type="info" size="small">已删除</el-tag>
               </div>
@@ -184,6 +185,7 @@
             </div>
           </div>
           <div class="version-actions">
+            <el-button size="small" @click="handleCompareVersion(index)">对比</el-button>
             <el-button
               type="primary"
               size="small"
@@ -196,6 +198,13 @@
         </div>
       </div>
     </el-dialog>
+
+    <ChangeDiffDialog
+      v-model="diffDialogOpen"
+      :title="diffTitle"
+      :sections="diffSections"
+      :kind="diffKind"
+    />
   </el-aside>
 </template>
 
@@ -210,6 +219,8 @@ import { useChangeFlagStore } from '../stores/changeFlagStore';
 import { timelineApi } from '../utils/api';
 import { formatDeletedAt } from '@shared/utils';
 import ContentViewerDialog from './ContentViewerDialog.vue';
+import ChangeDiffDialog from './ChangeDiffDialog.vue';
+import type { DiffSection } from '../utils/diff';
 import type { TimelineNode } from '@shared/types';
 
 const timelineStore = useTimelineStore();
@@ -238,6 +249,75 @@ const trashNodes = ref<any[]>([]);
 const isLoadingTrash = ref(false);
 const viewerOpen = ref(false);
 const viewingNode = ref<TimelineNode | null>(null);
+const diffDialogOpen = ref(false);
+const diffTitle = ref('');
+const diffSections = ref<DiffSection[]>([]);
+const diffKind = ref<'create' | 'update'>('update');
+
+// 版本快照存的是修改前内容，与相邻版本或当前内容对照即为该次修改的变化
+const buildTimelineSections = (
+  before?: { title?: string; date?: string; content?: string } | null,
+  after?: { title?: string; date?: string; content?: string } | null
+): DiffSection[] => {
+  return [
+    { label: '标题', before: before?.title ?? '', after: after?.title ?? '' },
+    { label: '时间', before: before?.date ?? '', after: after?.date ?? '' },
+    { label: '描述', before: before?.content ?? '', after: after?.content ?? '' },
+  ].filter(section => section.before !== section.after);
+};
+
+const openDiffDialog = (title: string, sections: DiffSection[], kind: 'create' | 'update') => {
+  diffTitle.value = title;
+  diffSections.value = sections;
+  diffKind.value = kind;
+  diffDialogOpen.value = true;
+};
+
+const currentNodeForVersions = computed(() => {
+  return nodes.value.find(n => n.id === versionNodeId.value);
+});
+
+// 红点点击：展示最近一次修改（最新版本快照 vs 当前内容）
+const handleViewChangeDiff = async (nodeId: string) => {
+  const node = nodes.value.find(n => n.id === nodeId);
+  if (!node) return;
+  try {
+    await loadVersions(nodeId);
+  } catch (error) {
+    console.error('Failed to load versions for diff:', error);
+  }
+  const latest = (versions.value.get(nodeId) ?? [])[0];
+  openDiffDialog(
+    `${node.title} · ${latest ? `v${latest.version} → 当前` : '新增内容'}`,
+    buildTimelineSections(latest ?? null, node),
+    latest ? 'update' : 'create'
+  );
+  changeFlagStore.clearFlag('timeline', nodeId);
+};
+
+// 版本历史：与上一个更新的版本（或当前内容）对照
+const handleCompareVersion = (index: number) => {
+  const list = currentVersions.value;
+  const before = list[index];
+  if (!before) return;
+  let afterLabel = '';
+  let sections: DiffSection[] = [];
+  if (index === 0) {
+    const current = currentNodeForVersions.value;
+    if (!current) return;
+    afterLabel = '当前';
+    sections = buildTimelineSections(before, current);
+  } else {
+    const newer = list[index - 1];
+    if (!newer) return;
+    afterLabel = `v${newer.version}`;
+    sections = buildTimelineSections(before, newer);
+  }
+  openDiffDialog(`${before.title} · v${before.version} → ${afterLabel}`, sections, 'update');
+  if (index === 0 && versionNodeId.value) {
+    changeFlagStore.clearFlag('timeline', versionNodeId.value);
+  }
+};
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -303,7 +383,6 @@ const viewerSections = computed(() => {
 const handleViewNode = (node: TimelineNode) => {
   viewingNode.value = node;
   viewerOpen.value = true;
-  changeFlagStore.clearFlag('timeline', node.id);
   if (!node.deleted) {
     selectNode(node.id);
   }
