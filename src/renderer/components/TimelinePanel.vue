@@ -40,6 +40,7 @@
               <div class="node-actions">
                 <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(node)" :disabled="node.deleted" />
                 <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(node.id)" title="查看版本" :disabled="node.deleted" />
+                <el-button :icon="CopyDocument" circle size="small" text @click.stop="handleViewChangeDiff(node.id)" title="修改对比" :disabled="node.deleted" />
                 <el-button v-if="node.deleted" :icon="RefreshLeft" circle size="small" text @click.stop="handleRestore(node.id)" title="恢复" />
                 <el-button v-if="node.deleted" :icon="Delete" circle size="small" text type="danger" @click.stop="handlePermanentDelete(node.id)" title="永久删除" />
                 <el-button v-else :icon="Delete" circle size="small" text @click.stop="deleteNode(node.id)" title="移至回收站" />
@@ -101,6 +102,13 @@
       @edit="handleEditFromViewer"
     >
       <template #actions>
+        <el-button
+          :icon="CopyDocument"
+          :disabled="!viewingNode || viewingNode.deleted"
+          @click="handleDiffFromViewer"
+        >
+          修改对比
+        </el-button>
         <el-button
           :icon="Clock"
           :disabled="!viewingNode || viewingNode.deleted"
@@ -211,7 +219,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft, CopyDocument } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -397,6 +405,11 @@ const handleVersionsFromViewer = async () => {
   if (!viewingNode.value) return;
   viewerOpen.value = false;
   await handleOpenVersionsDialog(viewingNode.value.id);
+};
+
+const handleDiffFromViewer = () => {
+  if (!viewingNode.value) return;
+  handleViewChangeDiff(viewingNode.value.id);
 };
 
 const handleOpenVersionsDialog = async (nodeId: string) => {

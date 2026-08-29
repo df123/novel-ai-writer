@@ -142,6 +142,12 @@
                 </el-button>
                 <el-button
                   :disabled="store.selectedRecord.deleted"
+                  @click="handleViewChangeDiff(store.selectedRecord.id)"
+                >
+                  修改对比
+                </el-button>
+                <el-button
+                  :disabled="store.selectedRecord.deleted"
                   @click="handleShowVersions"
                 >
                   版本历史

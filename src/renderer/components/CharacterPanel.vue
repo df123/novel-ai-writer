@@ -42,6 +42,7 @@
               <div class="character-actions">
                 <el-button :icon="Edit" circle size="small" text @click.stop="handleOpenEditDialog(character)" :disabled="character.deleted" />
                 <el-button :icon="Clock" circle size="small" text @click.stop="handleOpenVersionsDialog(character.id)" title="查看版本" :disabled="character.deleted" />
+                <el-button :icon="CopyDocument" circle size="small" text @click.stop="handleViewChangeDiff(character.id)" title="修改对比" :disabled="character.deleted" />
                 <el-button v-if="character.deleted" :icon="RefreshLeft" circle size="small" text @click.stop="handleRestore(character.id)" title="恢复" />
                 <el-button v-if="character.deleted" :icon="Delete" circle size="small" text type="danger" @click.stop="handlePermanentDelete(character.id)" title="永久删除" />
                 <el-button v-else :icon="Delete" circle size="small" text @click.stop="deleteCharacter(character.id)" title="移至回收站" />
@@ -104,6 +105,13 @@
       @edit="handleEditFromViewer"
     >
       <template #actions>
+        <el-button
+          :icon="CopyDocument"
+          :disabled="!viewingCharacter || viewingCharacter.deleted"
+          @click="handleDiffFromViewer"
+        >
+          修改对比
+        </el-button>
         <el-button
           :icon="Clock"
           :disabled="!viewingCharacter || viewingCharacter.deleted"
@@ -234,7 +242,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, User, ArrowLeft, ArrowRight, Clock, Loading, RefreshLeft, CopyDocument } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useCharacterStore } from '../stores/characterStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -397,6 +405,11 @@ const handleVersionsFromViewer = async () => {
   if (!viewingCharacter.value) return;
   viewerOpen.value = false;
   await handleOpenVersionsDialog(viewingCharacter.value.id);
+};
+
+const handleDiffFromViewer = () => {
+  if (!viewingCharacter.value) return;
+  handleViewChangeDiff(viewingCharacter.value.id);
 };
 
 const handleOpenEditDialog = (character: any) => {

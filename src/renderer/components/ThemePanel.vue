@@ -30,6 +30,9 @@
           <el-button :icon="Edit" type="primary" size="small" @click="handleOpenEditDialog(theme)">
             编辑
           </el-button>
+          <el-button :icon="CopyDocument" size="small" @click="handleViewThemeDiff">
+            修改对比
+          </el-button>
           <el-button :icon="Clock" size="small" @click="handleOpenHistoryDialog(theme.id)">
             历史记录
           </el-button>
@@ -66,7 +69,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { Plus, Edit, Delete, Clock } from '@element-plus/icons-vue';
+import { Plus, Edit, Delete, Clock, CopyDocument } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { marked } from 'marked';
 import { useThemeStore } from '../stores/themeStore';
