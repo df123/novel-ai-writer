@@ -18,7 +18,7 @@
         </span>
       </div>
 
-      <el-scrollbar class="diff-scrollbar">
+      <el-scrollbar max-height="65vh">
         <div
           v-for="(section, sIndex) in sections"
           :key="sIndex"
@@ -105,10 +105,6 @@ const sectionRows = (index: number): DiffRow[] => {
 .legend-add {
   background-color: #f0f9eb;
   color: #529b2e;
-}
-
-.diff-scrollbar {
-  max-height: 65vh;
 }
 
 .diff-section {
