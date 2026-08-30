@@ -23,17 +23,26 @@ export type DiffRow =
   | { kind: 'skip'; count: number };
 
 /**
- * 基于最长公共子序列（LCS）计算逐行差异
+ * 基于最长公共子序列（LCS）计算逐行差异。
+ * 换行符统一按 LF 处理；ignoreWhitespace 开启时忽略空白类差异（空格、制表符、全角空格、零宽字符等）。
  */
-export function diffLines(before: string, after: string): DiffLine[] {
-  const a = before.length > 0 ? before.split('\n') : [];
-  const b = after.length > 0 ? after.split('\n') : [];
+export function diffLines(before: string, after: string, options?: { ignoreWhitespace?: boolean }): DiffLine[] {
+  const beforeText = before.replace(/\r\n?/g, '\n');
+  const afterText = after.replace(/\r\n?/g, '\n');
+  const a = beforeText.length > 0 ? beforeText.split('\n') : [];
+  const b = afterText.length > 0 ? afterText.split('\n') : [];
   const n = a.length;
   const m = b.length;
 
   if (n === 0 && m === 0) return [];
   if (n === 0) return b.map(text => ({ type: 'add' as const, text }));
   if (m === 0) return a.map(text => ({ type: 'remove' as const, text }));
+
+  const keyOf = options?.ignoreWhitespace
+    ? (line: string) => line.replace(/[\s\u200b\u200c\u200d]/g, '')
+    : (line: string) => line;
+  const aKeys = a.map(keyOf);
+  const bKeys = b.map(keyOf);
 
   // 超大文本退化为整块替换，避免 O(n*m) 计算爆炸
   if (n * m > 1_000_000) {
@@ -46,7 +55,7 @@ export function diffLines(before: string, after: string): DiffLine[] {
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      dp[i][j] = aKeys[i] === bKeys[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
 
@@ -54,7 +63,7 @@ export function diffLines(before: string, after: string): DiffLine[] {
   let i = 0;
   let j = 0;
   while (i < n && j < m) {
-    if (a[i] === b[j]) {
+    if (aKeys[i] === bKeys[j]) {
       lines.push({ type: 'equal', text: a[i] });
       i++;
       j++;
