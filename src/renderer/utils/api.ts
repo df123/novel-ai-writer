@@ -161,6 +161,16 @@ export const researchApi = {
     api.post('/research/books', data),
 };
 
+// 语音输入 API
+export const speechApi = {
+  status: () => api.get('/speech/status'),
+  transcribe: (wav: Blob) =>
+    api.post('/speech/transcribe', wav, {
+      headers: { 'Content-Type': 'audio/wav' },
+      timeout: 120000,
+    }),
+};
+
 // Prompts
 export const promptApi = {
   list: () => api.get('/prompts'),

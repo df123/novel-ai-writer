@@ -268,6 +268,26 @@
           class="chat-input"
         />
         <div class="input-actions">
+          <!-- 语音输入按钮 -->
+          <el-button
+            v-if="!isRecording"
+            :icon="Microphone"
+            circle
+            :loading="isTranscribing"
+            :disabled="isLoading || !currentChat"
+            @click="handleStartRecording"
+            title="语音输入"
+            class="voice-button"
+          />
+          <div
+            v-else
+            class="recording-indicator"
+            title="点击结束录音"
+            @click="handleStopRecording"
+          >
+            <span class="recording-dot"></span>
+            <span>{{ recordSeconds }}s · 点击结束</span>
+          </div>
           <!-- 取消按钮 -->
           <el-button
             v-if="isLoading"
@@ -320,7 +340,7 @@
 import { ref, watch, nextTick, onMounted, onUnmounted, computed } from 'vue';
 import type { Message, TokenUsage } from '../../shared/types';
 import { storeToRefs } from 'pinia';
-import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight, ArrowDown } from '@element-plus/icons-vue';
+import { Promotion, MoreFilled, Close, Loading, DArrowLeft, DArrowRight, ArrowDown, Microphone } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { useChatStore } from '../stores/chatStore';
 import { useProjectStore } from '../stores/projectStore';
@@ -329,6 +349,8 @@ import { useCharacterStore } from '../stores/characterStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
+import { speechApi } from '../utils/api';
+import { startRecording, toWav16kMono, isRecordingSupported, type VoiceRecorder } from '../utils/audio';
 import ResearchResultCard from './ResearchResultCard.vue';
 import { formatTimestamp } from '../../shared/utils';
 import { marked } from 'marked';
@@ -642,7 +664,7 @@ const selectCommand = (command: Command) => {
   inputText.value = `/${command.name} `;
   showCommandMenu.value = false;
   commandFilter.value = '';
-  
+
   // 聚焦输入框并将光标移到末尾
   nextTick(() => {
     if (inputRef.value) {
@@ -654,6 +676,88 @@ const selectCommand = (command: Command) => {
       }
     }
   });
+};
+
+// ===== 语音输入 =====
+const isRecording = ref(false);
+const recordSeconds = ref(0);
+const isTranscribing = ref(false);
+let voiceRecorder: VoiceRecorder | null = null;
+let recordTimer: ReturnType<typeof setInterval> | null = null;
+
+const MAX_RECORD_SECONDS = 120;
+
+const insertTextAtCursor = (text: string) => {
+  const current = inputText.value;
+  const textarea = inputRef.value?.textarea;
+  if (textarea) {
+    const start = textarea.selectionStart ?? current.length;
+    const end = textarea.selectionEnd ?? current.length;
+    inputText.value = current.slice(0, start) + text + current.slice(end);
+    nextTick(() => {
+      inputRef.value?.focus();
+      const pos = start + text.length;
+      textarea.setSelectionRange(pos, pos);
+    });
+  } else {
+    inputText.value = current ? `${current} ${text}` : text;
+  }
+};
+
+const handleStartRecording = async () => {
+  if (isRecording.value || voiceRecorder) return;
+  if (!isRecordingSupported()) {
+    ElMessage.error('当前浏览器不支持录音，请使用 Chrome 或 Edge');
+    return;
+  }
+
+  try {
+    voiceRecorder = await startRecording();
+  } catch (error) {
+    console.error('Failed to start recording:', error);
+    ElMessage.error('无法访问麦克风，请检查浏览器麦克风权限');
+    return;
+  }
+
+  isRecording.value = true;
+  recordSeconds.value = 0;
+  recordTimer = setInterval(() => {
+    recordSeconds.value += 1;
+    if (recordSeconds.value >= MAX_RECORD_SECONDS) {
+      handleStopRecording();
+    }
+  }, 1000);
+};
+
+const handleStopRecording = async () => {
+  const recorder = voiceRecorder;
+  if (!recorder) return;
+  if (recordTimer) {
+    clearInterval(recordTimer);
+    recordTimer = null;
+  }
+  voiceRecorder = null;
+  isRecording.value = false;
+
+  try {
+    isTranscribing.value = true;
+    const rawBlob = await recorder.stop();
+    const wav = await toWav16kMono(rawBlob);
+    const response = await speechApi.transcribe(wav);
+    const text = (response.data as { text?: string }).text ?? '';
+    if (!text) {
+      ElMessage.warning('没有识别到语音内容');
+      return;
+    }
+    insertTextAtCursor(text);
+  } catch (error) {
+    console.error('Failed to transcribe speech:', error);
+    const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+      || '语音识别失败，请重试';
+    ElMessage.error(message);
+  } finally {
+    isTranscribing.value = false;
+  }
 };
 
 // 滚动到选中的命令项
@@ -687,6 +791,14 @@ onMounted(() => {
 // 组件卸载时移除事件监听（Vue 3 自动处理，但为明确起见）
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  // 录音中卸载时释放麦克风
+  if (recordTimer) {
+    clearInterval(recordTimer);
+    recordTimer = null;
+  }
+  voiceRecorder?.cancel();
+  voiceRecorder = null;
+  isRecording.value = false;
 });
 
 // 智能滚动相关
@@ -1497,6 +1609,43 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 10px;
+}
+
+.input-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.voice-button {
+  margin-left: 0;
+}
+
+.recording-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 32px;
+  border: 1px solid #fbc4c4;
+  border-radius: 16px;
+  background-color: #fef0f0;
+  color: #f56c6c;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f56c6c;
+  animation: recording-blink 1s ease-in-out infinite;
+}
+
+@keyframes recording-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
 }
 
 .theme-preview {
