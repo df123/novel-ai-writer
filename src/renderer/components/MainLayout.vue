@@ -33,6 +33,13 @@
           />
         </el-badge>
         <el-button
+          :icon="Picture"
+          circle
+          class="action-button illustration-button"
+          @click="showIllustration = true"
+          title="AI 插画"
+        />
+        <el-button
           :icon="Plus"
           circle
           class="action-button create-project-button"
@@ -98,12 +105,22 @@
     </el-dialog>
 
     <MiscRecordPanel v-model="showMiscRecord" />
+
+    <el-dialog
+      v-model="showIllustration"
+      title="AI 插画"
+      width="86%"
+      top="4vh"
+      destroy-on-close
+    >
+      <IllustrationPanel style="height: 76vh;" />
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { HomeFilled, Setting, MoreFilled, Reading, Document, Plus, Notebook } from '@element-plus/icons-vue';
+import { HomeFilled, Setting, MoreFilled, Reading, Document, Plus, Notebook, Picture } from '@element-plus/icons-vue';
 import { useProjectStore } from '../stores/projectStore';
 import { useChatStore } from '../stores/chatStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -122,6 +139,7 @@ import CreateProjectDialog from './CreateProjectDialog.vue';
 import LLMSettingsDialog from './LLMSettingsDialog.vue';
 import DatabasePanel from './DatabasePanel.vue';
 import MiscRecordPanel from './MiscRecordPanel.vue';
+import IllustrationPanel from './IllustrationPanel.vue';
 
 const projectStore = useProjectStore();
 const chatStore = useChatStore();
@@ -138,6 +156,7 @@ const showDatabase = ref(false);
 const showChapterDialog = ref(false);
 const showThemeDialog = ref(false);
 const showMiscRecord = ref(false);
+const showIllustration = ref(false);
 
 watch(
   () => projectStore.currentProject,

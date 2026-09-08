@@ -24,6 +24,7 @@ import databaseRouter from './routes/database';
 import miscRecordsRouter from './routes/miscRecords';
 import researchRouter from './routes/research';
 import speechRouter from './routes/speech';
+import illustrationsRouter from './routes/illustrations';
 
 // 初始化 Express 应用
 const app: App = express();
@@ -78,6 +79,8 @@ console.log('15. 注册 researchRouter (路径: /api/research)');
 app.use('/api/research', researchRouter);
 console.log('16. 注册 speechRouter (路径: /api/speech)');
 app.use('/api/speech', speechRouter);
+console.log('17. 注册 illustrationsRouter (路径: /api/illustrations)');
+app.use('/api/illustrations', illustrationsRouter);
 console.log('=== 路由注册完成 ===');
 
 // 托管前端静态文件（生产模式）

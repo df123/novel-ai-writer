@@ -751,3 +751,24 @@ export interface DbMiscRecordVersion {
   version: number;
   created_at: number;
 }
+
+export interface Illustration {
+  id: string;
+  projectId: string;
+  chapterId?: string | null;
+  prompt: string;
+  width: number;
+  height: number;
+  createdAt: number;
+}
+
+export interface DbIllustration {
+  id: string;
+  project_id: string;
+  chapter_id: string | null;
+  prompt: string;
+  file_path: string;
+  width: number;
+  height: number;
+  created_at: number;
+}

@@ -171,6 +171,17 @@ export const speechApi = {
     }),
 };
 
+// AI 插画 API
+export const illustrationApi = {
+  status: () => api.get('/illustrations/status'),
+  list: (projectId: string, chapterId?: string) =>
+    api.get('/illustrations', { params: { projectId, chapterId: chapterId || undefined } }),
+  generate: (data: { projectId: string; chapterId?: string | null; prompt: string; width?: number; height?: number }) =>
+    api.post('/illustrations/generate', data, { timeout: 600000 }),
+  remove: (id: string) => api.delete(`/illustrations/${id}`),
+  imageUrl: (id: string) => `/api/illustrations/image/${id}`,
+};
+
 // Prompts
 export const promptApi = {
   list: () => api.get('/prompts'),

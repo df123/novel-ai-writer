@@ -43,7 +43,13 @@ export function getCreateTablesSQL(): string[] {
     'CREATE INDEX IF NOT EXISTS idx_misc_records_deleted ON misc_records(deleted)',
     'CREATE INDEX IF NOT EXISTS idx_misc_records_deleted_at ON misc_records(deleted_at)',
     'CREATE INDEX IF NOT EXISTS idx_misc_record_versions_record_id ON misc_record_versions(misc_record_id)',
-    'CREATE INDEX IF NOT EXISTS idx_misc_records_category ON misc_records(project_id, category)'
+    'CREATE INDEX IF NOT EXISTS idx_misc_records_category ON misc_records(project_id, category)',
+
+    // ===== AI 插画表 =====
+    'CREATE TABLE IF NOT EXISTS illustrations (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, chapter_id TEXT DEFAULT NULL, prompt TEXT NOT NULL, file_path TEXT NOT NULL, width INTEGER NOT NULL DEFAULT 0, height INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL)',
+
+    'CREATE INDEX IF NOT EXISTS idx_illustrations_project_id ON illustrations(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_illustrations_chapter_id ON illustrations(chapter_id)'
   ];
 }
 
