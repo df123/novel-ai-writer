@@ -11,6 +11,8 @@ logs
 *.db-shm
 *.db-wal
 docs
+tests
+vitest.config.ts
 *.md
 !README.md
 .vscode

@@ -1,5 +1,5 @@
 # 阶段1：构建前端
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
@@ -18,7 +18,7 @@ COPY . .
 RUN pnpm run build:renderer
 
 # 阶段2：生产运行
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
@@ -54,6 +54,6 @@ EXPOSE 3002
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3002/api/settings || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3002/health || exit 1
 
 CMD ["sh", "-c", "pnpm start"]
