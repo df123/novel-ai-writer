@@ -139,10 +139,7 @@ export const createChapterInput = {
   project_id: projectIdSchema,
   chapter_number: z.number().int().min(1).max(100_000).describe('Chapter number (must be unique among active chapters)'),
   title: titleSchema,
-  content: z.string().min(1).max(2_000_000).describe('Full chapter text'),
-  expected_updated_at: z.number().int().positive().optional().describe(
-    'Only relevant when re-creating over an archived chapter number; usually omit.'
-  )
+  content: z.string().min(1).max(2_000_000).describe('Full chapter text')
 };
 
 export const updateChapterInput = {

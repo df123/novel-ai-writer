@@ -6,6 +6,7 @@ import { listChapters } from '../../services/domain/chapterService';
 import { exportChapters } from '../../services/exportService';
 import { createDownload } from '../downloads';
 import { exportManuscriptInput } from '../schemas/entities';
+import { exportManuscriptOutput } from '../schemas/output';
 
 const READ_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 
@@ -14,6 +15,7 @@ export function registerExportTools(server: McpServer): void {
     title: 'Export manuscript',
     description: 'Export all active chapters of a project as a single markdown/txt manuscript. Returns metadata plus a one-time download token (valid 10 minutes) — the full text is NOT embedded in the tool result.',
     inputSchema: exportManuscriptInput,
+    outputSchema: exportManuscriptOutput,
     annotations: READ_ANNOTATIONS
   }, async ({ project_id, format }) => runTool('export_manuscript', project_id, () => {
     const chapters = listChapters(project_id);

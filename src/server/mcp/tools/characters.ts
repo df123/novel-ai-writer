@@ -8,6 +8,7 @@ import {
   updateCharacterInput,
   archiveCharacterInput
 } from '../schemas/entities';
+import { characterToolOutput, archivedOutput } from '../schemas/output';
 
 const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 
@@ -16,6 +17,7 @@ export function registerCharacterTools(server: McpServer): void {
     title: 'Create character',
     description: 'Create a character in a project with name and optional personality/background/relationships.',
     inputSchema: createCharacterInput,
+    outputSchema: characterToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, name, personality, background, relationships }) =>
     runTool('create_character', project_id, () => {
@@ -28,6 +30,7 @@ export function registerCharacterTools(server: McpServer): void {
     title: 'Update character',
     description: 'Update a character by UUID (do NOT guess by name — resolve the ID via search_story/get_story_context first). A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read.',
     inputSchema: updateCharacterInput,
+    outputSchema: characterToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, character_id, name, personality, background, relationships, expected_updated_at }) =>
     runTool('update_character', project_id, () => {
@@ -45,6 +48,7 @@ export function registerCharacterTools(server: McpServer): void {
     title: 'Archive character',
     description: 'Soft-delete a character (recoverable via restore_item). Does not permanently destroy data.',
     inputSchema: archiveCharacterInput,
+    outputSchema: archivedOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, character_id }) =>
     runTool('archive_character', project_id, () => {

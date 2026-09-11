@@ -1,7 +1,7 @@
 // MCP 认证：与业务逻辑隔离
 // 三种模式（环境变量 MCP_AUTH_MODE）：
 //   none  - 开发用，直接放行；生产环境启动时打印显著警告
-//   token - 静态 Bearer Token（MCP_STATIC_TOKEN），适合 ChatGPT 自定义连接器粘贴令牌的场景
+//   token - 静态 Bearer Token（MCP_STATIC_TOKEN），适合手动贴令牌的客户端
 //   oauth - OAuth 2.1 授权服务器（PKCE + 动态客户端注册），符合 MCP Authorization 规范
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
@@ -87,11 +87,16 @@ function wwwAuthenticateValue(): string {
 
 // ===== OAuth 2.1 授权服务器（单用户，内存存储） =====
 
+/** 客户端在 token 端点的认证方式 */
+type ClientAuthMethod = 'none' | 'client_secret_post' | 'client_secret_basic';
+
 interface OAuthClient {
   clientId: string;
   clientSecret: string;
   redirectUris: string[];
   clientName: string;
+  /** 注册时声明的 token 端点认证方式,决定其按 public 还是 confidential 客户端对待 */
+  authMethod: ClientAuthMethod;
   createdAt: number;
 }
 
@@ -143,22 +148,39 @@ export const oauthRouter: Router = express.Router();
 
 oauthRouter.use(express.urlencoded({ extended: false }));
 
+/**
+ * 解析并校验 redirect_uri:必须与客户端注册时登记的某一个完全一致
+ * 防止授权码被引导到未登记的回调地址
+ */
+function requireRegisteredRedirect(client: OAuthClient, redirectUri: string | undefined): string | null {
+  if (!redirectUri || !client.redirectUris.includes(redirectUri)) {
+    return null;
+  }
+  return redirectUri;
+}
+
 /** 简单授权页：用户输入访问口令批准 ChatGPT 的授权请求 */
 oauthRouter.get('/authorize', (req: Request, res: Response) => {
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method } = req.query as Record<string, string>;
-  if (!client_id || !clients.has(client_id)) {
+  const client = client_id ? clients.get(client_id) : undefined;
+  if (!client) {
+    console.warn('[oauth] authorize 拒绝:client_id 无效(可能是服务重启后客户端未重新注册)');
     res.status(400).send('invalid client_id');
     return;
   }
-  if (!redirect_uri || !code_challenge) {
-    res.status(400).send('missing redirect_uri or code_challenge (PKCE required)');
+  if (!requireRegisteredRedirect(client, redirect_uri)) {
+    console.warn('[oauth] authorize 拒绝:redirect_uri 未在该客户端注册列表中');
+    res.status(400).send('redirect_uri is not registered for this client');
+    return;
+  }
+  if (!code_challenge) {
+    res.status(400).send('missing code_challenge (PKCE required)');
     return;
   }
   if (code_challenge_method && code_challenge_method !== 'S256') {
     res.status(400).send('only S256 code_challenge_method is supported');
     return;
   }
-  const client = clients.get(client_id)!;
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Novel Writer MCP 授权</title>
@@ -186,9 +208,15 @@ oauthRouter.post('/authorize', (req: Request, res: Response) => {
     res.status(500).send('MCP_OAUTH_PASSWORD not configured on server');
     return;
   }
-  if (!client_id || !clients.has(client_id)) {
+  const client = client_id ? clients.get(client_id) : undefined;
+  if (!client) {
     console.warn('[oauth] authorize 拒绝:client_id 无效(可能是服务重启后客户端未重新注册)');
     res.status(400).send('invalid client_id');
+    return;
+  }
+  if (!requireRegisteredRedirect(client, redirect_uri)) {
+    console.warn('[oauth] authorize 拒绝:redirect_uri 未在该客户端注册列表中');
+    res.status(400).send('redirect_uri is not registered for this client');
     return;
   }
   if (!password || !safeEqual(password, expectedPassword)) {
@@ -211,23 +239,70 @@ oauthRouter.post('/authorize', (req: Request, res: Response) => {
   if (state) {
     redirect.searchParams.set('state', state);
   }
+  // RFC 9207:授权响应附带 issuer 标识,便于客户端校验元数据一致性
+  redirect.searchParams.set('iss', getPublicBaseUrl());
   res.redirect(302, redirect.toString());
 });
+
+/**
+ * 客户端认证:按 confidential(client_secret_post/basic)或 public(none)严格校验
+ * @returns 认证成功的客户端;失败返回 null(已记录原因)
+ */
+function authenticateClient(req: Request, body: Record<string, string>): OAuthClient | null {
+  const authHeader = req.headers.authorization;
+
+  // client_secret_basic:Authorization: Basic base64(client_id:client_secret)
+  if (authHeader && /^basic /i.test(authHeader)) {
+    let decoded: string;
+    try {
+      decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+    } catch {
+      console.warn('[oauth] client 认证拒绝:Basic 头解码失败');
+      return null;
+    }
+    const separator = decoded.indexOf(':');
+    const clientId = separator >= 0 ? decoded.slice(0, separator) : '';
+    const clientSecret = separator >= 0 ? decoded.slice(separator + 1) : '';
+    const client = clients.get(clientId);
+    if (!client || !clientSecret || !safeEqual(clientSecret, client.clientSecret)) {
+      console.warn('[oauth] client 认证拒绝:client_secret_basic 凭据不匹配');
+      return null;
+    }
+    return client;
+  }
+
+  // client_secret_post:client_id + client_secret 放请求体
+  if (body.client_secret) {
+    const client = body.client_id ? clients.get(body.client_id) : undefined;
+    if (!client || !safeEqual(body.client_secret, client.clientSecret)) {
+      console.warn('[oauth] client 认证拒绝:client_secret_post 凭据不匹配');
+      return null;
+    }
+    return client;
+  }
+
+  // 无凭据:仅允许注册为 public(authMethod=none)的客户端
+  const client = body.client_id ? clients.get(body.client_id) : undefined;
+  if (!client) {
+    console.warn('[oauth] client 认证拒绝:client_id 无效');
+    return null;
+  }
+  if (client.authMethod !== 'none') {
+    console.warn('[oauth] client 认证拒绝:confidential 客户端未提供 client_secret');
+    return null;
+  }
+  return client;
+}
 
 /** OAuth 令牌端点（authorization_code + refresh_token，PKCE 校验） */
 oauthRouter.post('/token', (req: Request, res: Response) => {
   const body = req.body as Record<string, string>;
   const grantType = body.grant_type;
 
-  // 兼容 client_secret_basic:部分客户端把 client_id 放在 Basic 头而非请求体
-  let clientId: string | undefined = body.client_id;
-  const authHeader = req.headers.authorization;
-  if (!clientId && authHeader && /^basic /i.test(authHeader)) {
-    try {
-      clientId = Buffer.from(authHeader.slice(6), 'base64').toString('utf8').split(':')[0];
-    } catch {
-      clientId = undefined;
-    }
+  const client = authenticateClient(req, body);
+  if (!client) {
+    res.status(401).json({ error: 'invalid_client' });
+    return;
   }
 
   if (grantType === 'authorization_code') {
@@ -238,7 +313,7 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
       res.status(400).json({ error: 'invalid_grant', error_description: 'code expired or invalid' });
       return;
     }
-    if (!clientId || clientId !== record.clientId || redirect_uri !== record.redirectUri) {
+    if (record.clientId !== client.clientId || redirect_uri !== record.redirectUri) {
       console.warn('[oauth] token 拒绝:client_id 或 redirect_uri 与授权时不一致');
       res.status(400).json({ error: 'invalid_grant' });
       return;
@@ -250,21 +325,21 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
     }
     codes.delete(code);
     console.log('[oauth] token 签发成功(authorization_code)');
-    res.json(issueTokens(clientId));
+    res.json(issueTokens(client.clientId));
     return;
   }
 
   if (grantType === 'refresh_token') {
     const { refresh_token } = body;
     const record = refresh_token ? tokens.get(refresh_token) : undefined;
-    if (!record || record.kind !== 'refresh' || record.expiresAt < Date.now() || record.clientId !== clientId) {
+    if (!record || record.kind !== 'refresh' || record.expiresAt < Date.now() || record.clientId !== client.clientId) {
       console.warn('[oauth] token 拒绝:refresh_token 无效/过期/客户端不匹配');
       res.status(400).json({ error: 'invalid_grant' });
       return;
     }
     tokens.delete(refresh_token);
     console.log('[oauth] token 签发成功(refresh_token)');
-    res.json(issueTokens(clientId));
+    res.json(issueTokens(client.clientId));
     return;
   }
 
@@ -288,11 +363,22 @@ function issueTokens(clientId: string): { access_token: string; token_type: stri
 
 /** 动态客户端注册（RFC 7591 / MCP 规范要求） */
 oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
-  const body = req.body as { client_name?: string; redirect_uris?: string[] };
+  const body = req.body as {
+    client_name?: string;
+    redirect_uris?: string[];
+    token_endpoint_auth_method?: string;
+  };
   if (!body.redirect_uris || !Array.isArray(body.redirect_uris) || body.redirect_uris.length === 0) {
     res.status(400).json({ error: 'invalid_redirect_uri' });
     return;
   }
+
+  const requestedMethod = body.token_endpoint_auth_method || 'none';
+  if (requestedMethod !== 'none' && requestedMethod !== 'client_secret_post' && requestedMethod !== 'client_secret_basic') {
+    res.status(400).json({ error: 'invalid_client_metadata', error_description: 'unsupported token_endpoint_auth_method' });
+    return;
+  }
+
   const clientId = base64url(randomBytes(16));
   const clientSecret = base64url(randomBytes(32));
   clients.set(clientId, {
@@ -300,14 +386,16 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
     clientSecret,
     redirectUris: body.redirect_uris,
     clientName: body.client_name || 'MCP Client',
+    authMethod: requestedMethod,
     createdAt: Date.now()
   });
-  console.log(`[oauth] 客户端注册成功: ${body.client_name || 'MCP Client'}`);
+  console.log(`[oauth] 客户端注册成功: ${body.client_name || 'MCP Client'} (auth=${requestedMethod})`);
   res.status(201).json({
     client_id: clientId,
     client_secret: clientSecret,
     client_name: body.client_name || 'MCP Client',
-    redirect_uris: body.redirect_uris
+    redirect_uris: body.redirect_uris,
+    token_endpoint_auth_method: requestedMethod
   });
 });
 

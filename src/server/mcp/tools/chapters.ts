@@ -16,6 +16,7 @@ import {
   updateChapterInput,
   archiveChapterInput
 } from '../schemas/entities';
+import { listChaptersOutput, chapterToolOutput, archivedOutput } from '../schemas/output';
 
 const READ_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
@@ -25,6 +26,7 @@ export function registerChapterTools(server: McpServer): void {
     title: 'List chapters',
     description: 'List all active chapters of a project (index only: id, number, title, updated_at). Use get_chapter for full text.',
     inputSchema: listChaptersInput,
+    outputSchema: listChaptersOutput,
     annotations: READ_ANNOTATIONS
   }, async ({ project_id }) => runTool('list_chapters', project_id, () => {
     const chapters = listChapters(project_id);
@@ -41,6 +43,7 @@ export function registerChapterTools(server: McpServer): void {
     title: 'Get chapter',
     description: 'Read one chapter with full text by UUID.',
     inputSchema: getChapterInput,
+    outputSchema: chapterToolOutput,
     annotations: READ_ANNOTATIONS
   }, async ({ project_id, chapter_id }) => runTool('get_chapter', project_id, () => {
     const chapter = getChapter(project_id, chapter_id);
@@ -51,6 +54,7 @@ export function registerChapterTools(server: McpServer): void {
     title: 'Create chapter',
     description: 'Save a new chapter with full text. Only call after the user explicitly approves saving (e.g. "保存成第38章"). Drafts discussed in chat must NOT be saved automatically.',
     inputSchema: createChapterInput,
+    outputSchema: chapterToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, chapter_number, title, content }) =>
     runTool('create_chapter', project_id, () => {
@@ -63,6 +67,7 @@ export function registerChapterTools(server: McpServer): void {
     title: 'Update chapter',
     description: 'Update an existing chapter by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read.',
     inputSchema: updateChapterInput,
+    outputSchema: chapterToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, chapter_id, title, chapter_number, content, expected_updated_at }) =>
     runTool('update_chapter', project_id, () => {
@@ -80,6 +85,7 @@ export function registerChapterTools(server: McpServer): void {
     title: 'Archive chapter',
     description: 'Soft-delete a chapter (recoverable via restore_item). Does not permanently destroy data.',
     inputSchema: archiveChapterInput,
+    outputSchema: archivedOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, chapter_id }) =>
     runTool('archive_chapter', project_id, () => {

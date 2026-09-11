@@ -8,6 +8,7 @@ import {
   updateWorldEntryInput,
   archiveWorldEntryInput
 } from '../schemas/entities';
+import { worldEntryToolOutput, archivedOutput } from '../schemas/output';
 
 const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 
@@ -16,6 +17,7 @@ export function registerWorldTools(server: McpServer): void {
     title: 'Create world entry',
     description: 'Create a worldbuilding entry (city, sect, faction, magic system, item, etc.). Category is free-form text such as 城市/宗门/功法/物品.',
     inputSchema: createWorldEntryInput,
+    outputSchema: worldEntryToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, title, category, content }) =>
     runTool('create_world_entry', project_id, () => {
@@ -28,6 +30,7 @@ export function registerWorldTools(server: McpServer): void {
     title: 'Update world entry',
     description: 'Update a world entry by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read.',
     inputSchema: updateWorldEntryInput,
+    outputSchema: worldEntryToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, entry_id, title, category, content, expected_updated_at }) =>
     runTool('update_world_entry', project_id, () => {
@@ -45,6 +48,7 @@ export function registerWorldTools(server: McpServer): void {
     title: 'Archive world entry',
     description: 'Soft-delete a world entry (recoverable via restore_item). Does not permanently destroy data.',
     inputSchema: archiveWorldEntryInput,
+    outputSchema: archivedOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, entry_id }) =>
     runTool('archive_world_entry', project_id, () => {

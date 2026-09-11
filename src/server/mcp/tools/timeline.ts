@@ -12,6 +12,7 @@ import {
   updateTimelineEventInput,
   archiveTimelineEventInput
 } from '../schemas/entities';
+import { timelineEventToolOutput, archivedOutput } from '../schemas/output';
 
 const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 
@@ -20,6 +21,7 @@ export function registerTimelineTools(server: McpServer): void {
     title: 'Create timeline event',
     description: 'Create a timeline event (plot point) in a project.',
     inputSchema: createTimelineEventInput,
+    outputSchema: timelineEventToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, title, date, content, order_index }) =>
     runTool('create_timeline_event', project_id, () => {
@@ -32,6 +34,7 @@ export function registerTimelineTools(server: McpServer): void {
     title: 'Update timeline event',
     description: 'Update a timeline event by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read.',
     inputSchema: updateTimelineEventInput,
+    outputSchema: timelineEventToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, event_id, title, date, content, order_index, expected_updated_at }) =>
     runTool('update_timeline_event', project_id, () => {
@@ -49,6 +52,7 @@ export function registerTimelineTools(server: McpServer): void {
     title: 'Archive timeline event',
     description: 'Soft-delete a timeline event (recoverable via restore_item). Does not permanently destroy data.',
     inputSchema: archiveTimelineEventInput,
+    outputSchema: archivedOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, event_id }) =>
     runTool('archive_timeline_event', project_id, () => {

@@ -11,13 +11,23 @@ import type {
   DbChapter
 } from '@shared/types';
 
-/** 单类型上限与摘要截断长度 */
+/** 单类型上限、字段截断长度与摘要截断长度 */
 const LIMITS = {
   characters: 100,
   timeline: 100,
   worldEntries: 200,
-  worldEntrySummaryChars: 300
+  worldEntrySummaryChars: 300,
+  characterPersonalityChars: 2000,
+  characterBackgroundChars: 3000,
+  characterRelationshipsChars: 3000,
+  timelineContentChars: 3000,
+  themeContentChars: 5000
 } as const;
+
+/** 截断文本,超出时返回截断值,否则原样 */
+function clampText(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max) : text;
+}
 
 export interface StoryContextCharacter {
   id: string;
@@ -120,6 +130,32 @@ export function getStoryContext(projectId: string): StoryContext {
     truncatedParts.push(`world_entries (showing ${LIMITS.worldEntries} of ${allWorldEntries.length}, use search_story for the rest)`);
   }
 
+  // 单实体大字段截断:context 只给摘要,完整内容走 get_story_item
+  for (const c of characters) {
+    if ((c.personality ?? '').length > LIMITS.characterPersonalityChars) {
+      truncatedParts.push(`character "${c.name}" personality truncated to ${LIMITS.characterPersonalityChars} chars (get_story_item for full text)`);
+    }
+    if ((c.background ?? '').length > LIMITS.characterBackgroundChars) {
+      truncatedParts.push(`character "${c.name}" background truncated to ${LIMITS.characterBackgroundChars} chars (get_story_item for full text)`);
+    }
+    if ((c.relationships ?? '').length > LIMITS.characterRelationshipsChars) {
+      truncatedParts.push(`character "${c.name}" relationships truncated to ${LIMITS.characterRelationshipsChars} chars (get_story_item for full text)`);
+    }
+  }
+  for (const t of timeline) {
+    if ((t.content ?? '').length > LIMITS.timelineContentChars) {
+      truncatedParts.push(`timeline event "${t.title}" content truncated to ${LIMITS.timelineContentChars} chars (get_story_item for full text)`);
+    }
+  }
+  let themeContent = '';
+  if (themes.length > 0) {
+    themeContent = themes[0].content;
+    if (themeContent.length > LIMITS.themeContentChars) {
+      truncatedParts.push(`theme content truncated to ${LIMITS.themeContentChars} chars (get_story_item/get_theme for full text)`);
+      themeContent = clampText(themeContent, LIMITS.themeContentChars);
+    }
+  }
+
   return {
     project: {
       id: project.id,
@@ -132,7 +168,7 @@ export function getStoryContext(projectId: string): StoryContext {
         ? {
             id: themes[0].id,
             title: themes[0].title,
-            content: themes[0].content,
+            content: themeContent,
             version: themes[0].version,
             updated_at: themes[0].updated_at
           }
@@ -140,16 +176,16 @@ export function getStoryContext(projectId: string): StoryContext {
     characters: characters.map(c => ({
       id: c.id,
       name: c.name,
-      personality: c.personality ?? '',
-      background: c.background ?? '',
-      relationships: c.relationships ?? '',
+      personality: clampText(c.personality ?? '', LIMITS.characterPersonalityChars),
+      background: clampText(c.background ?? '', LIMITS.characterBackgroundChars),
+      relationships: clampText(c.relationships ?? '', LIMITS.characterRelationshipsChars),
       updated_at: c.updated_at
     })),
     timeline: timeline.map(t => ({
       id: t.id,
       date: t.date ?? '',
       title: t.title,
-      content: t.content ?? '',
+      content: clampText(t.content ?? '', LIMITS.timelineContentChars),
       updated_at: t.updated_at
     })),
     world_entries: worldEntries.map(w => ({

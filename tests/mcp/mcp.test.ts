@@ -65,6 +65,8 @@ describe('MCP initialize / tools/list', () => {
     }
     // 全部工具都带 annotations
     expect(tools.every(t => t.annotations && 'readOnlyHint' in t.annotations)).toBe(true);
+    // 全部工具都带 outputSchema(与 structuredContent 实际形状对应)
+    expect(tools.every(t => t.outputSchema && Object.keys(t.outputSchema).length > 0)).toBe(true);
   });
 });
 

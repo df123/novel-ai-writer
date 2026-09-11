@@ -7,7 +7,7 @@ Server:`novel-ai-writer` v1.0.0
 
 - 除 `list_projects` / `get_project` / `create_project` 外,所有工具必须显式传 `project_id`。
 - 所有更新类工具接受可选 `expected_updated_at`(上次读取到的 `updated_at`,Unix 秒);不匹配返回 `[CONFLICT]` 可恢复错误。
-- 所有工具返回 `structuredContent`(结构化)+ `content`(一句话摘要)。
+- 所有工具返回 `structuredContent`(结构化)+ `content`(一句话摘要),且带与实际输出一致的 `outputSchema`(SDK 逐调用校验)。
 - 时间戳均为 Unix 秒。
 
 ## Projects
@@ -54,7 +54,7 @@ Server:`novel-ai-writer` v1.0.0
 |---|---|
 | `list_chapters` | 章节索引(无正文) |
 | `get_chapter` | 读完整章节正文 |
-| `create_chapter` | 保存新章节;编号冲突返回 CONFLICT。**仅在用户明确同意保存时调用**,讨论稿不得自动入库 |
+| `create_chapter` | 保存新章节;编号冲突返回 CONFLICT。**仅在用户明确同意保存时调用**,讨论稿不得自动入库(2026-09-11 移除了无实际语义的 expected_updated_at 参数) |
 | `update_chapter` | 更新章节(自动写 chapter_versions 快照) |
 | `archive_chapter` | 软删除(可恢复) |
 

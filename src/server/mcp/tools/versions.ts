@@ -10,6 +10,7 @@ import {
   listTrashInput,
   restoreItemInput
 } from '../schemas/entities';
+import { versionsOutput, trashOutput, restoredItemOutput } from '../schemas/output';
 
 const READ_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
@@ -19,6 +20,7 @@ export function registerVersionTools(server: McpServer): void {
     title: 'List item versions',
     description: 'List saved version snapshots of one entity (theme/character/timeline/world_entry/chapter). Chapter/theme snapshots include full old content.',
     inputSchema: listItemVersionsInput,
+    outputSchema: versionsOutput,
     annotations: READ_ANNOTATIONS
   }, async ({ project_id, type, id }) => runTool('list_item_versions', project_id, () => {
     const versions = listItemVersions(project_id, type as StoryItemType, id) as Array<{ version?: number }>;
@@ -29,6 +31,7 @@ export function registerVersionTools(server: McpServer): void {
     title: 'Restore item version',
     description: 'Restore an entity to a previous version. The current state is snapshotted first, so restoring is itself reversible.',
     inputSchema: restoreItemVersionInput,
+    outputSchema: restoredItemOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, type, id, version_id }) =>
     runTool('restore_item_version', project_id, () => {
@@ -41,6 +44,7 @@ export function registerVersionTools(server: McpServer): void {
     title: 'List trash',
     description: 'List archived (soft-deleted) entities of a project by type. Theme has no trash list.',
     inputSchema: listTrashInput,
+    outputSchema: trashOutput,
     annotations: READ_ANNOTATIONS
   }, async ({ project_id, type }) => runTool('list_trash', project_id, () => {
     const items = listTrash(project_id, type as StoryItemType) as Array<{ id?: string; title?: string; name?: string }>;
@@ -51,6 +55,7 @@ export function registerVersionTools(server: McpServer): void {
     title: 'Restore item',
     description: 'Restore an archived entity from trash back to active state.',
     inputSchema: restoreItemInput,
+    outputSchema: restoredItemOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, type, id }) =>
     runTool('restore_item', project_id, () => {

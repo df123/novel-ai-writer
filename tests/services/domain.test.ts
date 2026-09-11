@@ -7,6 +7,7 @@ import * as chapterService from '../../src/server/services/domain/chapterService
 import * as worldEntryService from '../../src/server/services/domain/worldEntryService';
 import * as themeService from '../../src/server/services/domain/themeService';
 import { getStoryContext } from '../../src/server/services/domain/storyContextService';
+import { getStoryItem } from '../../src/server/services/domain/storyItemService';
 import { searchStory } from '../../src/server/services/domain/storySearchService';
 import { DomainError } from '../../src/server/services/domain/errors';
 
@@ -157,6 +158,19 @@ describe('storyContext / search', () => {
   it('跨实体搜索命中并返回片段', () => {
     const { results } = searchStory(projectId, '黑岩');
     expect(results.some(r => r.type === 'world_entry' && r.title.includes('黑岩城'))).toBe(true);
+  });
+
+  it('上下文大字段截断:get_story_item 可取完整原文', () => {
+    const longText = '冷'.repeat(5000);
+    const character = characterService.createCharacter(projectId, { name: '超长角色', personality: longText });
+    const context = getStoryContext(projectId);
+    const ctxCharacter = context.characters.find(c => c.id === character.id)!;
+    expect(ctxCharacter.personality.length).toBe(2000);
+    expect(context.truncated).toBe(true);
+    expect(context.truncated_note).toContain('超长角色');
+
+    const full = getStoryItem(projectId, 'character', character.id);
+    expect(full.character?.personality?.length).toBe(5000);
   });
 
   it('搜索仅限当前项目', () => {

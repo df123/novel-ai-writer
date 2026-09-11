@@ -68,6 +68,8 @@ MCP Tool (src/server/mcp/tools/*)     ← 独立的协议层定义,不复用前�
 ### 关键设计决策
 
 1. **无状态、无 currentProject**:不使用 Mcp-Session-Id,任何请求独立处理;除 list/get_project 外全部工具显式传 `project_id`,适配多个 ChatGPT 对话并发调用与反代环境。
+1b. **outputSchema**:全部 28 个工具带 zod 输出 schema(共享定义于 `src/server/mcp/schemas/output.ts`),SDK 在每次成功调用时校验 structuredContent 与之一致。
+1c. **context 体积双保险**:集合数量上限之外,单实体大字段也截断(personality≤2000、background≤3000、relationships≤3000、timeline content≤3000、theme content≤5000 字符),任一截断即 `truncated: true` 并在 note 中指引 `get_story_item` 取全文。
 2. **乐观并发**:所有 update 工具接受 `expected_updated_at`(Unix 秒),不匹配返回 CONFLICT 并附重读提示。时间戳为秒级,同秒内的先后写入不做区分(与既有库一致)。
 3. **版本快照是服务器规则**:MCP 更新版本化实体(character/timeline/world_entry/theme/chapter)自动保存旧状态快照,模型无法关闭。主题沿用 theme_history,其余沿用 `*_versions` 表,章节新增 `chapter_versions` 表(向后兼容迁移,`CREATE TABLE IF NOT EXISTS`)。
 4. **Web 与 MCP 同享 chapterService.update()**:原 Web 章节更新同样获得版本保护(schema 迁移对旧库无损)。
@@ -81,11 +83,19 @@ MCP Tool (src/server/mcp/tools/*)     ← 独立的协议层定义,不复用前�
 
 | 模式 | 说明 | 适用 |
 |---|---|---|
-| `none` | 直接放行;生产环境启动时打印显著警告 | 本地开发 / MCP Inspector |
-| `token` | 校验 `Authorization: Bearer <MCP_STATIC_TOKEN>` | ChatGPT 自定义连接器粘贴令牌 |
-| `oauth` | 内置 OAuth 2.1 授权服务器:PKCE(S256)+ 动态客户端注册 + refresh token,暴露 `/.well-known/oauth-protected-resource` 与 `/.well-known/oauth-authorization-server` | 符合 MCP Authorization 规范的正式公网方案 |
+| `none` | 直接放行;生产环境启动时打印显著警告;不发布 OAuth 元数据 | 本地开发 / MCP Inspector |
+| `token` | 校验 `Authorization: Bearer <MCP_STATIC_TOKEN>`;不发布 OAuth 元数据 | 手动贴令牌的客户端(Inspector/curl) |
+| `oauth` | 内置 OAuth 2.1 授权服务器,发布 `/.well-known/*` 双元数据 | 符合 MCP Authorization 规范的正式公网方案(ChatGPT 用这个) |
 
 oauth 模式相关环境变量:`MCP_PUBLIC_URL`(对外基准 URL)、`MCP_OAUTH_PASSWORD`(授权页口令)。客户端/令牌存内存,服务重启后 ChatGPT 需重新授权(单用户系统可接受)。
+
+OAuth 安全要点(2026-09-11 整改后):
+
+- **redirect_uri 严格绑定**:授权(GET/POST)与换令牌阶段都要求 redirect_uri 与动态注册登记的完全一致,未登记的回调一律 400;
+- **client_secret 真校验**:区分 public(none,必须 PKCE S256)与 confidential(client_secret_post / client_secret_basic)客户端,secret 比对使用 timing-safe;confidential 客户端不带 secret 一律 401;
+- **元数据与实现一致**:`token_endpoint_auth_methods_supported = [none, client_secret_post, client_secret_basic]` 全部真实支持;
+- **RFC 9207**:授权成功重定向附带 `iss` 参数;
+- 授权码单次有效(10 分钟),refresh token 一次性轮换(30 天),访问令牌 12 小时。
 
 ## 五、Express 集成
 
@@ -107,7 +117,8 @@ oauth 模式相关环境变量:`MCP_PUBLIC_URL`(对外基准 URL)、`MCP_OAUTH_P
 
 ## 八、已知边界(如实记录)
 
-- 秒级 updated_at:同一秒内的并发写不做冲突区分。
+- **秒级 updated_at:同一秒内的并发写不做冲突区分**(整改任务书 §9 建议的 revision 整数版本号方案已评估,本轮未实施,作为后续项;当前实现不能宣称无竞争窗口)。
 - 限流为单实例内存计数,重启清零。
-- oauth 模式客户端注册与令牌存内存,重启失效。
-- ChatGPT Plus Web host 对 write 工具的实际可用性以真机测试为准(见部署文档);服务端 write 能力完整实现且 annotation 如实标注。
+- oauth 模式客户端注册与令牌存内存,重启失效(§12 建议的持久化列为后续项;严禁 token 明文入日志已满足)。
+- CIMD(Client ID Metadata Documents)兼容为 §11 P2 规划项,当前保留 DCR。
+- ChatGPT Plus Web host 对 write 工具的实际可用性以真机测试为准(见 CHATGPT_MCP_LIVE_TEST_REPORT.md);服务端 write 能力完整实现且 annotation 如实标注。
