@@ -5,7 +5,7 @@
 //   oauth - OAuth 2.1 授权服务器（PKCE + 动态客户端注册），符合 MCP Authorization 规范
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { loadClients, saveClient, loadTokens, saveTokenPair, deleteToken } from './oauthStore';
+import { loadClients, saveClient, loadTokens, saveTokenPair, deleteToken, rotateRefreshToken } from './oauthStore';
 
 /** 认证模式 */
 export type McpAuthMode = 'none' | 'token' | 'oauth';
@@ -167,8 +167,8 @@ function isValidAccessToken(token: string): boolean {
     return false;
   }
   if (record.expiresAt < Date.now()) {
-    tokens.delete(token);
     deleteToken(token);
+    tokens.delete(token);
     return false;
   }
   return true;
@@ -374,8 +374,12 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
       return;
     }
     codes.delete(code);
+    // 先落盘再进内存(失败抛错时内存无幽灵令牌;授权码已消费,客户端需重新授权)
+    const pair = generateTokenPair(client.clientId);
+    saveTokenPair(pair.access, pair.refresh);
+    cacheTokenPair(pair);
     console.log('[oauth] token 签发成功(authorization_code)');
-    res.json(issueTokens(client.clientId));
+    res.json(tokenResponse(pair));
     return;
   }
 
@@ -387,10 +391,13 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
       res.status(400).json({ error: 'invalid_grant' });
       return;
     }
+    // 单事务原子轮换:删旧 refresh + 写新令牌对;失败抛错时旧 refresh 未被消费,客户端可原样重试
+    const pair = generateTokenPair(client.clientId);
+    rotateRefreshToken(refresh_token, pair.access, pair.refresh);
     tokens.delete(refresh_token);
-    deleteToken(refresh_token);
+    cacheTokenPair(pair);
     console.log('[oauth] token 签发成功(refresh_token)');
-    res.json(issueTokens(client.clientId));
+    res.json(tokenResponse(pair));
     return;
   }
 
@@ -398,21 +405,28 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
   res.status(400).json({ error: 'unsupported_grant_type' });
 });
 
-function issueTokens(clientId: string): { access_token: string; token_type: string; expires_in: number; refresh_token: string } {
-  const access = base64url(randomBytes(32));
-  const refresh = base64url(randomBytes(32));
+/** 生成一对新令牌记录(只构造,不写库不进内存) */
+function generateTokenPair(clientId: string): { access: TokenRecord; refresh: TokenRecord; expiresIn: number } {
   const nowMs = Date.now();
-  tokens.set(access, { token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS });
-  tokens.set(refresh, { token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS });
-  saveTokenPair(
-    { token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS },
-    { token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS }
-  );
   return {
-    access_token: access,
+    access: { token: base64url(randomBytes(32)), kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS },
+    refresh: { token: base64url(randomBytes(32)), kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS },
+    expiresIn: Math.floor(ACCESS_TTL_MS / 1000)
+  };
+}
+
+/** 落盘成功后才同步内存缓存,保证内存与磁盘一致 */
+function cacheTokenPair(pair: { access: TokenRecord; refresh: TokenRecord }): void {
+  tokens.set(pair.access.token, pair.access);
+  tokens.set(pair.refresh.token, pair.refresh);
+}
+
+function tokenResponse(pair: { access: TokenRecord; refresh: TokenRecord; expiresIn: number }): { access_token: string; token_type: string; expires_in: number; refresh_token: string } {
+  return {
+    access_token: pair.access.token,
     token_type: 'Bearer',
-    expires_in: Math.floor(ACCESS_TTL_MS / 1000),
-    refresh_token: refresh
+    expires_in: pair.expiresIn,
+    refresh_token: pair.refresh.token
   };
 }
 
@@ -445,7 +459,7 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
     authMethod: requestedMethod,
     createdAt: Date.now()
   };
-  clients.set(clientId, newClient);
+  // 先落盘再进内存(失败抛错时不留内存幽灵注册)
   saveClient({
     clientId: newClient.clientId,
     clientSecret: newClient.clientSecret,
@@ -454,6 +468,7 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
     authMethod: newClient.authMethod,
     createdAt: newClient.createdAt
   });
+  clients.set(clientId, newClient);
   console.log(`[oauth] 客户端注册成功: ${body.client_name || 'MCP Client'} (auth=${requestedMethod})`);
   res.status(201).json({
     client_id: clientId,

@@ -1,10 +1,11 @@
 // OAuth 2.1 授权服务器自动化测试(不记录任何真实 token/secret 到断言输出)
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import { createHash } from 'crypto';
-import { initDB } from '../../src/server/db';
+import { initDB, query } from '../../src/server/db';
 import { createApp } from '../../src/server/app';
 import { _testSimulateRestart } from '../../src/server/mcp/auth';
+import * as oauthStore from '../../src/server/mcp/oauthStore';
 
 let app: ReturnType<typeof createApp>;
 const TEST_PASSWORD = 'oauth-test-password';
@@ -389,5 +390,103 @@ describe('/mcp 认证边界', () => {
     const res = await registerClient({ client_name: 'bad-method', redirect_uris: [REDIRECT_A], token_endpoint_auth_method: 'client_secret_jwt' });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('invalid_client_metadata');
+  });
+});
+
+/** 磁盘令牌行数(绕过内存缓存直接查表) */
+function diskTokenCount(): number {
+  return query<{ count: number }>('SELECT COUNT(*) as count FROM oauth_tokens')[0].count;
+}
+
+/** 磁盘客户端注册行数 */
+function diskClientCount(): number {
+  return query<{ count: number }>('SELECT COUNT(*) as count FROM oauth_clients')[0].count;
+}
+
+describe('refresh 轮换原子性(单事务:删旧+写新)', () => {
+  it('轮换落盘失败返回 500,旧 refresh 未被消费,恢复后原样重试成功,成功后旧 refresh 不可重放', async () => {
+    const reg = await registerClient({ client_name: 'rotate-fail-retry', redirect_uris: [REDIRECT_A] });
+    const tokenRes = await authorizationCodeFlow({ clientId: reg.body.client_id, redirectUri: REDIRECT_A, verifier: 'm1'.padEnd(43, 'x') });
+    expect(tokenRes.status).toBe(200);
+    const oldRefresh = tokenRes.body.refresh_token;
+
+    const spy = vi.spyOn(oauthStore, 'rotateRefreshToken').mockImplementation(() => {
+      throw new Error('simulated disk failure');
+    });
+    const failed = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: oldRefresh, client_id: reg.body.client_id
+    });
+    expect(failed.status).toBe(500);
+    spy.mockRestore();
+
+    // 旧 refresh 保持可用:客户端原样重试即可恢复,无需重新授权
+    const retry = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: oldRefresh, client_id: reg.body.client_id
+    });
+    expect(retry.status).toBe(200);
+    expect(await callMcpInitialize(retry.body.access_token)).toBe(200);
+
+    // 一次性轮换语义:成功轮换后旧 refresh 不可重放
+    const replay = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: oldRefresh, client_id: reg.body.client_id
+    });
+    expect(replay.status).toBe(400);
+  });
+
+  it('轮换失败不产生半完成状态:磁盘上旧 refresh 行仍在,且无幽灵新令牌', async () => {
+    const reg = await registerClient({ client_name: 'rotate-fail-disk', redirect_uris: [REDIRECT_A] });
+    const tokenRes = await authorizationCodeFlow({ clientId: reg.body.client_id, redirectUri: REDIRECT_A, verifier: 'm2'.padEnd(43, 'x') });
+    const oldRefresh = tokenRes.body.refresh_token;
+    const before = diskTokenCount();
+
+    const spy = vi.spyOn(oauthStore, 'rotateRefreshToken').mockImplementation(() => {
+      throw new Error('simulated disk failure');
+    });
+    const failed = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: oldRefresh, client_id: reg.body.client_id
+    });
+    expect(failed.status).toBe(500);
+    spy.mockRestore();
+
+    // 旧 refresh 未被删除,新令牌对未写入(总数不变)
+    expect(diskTokenCount()).toBe(before);
+    const rows = query<{ kind: string }>('SELECT kind FROM oauth_tokens WHERE token = ?', [oldRefresh]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].kind).toBe('refresh');
+  });
+});
+
+describe('内存缓存与持久化的失败一致性(先落盘,后进内存)', () => {
+  it('授权码换令牌落盘失败:响应 500,磁盘无幽灵令牌,恢复后完整流程可用', async () => {
+    const reg = await registerClient({ client_name: 'issue-fail', redirect_uris: [REDIRECT_A] });
+    const before = diskTokenCount();
+
+    const spy = vi.spyOn(oauthStore, 'saveTokenPair').mockImplementation(() => {
+      throw new Error('simulated disk failure');
+    });
+    const failed = await authorizationCodeFlow({ clientId: reg.body.client_id, redirectUri: REDIRECT_A, verifier: 'm3'.padEnd(43, 'x') });
+    expect(failed.status).toBe(500);
+    spy.mockRestore();
+
+    expect(diskTokenCount()).toBe(before);
+
+    const ok = await authorizationCodeFlow({ clientId: reg.body.client_id, redirectUri: REDIRECT_A, verifier: 'm4'.padEnd(43, 'x') });
+    expect(ok.status).toBe(200);
+    expect(await callMcpInitialize(ok.body.access_token)).toBe(200);
+  });
+
+  it('客户端注册落盘失败:响应 500,磁盘无幽灵注册', async () => {
+    const before = diskClientCount();
+    const spy = vi.spyOn(oauthStore, 'saveClient').mockImplementation(() => {
+      throw new Error('simulated disk failure');
+    });
+    const failed = await registerClient({ client_name: 'reg-fail', redirect_uris: [REDIRECT_A] });
+    expect(failed.status).toBe(500);
+    spy.mockRestore();
+
+    expect(diskClientCount()).toBe(before);
+
+    const ok = await registerClient({ client_name: 'reg-recover', redirect_uris: [REDIRECT_A] });
+    expect(ok.status).toBe(201);
   });
 });

@@ -116,10 +116,29 @@ export function saveTokenPair(access: StoredOAuthToken, refresh: StoredOAuthToke
   });
 }
 
-/** 删除令牌(轮换/吊销,事务提交后落盘) */
+/** 删除令牌(过期清理/吊销,事务提交后落盘) */
 export function deleteToken(token: string): void {
   ensureTables();
   withWriteTransaction(() => {
     run('DELETE FROM oauth_tokens WHERE token = ?', [token]);
+  });
+}
+
+/**
+ * 原子轮换 refresh token:删除旧 refresh + 写入新 access/refresh 在同一事务完成
+ * 任一步失败整体回滚(旧 refresh 保持可用,客户端可重试),杜绝"旧已删、新未写"的半完成状态
+ */
+export function rotateRefreshToken(oldRefresh: string, newAccess: StoredOAuthToken, newRefresh: StoredOAuthToken): void {
+  ensureTables();
+  withWriteTransaction(() => {
+    run('DELETE FROM oauth_tokens WHERE token = ?', [oldRefresh]);
+    run(
+      'INSERT OR REPLACE INTO oauth_tokens (token, kind, client_id, expires_at) VALUES (?, ?, ?, ?)',
+      [newAccess.token, newAccess.kind, newAccess.clientId, newAccess.expiresAt]
+    );
+    run(
+      'INSERT OR REPLACE INTO oauth_tokens (token, kind, client_id, expires_at) VALUES (?, ?, ?, ?)',
+      [newRefresh.token, newRefresh.kind, newRefresh.clientId, newRefresh.expiresAt]
+    );
   });
 }

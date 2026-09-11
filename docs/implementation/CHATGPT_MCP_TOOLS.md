@@ -6,9 +6,22 @@ Server:`novel-ai-writer` v1.0.0
 约定:
 
 - 除 `list_projects` / `get_project` / `create_project` 外,所有工具必须显式传 `project_id`。
-- 所有更新类工具接受可选 `expected_updated_at`(上次读取到的 `updated_at`,Unix 秒);不匹配返回 `[CONFLICT]` 可恢复错误。
+- 所有更新类工具接受可选 `expected_updated_at`(取上次读取实体返回的 **`updatedAt` 字段值**,Unix 秒);不匹配返回 `[CONFLICT]` 可恢复错误。
 - 所有工具返回 `structuredContent`(结构化)+ `content`(一句话摘要),且带与实际输出一致的 `outputSchema`(SDK 逐调用校验)。
 - 时间戳均为 Unix 秒。
+
+## 输出字段命名约定(2026-09-11 真机发现审计)
+
+真机测试曾观察到"部分输出 `updatedAt`,部分输出 `updated_at`"与 Character 响应疑似同时携带两种命名。审计结论与处置:
+
+| 现象 | 根因 | 处置 |
+|---|---|---|
+| 完整实体工具(get_story_item、create/update_*)输出 `updatedAt/projectId/createdAt`(camelCase),而 get_story_context、list_chapters 索引输出 `updated_at/chapter_number`(snake_case) | **跨工具的有意设计**:实体输出即 outputSchema 声明的 camelCase 契约字段;context/索引形状按原任务书 §16 规范定义。同一响应内不混用 | 保持现状(统一属 breaking change),列 V2 cleanup |
+| 实体响应同时含 `project_id`+`projectId`、`updated_at`+`updatedAt` 等成对重复 | 共享 formatter(`src/server/utils/formatters.ts`)用 `...dbRow` 展开原始行再叠加 camelCase 字段,数据库列名泄漏进输出 | **已修复**:MCP 边界(`toolOk`)递归移除与 camelCase 孪生字段并存的 snake 原字段;仅同对象存在孪生时才删(值相同无信息损失),无孪生的 `updated_at`/`chapter_number` 等索引字段原样保留。REST/Web 响应零改动 |
+| Timeline 实体同时有 `description` 与 `content` | 共享实体的两个真实字段(原 Web UI 使用 description;MCP 输入仅写 content),非泄漏 | 保持现状,列 V2 cleanup(候选:MCP 实体仅返回 content) |
+| `get_story_context.world_entries[].summary` 与完整实体的 `content` 不同名 | 有意设计:context 只给摘要防 token 失控 | 保持(非 bug) |
+
+V2 cleanup 候选清单(均为兼容性评估后再动的非阻塞项):统一实体/索引两种命名风格;timeline 实体去 `description`。
 
 ## Projects
 

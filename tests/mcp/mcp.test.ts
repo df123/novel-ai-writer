@@ -199,3 +199,95 @@ describe('MCP 全链路：读取 → 写入 → 并发 → 版本 → 回收站 
     expect((missing.result.content as Array<{ text: string }>)[0].text).toContain('NOT_FOUND');
   });
 });
+
+/** 递归收集"同对象内同时存在 snake_case 键与其 camelCase 孪生键"的重复字段 */
+function collectSnakeCamelDupes(value: unknown, path: string, found: string[]): void {
+  if (Array.isArray(value)) {
+    value.forEach((v, i) => collectSnakeCamelDupes(v, `${path}[${i}]`, found));
+    return;
+  }
+  if (value === null || typeof value !== 'object') {
+    return;
+  }
+  const src = value as Record<string, unknown>;
+  for (const key of Object.keys(src)) {
+    const twin = key.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+    if (twin !== key && twin in src) {
+      found.push(`${path}.${key}`);
+    }
+    collectSnakeCamelDupes(src[key], `${path}.${key}`, found);
+  }
+}
+
+describe('输出字段命名卫生(MCP 边界去除 db 行展开重复)', () => {
+  it('实体输出仅含 camelCase 契约字段,不再同时携带 project_id/updated_at 等 snake 重复', async () => {
+    const created = await rpc('tools/call', {
+      name: 'create_character',
+      arguments: { project_id: projectId, name: '命名审计角色', personality: '严谨' }
+    });
+    expect(created.result.isError).toBeFalsy();
+    const character = (created.result.structuredContent as { character: Record<string, unknown> }).character;
+
+    // camelCase 契约字段(outputSchema 声明)必须在
+    for (const key of ['id', 'projectId', 'name', 'createdAt', 'updatedAt']) {
+      expect(character).toHaveProperty(key);
+    }
+    // ...dbRow 展开遗留的 snake 重复字段必须不在
+    for (const key of ['project_id', 'created_at', 'updated_at', 'deleted_at']) {
+      expect(character).not.toHaveProperty(key);
+    }
+
+    const dupes: string[] = [];
+    collectSnakeCamelDupes(created.result.structuredContent, '$', dupes);
+    expect(dupes).toEqual([]);
+  });
+
+  it('timeline/world_entry/chapter/version/trash 输出同样无 snake/camel 成对重复', async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown>; pick: string }> = [
+      { name: 'create_timeline_event', args: { project_id: projectId, title: '命名审计事件', date: '2026-01-01', content: '事件内容' }, pick: 'timeline_event' },
+      { name: 'create_world_entry', args: { project_id: projectId, title: '命名审计地点', category: '城市', content: '城市说明' }, pick: 'world_entry' },
+      { name: 'create_chapter', args: { project_id: projectId, chapter_number: 99, title: '命名审计章', content: '正文' }, pick: 'chapter' },
+      { name: 'get_story_item', args: { project_id: projectId, type: 'character', id: (await (await rpc('tools/call', { name: 'search_story', arguments: { project_id: projectId, query: '命名审计角色' } })).result.structuredContent as { results: Array<{ id: string }> }).results[0].id }, pick: '$' }
+    ];
+    for (const call of calls) {
+      const res = await rpc('tools/call', { name: call.name, arguments: call.args });
+      expect(res.result.isError).toBeFalsy();
+      const dupes: string[] = [];
+      collectSnakeCamelDupes(res.result.structuredContent, '$', dupes);
+      expect(dupes).toEqual([]);
+    }
+
+    const versions = await rpc('tools/call', {
+      name: 'list_item_versions',
+      arguments: { project_id: projectId, type: 'character', id: (await (await rpc('tools/call', { name: 'search_story', arguments: { project_id: projectId, query: '命名审计角色' } })).result.structuredContent as { results: Array<{ id: string }> }).results[0].id }
+    });
+    const dupesV: string[] = [];
+    collectSnakeCamelDupes(versions.result.structuredContent, '$', dupesV);
+    expect(dupesV).toEqual([]);
+  });
+
+  it('无孪生的有意 snake 字段保留:context 索引与章节索引仍是 updated_at/chapter_number', async () => {
+    const context = await rpc('tools/call', { name: 'get_story_context', arguments: { project_id: projectId } });
+    expect(context.result.isError).toBeFalsy();
+    const ctx = context.result.structuredContent as {
+      characters: Array<Record<string, unknown>>;
+      chapters: Array<Record<string, unknown>>;
+      world_entries: Array<Record<string, unknown>>;
+    };
+    expect(ctx.characters.length).toBeGreaterThan(0);
+    expect(ctx.characters[0]).toHaveProperty('updated_at');
+    expect(ctx.characters[0]).not.toHaveProperty('updatedAt');
+    expect(ctx.chapters[0]).toHaveProperty('chapter_number');
+    expect(ctx.chapters[0]).toHaveProperty('updated_at');
+
+    const listed = await rpc('tools/call', { name: 'list_chapters', arguments: { project_id: projectId } });
+    const chapters = (listed.result.structuredContent as { chapters: Array<Record<string, unknown>> }).chapters;
+    expect(chapters[0]).toHaveProperty('chapter_number');
+    expect(chapters[0]).not.toHaveProperty('chapterNumber');
+
+    // context 是刻意设计的 snake 索引形状,不因去重而破坏
+    const dupes: string[] = [];
+    collectSnakeCamelDupes(context.result.structuredContent, '$', dupes);
+    expect(dupes).toEqual([]);
+  });
+});

@@ -95,7 +95,8 @@ OAuth 安全要点(2026-09-11 整改后):
 - **client_secret 真校验**:区分 public(none,必须 PKCE S256)与 confidential(client_secret_post / client_secret_basic)客户端,secret 比对使用 timing-safe;实际使用的认证方法必须与注册方法严格一致(注册 basic 用 post 发送被拒,public 客户端携带 secret 不能升级);public 注册不签发 client_secret;confidential 客户端不带 secret 一律 401;
 - **元数据与实现一致**:`token_endpoint_auth_methods_supported = [none, client_secret_post, client_secret_basic]` 全部真实支持;
 - **RFC 9207**:授权成功重定向附带 `iss` 参数;
-- 授权码单次有效(10 分钟),refresh token 一次性轮换(30 天),访问令牌 12 小时。
+- 授权码单次有效(10 分钟),refresh token 一次性轮换(30 天),访问令牌 12 小时;refresh 轮换为**单事务原子操作**(`rotateRefreshToken`:删旧 refresh + 写入新令牌对在同一 `withWriteTransaction` 内完成,落盘失败整体回滚、旧 refresh 保持可用可原样重试,不存在"旧已删、新未写"的半完成状态);
+- 所有持久化写入均**先落盘成功、后更新内存缓存**(授权码换令牌 / refresh 轮换 / 客户端注册),写失败时内存与磁盘不分叉、不产生幽灵记录,均有失败注入测试(`vi.spyOn` mock 持久化函数)覆盖。
 
 ## 五、Express 集成
 
@@ -117,8 +118,10 @@ OAuth 安全要点(2026-09-11 整改后):
 
 ## 八、已知边界(如实记录)
 
-- **秒级 updated_at:同一秒内的并发写不做冲突区分**(整改任务书 §9 建议的 revision 整数版本号方案已评估,本轮未实施,作为后续项;当前实现不能宣称无竞争窗口)。
+- **秒级 updated_at:同一秒内的并发写不做冲突区分**(整改任务书 §9 建议的 revision 整数版本号方案已评估,本轮不实施——涉及全部实体 schema,保持为后续项;当前实现不能宣称无竞争窗口)。
 - 限流为单实例内存计数,重启清零。
 - ~~oauth 模式客户端注册与令牌存内存,重启失效~~ → **已持久化**(2026-09-11 落地):客户端注册与访问/刷新令牌写 SQLite(oauth_clients/oauth_tokens 表,懒加载+写穿,全部经 withWriteTransaction 提交后 saveDB 落盘,并有真实落盘重载测试),服务重启后 ChatGPT 无需重新授权;授权码仍为内存 10 分钟短命对象;令牌永不明文写日志。
 - CIMD(Client ID Metadata Documents)兼容为 §11 P2 规划项,当前保留 DCR。
-- ChatGPT Plus Web host 对 write 工具的实际可用性以真机测试为准(见 CHATGPT_MCP_LIVE_TEST_REPORT.md);服务端 write 能力完整实现且 annotation 如实标注。
+- Apps SDK NovelWorkspace Widget 属 Phase 2(后续阶段),不是 MCP V1 合并阻塞项;Widget 届时仍须经 MCP Tool → Domain Service 访问数据,不得直连数据库。
+- MCP 输出命名存在**跨工具**的两种风格(完整实体工具输出 camelCase 契约字段;context/章节索引工具按原任务书 §16 规范输出 snake_case 索引字段)——2026-09-11 审计确认为有意设计且同一响应内不混用;MCP 边界已去除 db 行展开造成的成对重复字段(详见 CHATGPT_MCP_TOOLS.md 命名约定),彻底统一两种风格列为 V2 cleanup。
+- ChatGPT Plus Web host 对 write 工具的实际可用性以真机测试为准(见 CHATGPT_MCP_LIVE_TEST_REPORT.md,2026-09-11 真机实测:allowed);服务端 write 能力完整实现且 annotation 如实标注。
