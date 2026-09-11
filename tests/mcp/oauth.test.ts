@@ -4,6 +4,7 @@ import request from 'supertest';
 import { createHash } from 'crypto';
 import { initDB } from '../../src/server/db';
 import { createApp } from '../../src/server/app';
+import { _testSimulateRestart } from '../../src/server/mcp/auth';
 
 let app: ReturnType<typeof createApp>;
 const TEST_PASSWORD = 'oauth-test-password';
@@ -297,6 +298,30 @@ describe('授权码与令牌生命周期', () => {
     expect(url.searchParams.get('iss')).toBe('https://auth-test.example.com');
     expect(url.searchParams.get('state')).toBe('xyz');
     expect(url.searchParams.get('code')).toBeTruthy();
+  });
+});
+
+describe('OAuth 持久化(重启不失效)', () => {
+  it('模拟重启后:已注册客户端、access token、refresh token 均从库恢复可用', async () => {
+    const reg = await registerClient({ client_name: 'persist-client', redirect_uris: [REDIRECT_A] });
+    const clientId = reg.body.client_id;
+    const tokenRes = await authorizationCodeFlow({ clientId, redirectUri: REDIRECT_A, verifier: 'z'.repeat(43) });
+    expect(tokenRes.status).toBe(200);
+    const accessToken = tokenRes.body.access_token;
+    const refreshToken = tokenRes.body.refresh_token;
+
+    // 模拟服务重启:清空内存缓存(数据库保留)
+    _testSimulateRestart();
+
+    // 重启后旧 access token 仍能调 /mcp
+    expect(await callMcpInitialize(accessToken)).toBe(200);
+
+    // 重启后旧 refresh token 仍能轮换
+    const refreshed = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId
+    });
+    expect(refreshed.status).toBe(200);
+    expect(await callMcpInitialize(refreshed.body.access_token)).toBe(200);
   });
 });
 

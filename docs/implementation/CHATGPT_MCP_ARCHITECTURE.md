@@ -85,7 +85,7 @@ MCP Tool (src/server/mcp/tools/*)     ← 独立的协议层定义,不复用前�
 |---|---|---|
 | `none` | 直接放行;生产环境启动时打印显著警告;不发布 OAuth 元数据 | 本地开发 / MCP Inspector |
 | `token` | 校验 `Authorization: Bearer <MCP_STATIC_TOKEN>`;不发布 OAuth 元数据 | 手动贴令牌的客户端(Inspector/curl) |
-| `oauth` | 内置 OAuth 2.1 授权服务器,发布 `/.well-known/*` 双元数据 | 符合 MCP Authorization 规范的正式公网方案(ChatGPT 用这个) |
+| `oauth` | 内置 OAuth 2.1 授权服务器,发布 `/.well-known/*` 双元数据;客户端注册与令牌持久化到 SQLite(oauthStore),重启免重授权 | 符合 MCP Authorization 规范的正式公网方案(ChatGPT 用这个) |
 
 oauth 模式相关环境变量:`MCP_PUBLIC_URL`(对外基准 URL)、`MCP_OAUTH_PASSWORD`(授权页口令)。客户端/令牌存内存,服务重启后 ChatGPT 需重新授权(单用户系统可接受)。
 
@@ -119,6 +119,6 @@ OAuth 安全要点(2026-09-11 整改后):
 
 - **秒级 updated_at:同一秒内的并发写不做冲突区分**(整改任务书 §9 建议的 revision 整数版本号方案已评估,本轮未实施,作为后续项;当前实现不能宣称无竞争窗口)。
 - 限流为单实例内存计数,重启清零。
-- oauth 模式客户端注册与令牌存内存,重启失效(§12 建议的持久化列为后续项;严禁 token 明文入日志已满足)。
+- ~~oauth 模式客户端注册与令牌存内存,重启失效~~ → **已持久化**(2026-09-11 落地):客户端注册与访问/刷新令牌写 SQLite(oauth_clients/oauth_tokens 表,懒加载+写穿),服务重启后 ChatGPT 无需重新授权;授权码仍为内存 10 分钟短命对象;令牌永不明文写日志。
 - CIMD(Client ID Metadata Documents)兼容为 §11 P2 规划项,当前保留 DCR。
 - ChatGPT Plus Web host 对 write 工具的实际可用性以真机测试为准(见 CHATGPT_MCP_LIVE_TEST_REPORT.md);服务端 write 能力完整实现且 annotation 如实标注。

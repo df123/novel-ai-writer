@@ -5,6 +5,7 @@
 //   oauth - OAuth 2.1 授权服务器（PKCE + 动态客户端注册），符合 MCP Authorization 规范
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { loadClients, saveClient, loadTokens, saveToken, deleteToken } from './oauthStore';
 
 /** 认证模式 */
 export type McpAuthMode = 'none' | 'token' | 'oauth';
@@ -123,13 +124,51 @@ const clients = new Map<string, OAuthClient>();
 const codes = new Map<string, AuthCode>();
 const tokens = new Map<string, TokenRecord>();
 
+// 懒加载持久化数据:首次访问 OAuth 相关能力时从库恢复(重启不丢注册与令牌)
+let persistedLoaded = false;
+
+function ensurePersisted(): void {
+  if (persistedLoaded) {
+    return;
+  }
+  persistedLoaded = true;
+  try {
+    for (const c of loadClients()) {
+      clients.set(c.clientId, {
+        clientId: c.clientId,
+        clientSecret: c.clientSecret,
+        redirectUris: c.redirectUris,
+        clientName: c.clientName,
+        authMethod: (c.authMethod as ClientAuthMethod) || 'none',
+        createdAt: c.createdAt
+      });
+    }
+    for (const t of loadTokens()) {
+      tokens.set(t.token, { token: t.token, kind: t.kind, clientId: t.clientId, expiresAt: t.expiresAt });
+    }
+    console.log(`[oauth] 持久化数据已加载:${clients.size} 个客户端,${tokens.size} 个有效令牌`);
+  } catch (e) {
+    console.error('[oauth] 持久化数据加载失败(数据库未初始化?):', e);
+  }
+}
+
+/** 仅供测试:模拟服务重启(清空内存缓存,保留数据库) */
+export function _testSimulateRestart(): void {
+  clients.clear();
+  tokens.clear();
+  codes.clear();
+  persistedLoaded = false;
+}
+
 function isValidAccessToken(token: string): boolean {
+  ensurePersisted();
   const record = tokens.get(token);
   if (!record || record.kind !== 'access') {
     return false;
   }
   if (record.expiresAt < Date.now()) {
     tokens.delete(token);
+    deleteToken(token);
     return false;
   }
   return true;
@@ -161,6 +200,7 @@ function requireRegisteredRedirect(client: OAuthClient, redirectUri: string | un
 
 /** 简单授权页：用户输入访问口令批准 ChatGPT 的授权请求 */
 oauthRouter.get('/authorize', (req: Request, res: Response) => {
+  ensurePersisted();
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method } = req.query as Record<string, string>;
   const client = client_id ? clients.get(client_id) : undefined;
   if (!client) {
@@ -201,6 +241,7 @@ oauthRouter.get('/authorize', (req: Request, res: Response) => {
 });
 
 oauthRouter.post('/authorize', (req: Request, res: Response) => {
+  ensurePersisted();
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method, password } = req.body as Record<string, string>;
   const expectedPassword = process.env.MCP_OAUTH_PASSWORD || '';
   if (!expectedPassword) {
@@ -249,6 +290,7 @@ oauthRouter.post('/authorize', (req: Request, res: Response) => {
  * @returns 认证成功的客户端;失败返回 null(已记录原因)
  */
 function authenticateClient(req: Request, body: Record<string, string>): OAuthClient | null {
+  ensurePersisted();
   const authHeader = req.headers.authorization;
 
   // client_secret_basic:Authorization: Basic base64(client_id:client_secret)
@@ -338,6 +380,7 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
       return;
     }
     tokens.delete(refresh_token);
+    deleteToken(refresh_token);
     console.log('[oauth] token 签发成功(refresh_token)');
     res.json(issueTokens(client.clientId));
     return;
@@ -353,6 +396,8 @@ function issueTokens(clientId: string): { access_token: string; token_type: stri
   const nowMs = Date.now();
   tokens.set(access, { token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS });
   tokens.set(refresh, { token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS });
+  saveToken({ token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS });
+  saveToken({ token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS });
   return {
     access_token: access,
     token_type: 'Bearer',
@@ -381,13 +426,22 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
 
   const clientId = base64url(randomBytes(16));
   const clientSecret = base64url(randomBytes(32));
-  clients.set(clientId, {
+  const newClient: OAuthClient = {
     clientId,
     clientSecret,
     redirectUris: body.redirect_uris,
     clientName: body.client_name || 'MCP Client',
     authMethod: requestedMethod,
     createdAt: Date.now()
+  };
+  clients.set(clientId, newClient);
+  saveClient({
+    clientId: newClient.clientId,
+    clientSecret: newClient.clientSecret,
+    redirectUris: newClient.redirectUris,
+    clientName: newClient.clientName,
+    authMethod: newClient.authMethod,
+    createdAt: newClient.createdAt
   });
   console.log(`[oauth] 客户端注册成功: ${body.client_name || 'MCP Client'} (auth=${requestedMethod})`);
   res.status(201).json({
