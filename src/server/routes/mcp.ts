@@ -30,8 +30,13 @@ router.all('/mcp', mcpAuthMiddleware, (req: Request, res: Response) => {
 
 /**
  * 受保护资源元数据（MCP Authorization 规范）
+ * 仅在 oauth 模式发布;token/none 模式返回 404,避免自动发现的客户端误入 OAuth 流程
  */
 router.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
+  if (getAuthMode() !== 'oauth') {
+    res.status(404).json({ error: 'not found' });
+    return;
+  }
   const base = getPublicBaseUrl();
   res.json({
     resource: `${base}/mcp`,
@@ -43,6 +48,10 @@ router.get('/.well-known/oauth-protected-resource', (_req: Request, res: Respons
  * 授权服务器元数据（OAuth 2.0 Authorization Server Metadata）
  */
 router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
+  if (getAuthMode() !== 'oauth') {
+    res.status(404).json({ error: 'not found' });
+    return;
+  }
   const base = getPublicBaseUrl();
   res.json({
     issuer: base,

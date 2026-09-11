@@ -47,7 +47,7 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
   const header = req.headers.authorization || '';
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) {
-    res.status(401).header('WWW-Authenticate', 'Bearer').json({ error: 'unauthorized', error_description: 'Missing bearer token' });
+    res.status(401).header('WWW-Authenticate', wwwAuthenticateValue()).json({ error: 'unauthorized', error_description: 'Missing bearer token' });
     return;
   }
   const token = match[1].trim();
@@ -63,7 +63,8 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
       next();
       return;
     }
-    res.status(401).header('WWW-Authenticate', 'Bearer').json({ error: 'unauthorized' });
+    console.warn('[mcp-auth] 静态令牌校验失败(401)');
+    res.status(401).header('WWW-Authenticate', wwwAuthenticateValue()).json({ error: 'unauthorized' });
     return;
   }
 
@@ -72,7 +73,16 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
     next();
     return;
   }
-  res.status(401).header('WWW-Authenticate', 'Bearer').json({ error: 'unauthorized' });
+  console.warn('[mcp-auth] 访问令牌无效或已过期(401)');
+  res.status(401).header('WWW-Authenticate', wwwAuthenticateValue()).json({ error: 'unauthorized' });
+}
+
+/** WWW-Authenticate 头:oauth 模式按 RFC 9728 附带资源元数据地址,引导客户端走发现流程 */
+function wwwAuthenticateValue(): string {
+  if (getAuthMode() === 'oauth') {
+    return `Bearer resource_metadata="${getPublicBaseUrl()}/.well-known/oauth-protected-resource"`;
+  }
+  return 'Bearer';
 }
 
 // ===== OAuth 2.1 授权服务器（单用户，内存存储） =====
@@ -172,14 +182,17 @@ oauthRouter.post('/authorize', (req: Request, res: Response) => {
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method, password } = req.body as Record<string, string>;
   const expectedPassword = process.env.MCP_OAUTH_PASSWORD || '';
   if (!expectedPassword) {
+    console.error('[oauth] authorize 拒绝:服务器未配置 MCP_OAUTH_PASSWORD');
     res.status(500).send('MCP_OAUTH_PASSWORD not configured on server');
     return;
   }
   if (!client_id || !clients.has(client_id)) {
+    console.warn('[oauth] authorize 拒绝:client_id 无效(可能是服务重启后客户端未重新注册)');
     res.status(400).send('invalid client_id');
     return;
   }
   if (!password || !safeEqual(password, expectedPassword)) {
+    console.warn('[oauth] authorize 拒绝:访问口令错误');
     res.status(401).setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send('<p>口令错误。<a href="javascript:history.back()">返回重试</a></p>');
     return;
@@ -206,38 +219,56 @@ oauthRouter.post('/token', (req: Request, res: Response) => {
   const body = req.body as Record<string, string>;
   const grantType = body.grant_type;
 
+  // 兼容 client_secret_basic:部分客户端把 client_id 放在 Basic 头而非请求体
+  let clientId: string | undefined = body.client_id;
+  const authHeader = req.headers.authorization;
+  if (!clientId && authHeader && /^basic /i.test(authHeader)) {
+    try {
+      clientId = Buffer.from(authHeader.slice(6), 'base64').toString('utf8').split(':')[0];
+    } catch {
+      clientId = undefined;
+    }
+  }
+
   if (grantType === 'authorization_code') {
-    const { code, redirect_uri, client_id, code_verifier } = body;
+    const { code, redirect_uri, code_verifier } = body;
     const record = code ? codes.get(code) : undefined;
     if (!record || record.expiresAt < Date.now()) {
+      console.warn('[oauth] token 拒绝:授权码无效或已过期');
       res.status(400).json({ error: 'invalid_grant', error_description: 'code expired or invalid' });
       return;
     }
-    if (!client_id || client_id !== record.clientId || redirect_uri !== record.redirectUri) {
+    if (!clientId || clientId !== record.clientId || redirect_uri !== record.redirectUri) {
+      console.warn('[oauth] token 拒绝:client_id 或 redirect_uri 与授权时不一致');
       res.status(400).json({ error: 'invalid_grant' });
       return;
     }
     if (!code_verifier || sha256(code_verifier) !== record.codeChallenge) {
+      console.warn('[oauth] token 拒绝:PKCE 校验失败');
       res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
       return;
     }
     codes.delete(code);
-    res.json(issueTokens(client_id));
+    console.log('[oauth] token 签发成功(authorization_code)');
+    res.json(issueTokens(clientId));
     return;
   }
 
   if (grantType === 'refresh_token') {
-    const { refresh_token, client_id } = body;
+    const { refresh_token } = body;
     const record = refresh_token ? tokens.get(refresh_token) : undefined;
-    if (!record || record.kind !== 'refresh' || record.expiresAt < Date.now() || record.clientId !== client_id) {
+    if (!record || record.kind !== 'refresh' || record.expiresAt < Date.now() || record.clientId !== clientId) {
+      console.warn('[oauth] token 拒绝:refresh_token 无效/过期/客户端不匹配');
       res.status(400).json({ error: 'invalid_grant' });
       return;
     }
     tokens.delete(refresh_token);
-    res.json(issueTokens(client_id));
+    console.log('[oauth] token 签发成功(refresh_token)');
+    res.json(issueTokens(clientId));
     return;
   }
 
+  console.warn(`[oauth] token 拒绝:不支持的 grant_type=${grantType}`);
   res.status(400).json({ error: 'unsupported_grant_type' });
 });
 
@@ -271,6 +302,7 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
     clientName: body.client_name || 'MCP Client',
     createdAt: Date.now()
   });
+  console.log(`[oauth] 客户端注册成功: ${body.client_name || 'MCP Client'}`);
   res.status(201).json({
     client_id: clientId,
     client_secret: clientSecret,
