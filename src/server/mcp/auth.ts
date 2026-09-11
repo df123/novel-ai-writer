@@ -5,7 +5,7 @@
 //   oauth - OAuth 2.1 授权服务器（PKCE + 动态客户端注册），符合 MCP Authorization 规范
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { loadClients, saveClient, loadTokens, saveToken, deleteToken } from './oauthStore';
+import { loadClients, saveClient, loadTokens, saveTokenPair, deleteToken } from './oauthStore';
 
 /** 认证模式 */
 export type McpAuthMode = 'none' | 'token' | 'oauth';
@@ -306,7 +306,11 @@ function authenticateClient(req: Request, body: Record<string, string>): OAuthCl
     const clientId = separator >= 0 ? decoded.slice(0, separator) : '';
     const clientSecret = separator >= 0 ? decoded.slice(separator + 1) : '';
     const client = clients.get(clientId);
-    if (!client || !clientSecret || !safeEqual(clientSecret, client.clientSecret)) {
+    if (!client || client.authMethod !== 'client_secret_basic') {
+      console.warn('[oauth] client 认证拒绝:该客户端未注册为 client_secret_basic');
+      return null;
+    }
+    if (!clientSecret || !safeEqual(clientSecret, client.clientSecret)) {
       console.warn('[oauth] client 认证拒绝:client_secret_basic 凭据不匹配');
       return null;
     }
@@ -316,14 +320,18 @@ function authenticateClient(req: Request, body: Record<string, string>): OAuthCl
   // client_secret_post:client_id + client_secret 放请求体
   if (body.client_secret) {
     const client = body.client_id ? clients.get(body.client_id) : undefined;
-    if (!client || !safeEqual(body.client_secret, client.clientSecret)) {
+    if (!client || client.authMethod !== 'client_secret_post') {
+      console.warn('[oauth] client 认证拒绝:该客户端未注册为 client_secret_post');
+      return null;
+    }
+    if (!safeEqual(body.client_secret, client.clientSecret)) {
       console.warn('[oauth] client 认证拒绝:client_secret_post 凭据不匹配');
       return null;
     }
     return client;
   }
 
-  // 无凭据:仅允许注册为 public(authMethod=none)的客户端
+  // 无凭据:仅允许注册为 public(authMethod=none)的客户端;public 客户端不得借携带 secret 升级为 confidential
   const client = body.client_id ? clients.get(body.client_id) : undefined;
   if (!client) {
     console.warn('[oauth] client 认证拒绝:client_id 无效');
@@ -396,8 +404,10 @@ function issueTokens(clientId: string): { access_token: string; token_type: stri
   const nowMs = Date.now();
   tokens.set(access, { token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS });
   tokens.set(refresh, { token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS });
-  saveToken({ token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS });
-  saveToken({ token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS });
+  saveTokenPair(
+    { token: access, kind: 'access', clientId, expiresAt: nowMs + ACCESS_TTL_MS },
+    { token: refresh, kind: 'refresh', clientId, expiresAt: nowMs + REFRESH_TTL_MS }
+  );
   return {
     access_token: access,
     token_type: 'Bearer',
@@ -425,7 +435,8 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
   }
 
   const clientId = base64url(randomBytes(16));
-  const clientSecret = base64url(randomBytes(32));
+  // RFC 7591:public 客户端(none)不签发 client_secret
+  const clientSecret = requestedMethod === 'none' ? '' : base64url(randomBytes(32));
   const newClient: OAuthClient = {
     clientId,
     clientSecret,
@@ -446,7 +457,7 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
   console.log(`[oauth] 客户端注册成功: ${body.client_name || 'MCP Client'} (auth=${requestedMethod})`);
   res.status(201).json({
     client_id: clientId,
-    client_secret: clientSecret,
+    ...(requestedMethod !== 'none' ? { client_secret: clientSecret } : {}),
     client_name: body.client_name || 'MCP Client',
     redirect_uris: body.redirect_uris,
     token_endpoint_auth_method: requestedMethod

@@ -301,8 +301,8 @@ describe('授权码与令牌生命周期', () => {
   });
 });
 
-describe('OAuth 持久化(重启不失效)', () => {
-  it('模拟重启后:已注册客户端、access token、refresh token 均从库恢复可用', async () => {
+describe('OAuth 持久化(真实落盘重载)', () => {
+  it('重新 initDB() 从磁盘文件重建后:客户端注册、access、refresh 均可用', async () => {
     const reg = await registerClient({ client_name: 'persist-client', redirect_uris: [REDIRECT_A] });
     const clientId = reg.body.client_id;
     const tokenRes = await authorizationCodeFlow({ clientId, redirectUri: REDIRECT_A, verifier: 'z'.repeat(43) });
@@ -310,18 +310,66 @@ describe('OAuth 持久化(重启不失效)', () => {
     const accessToken = tokenRes.body.access_token;
     const refreshToken = tokenRes.body.refresh_token;
 
-    // 模拟服务重启:清空内存缓存(数据库保留)
+    // 真实重启模拟:丢弃当前 sql.js Database,重新 initDB() 从磁盘 database.db 加载
+    await initDB();
     _testSimulateRestart();
 
     // 重启后旧 access token 仍能调 /mcp
     expect(await callMcpInitialize(accessToken)).toBe(200);
 
-    // 重启后旧 refresh token 仍能轮换
+    // 重启后旧 refresh token 仍能轮换,且新令牌继续可用
     const refreshed = await request(app).post('/oauth/token').type('form').send({
       grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId
     });
     expect(refreshed.status).toBe(200);
     expect(await callMcpInitialize(refreshed.body.access_token)).toBe(200);
+  });
+
+  it('落盘验证:oauth_clients/oauth_tokens 行真实存在于磁盘文件', async () => {
+    const reg = await registerClient({ client_name: 'disk-check', redirect_uris: [REDIRECT_A], token_endpoint_auth_method: 'client_secret_post' });
+    await authorizationCodeFlow({ clientId: reg.body.client_id, redirectUri: REDIRECT_A, verifier: 'y'.repeat(43) });
+
+    // 重新 initDB 从磁盘读,直接查表计数(不经过内存缓存)
+    await initDB();
+    const { query } = await import('../../src/server/db');
+    const clientRows = query<{ count: number }>('SELECT COUNT(*) as count FROM oauth_clients');
+    const tokenRows = query<{ count: number }>('SELECT COUNT(*) as count FROM oauth_tokens');
+    expect(clientRows[0].count).toBeGreaterThanOrEqual(2); // 本文件先前用例注册的 + 本次
+    expect(tokenRows[0].count).toBeGreaterThanOrEqual(2);  // access + refresh 至少一对
+  });
+});
+
+describe('authMethod 严格匹配(注册方法必须等于使用方法)', () => {
+  it('注册 basic,用 post 发 secret 必须失败', async () => {
+    const reg = await registerClient({ client_name: 'cross-bp', redirect_uris: [REDIRECT_A], token_endpoint_auth_method: 'client_secret_basic' });
+    const res = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: 'whatever', client_id: reg.body.client_id, client_secret: reg.body.client_secret
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('注册 post,用 basic 发凭据必须失败', async () => {
+    const reg = await registerClient({ client_name: 'cross-pb', redirect_uris: [REDIRECT_A], token_endpoint_auth_method: 'client_secret_post' });
+    const basic = Buffer.from(`${reg.body.client_id}:${reg.body.client_secret}`).toString('base64');
+    const res = await request(app).post('/oauth/token').set('Authorization', `Basic ${basic}`).type('form').send({
+      grant_type: 'refresh_token', refresh_token: 'whatever'
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('注册 none 的 public 客户端携带 secret 不能升级为 confidential', async () => {
+    const reg = await registerClient({ client_name: 'upgrade-attempt', redirect_uris: [REDIRECT_A], token_endpoint_auth_method: 'none' });
+    const fakeSecret = 'should-not-matter';
+    const res = await request(app).post('/oauth/token').type('form').send({
+      grant_type: 'refresh_token', refresh_token: 'whatever', client_id: reg.body.client_id, client_secret: fakeSecret
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('public(none)注册响应不包含 client_secret 字段', async () => {
+    const reg = await registerClient({ client_name: 'no-secret-response', redirect_uris: [REDIRECT_A], token_endpoint_auth_method: 'none' });
+    expect(reg.status).toBe(201);
+    expect(reg.body).not.toHaveProperty('client_secret');
   });
 });
 

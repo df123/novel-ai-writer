@@ -87,12 +87,12 @@ MCP Tool (src/server/mcp/tools/*)     ← 独立的协议层定义,不复用前�
 | `token` | 校验 `Authorization: Bearer <MCP_STATIC_TOKEN>`;不发布 OAuth 元数据 | 手动贴令牌的客户端(Inspector/curl) |
 | `oauth` | 内置 OAuth 2.1 授权服务器,发布 `/.well-known/*` 双元数据;客户端注册与令牌持久化到 SQLite(oauthStore),重启免重授权 | 符合 MCP Authorization 规范的正式公网方案(ChatGPT 用这个) |
 
-oauth 模式相关环境变量:`MCP_PUBLIC_URL`(对外基准 URL)、`MCP_OAUTH_PASSWORD`(授权页口令)。客户端/令牌存内存,服务重启后 ChatGPT 需重新授权(单用户系统可接受)。
+oauth 模式相关环境变量:`MCP_PUBLIC_URL`(对外基准 URL)、`MCP_OAUTH_PASSWORD`(授权页口令)。客户端注册与令牌经 withWriteTransaction 持久化到 SQLite(见下方 OAuth 安全要点),服务重启后 ChatGPT 无需重新授权。
 
 OAuth 安全要点(2026-09-11 整改后):
 
 - **redirect_uri 严格绑定**:授权(GET/POST)与换令牌阶段都要求 redirect_uri 与动态注册登记的完全一致,未登记的回调一律 400;
-- **client_secret 真校验**:区分 public(none,必须 PKCE S256)与 confidential(client_secret_post / client_secret_basic)客户端,secret 比对使用 timing-safe;confidential 客户端不带 secret 一律 401;
+- **client_secret 真校验**:区分 public(none,必须 PKCE S256)与 confidential(client_secret_post / client_secret_basic)客户端,secret 比对使用 timing-safe;实际使用的认证方法必须与注册方法严格一致(注册 basic 用 post 发送被拒,public 客户端携带 secret 不能升级);public 注册不签发 client_secret;confidential 客户端不带 secret 一律 401;
 - **元数据与实现一致**:`token_endpoint_auth_methods_supported = [none, client_secret_post, client_secret_basic]` 全部真实支持;
 - **RFC 9207**:授权成功重定向附带 `iss` 参数;
 - 授权码单次有效(10 分钟),refresh token 一次性轮换(30 天),访问令牌 12 小时。
@@ -119,6 +119,6 @@ OAuth 安全要点(2026-09-11 整改后):
 
 - **秒级 updated_at:同一秒内的并发写不做冲突区分**(整改任务书 §9 建议的 revision 整数版本号方案已评估,本轮未实施,作为后续项;当前实现不能宣称无竞争窗口)。
 - 限流为单实例内存计数,重启清零。
-- ~~oauth 模式客户端注册与令牌存内存,重启失效~~ → **已持久化**(2026-09-11 落地):客户端注册与访问/刷新令牌写 SQLite(oauth_clients/oauth_tokens 表,懒加载+写穿),服务重启后 ChatGPT 无需重新授权;授权码仍为内存 10 分钟短命对象;令牌永不明文写日志。
+- ~~oauth 模式客户端注册与令牌存内存,重启失效~~ → **已持久化**(2026-09-11 落地):客户端注册与访问/刷新令牌写 SQLite(oauth_clients/oauth_tokens 表,懒加载+写穿,全部经 withWriteTransaction 提交后 saveDB 落盘,并有真实落盘重载测试),服务重启后 ChatGPT 无需重新授权;授权码仍为内存 10 分钟短命对象;令牌永不明文写日志。
 - CIMD(Client ID Metadata Documents)兼容为 §11 P2 规划项,当前保留 DCR。
 - ChatGPT Plus Web host 对 write 工具的实际可用性以真机测试为准(见 CHATGPT_MCP_LIVE_TEST_REPORT.md);服务端 write 能力完整实现且 annotation 如实标注。

@@ -1,6 +1,8 @@
 // OAuth 持久化存储:客户端注册与令牌落 SQLite,服务重启后 ChatGPT 无需重新授权
 // 内存 Map 作热缓存,写穿/删穿到库;首次访问时懒加载
+// 所有写操作必须经 withWriteTransaction:sql.js 的 run() 只改内存,COMMIT 后的 saveDB() 才真正落盘
 import { query, run } from '../db';
+import { withWriteTransaction } from '../db/transaction';
 
 export interface StoredOAuthClient {
   clientId: string;
@@ -59,20 +61,24 @@ export function loadClients(): StoredOAuthClient[] {
   }));
 }
 
-/** 写入/更新客户端注册 */
+/** 写入/更新客户端注册(事务提交后落盘) */
 export function saveClient(client: StoredOAuthClient): void {
   ensureTables();
-  run(
-    'INSERT OR REPLACE INTO oauth_clients (client_id, client_secret, redirect_uris, client_name, auth_method, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [client.clientId, client.clientSecret, JSON.stringify(client.redirectUris), client.clientName, client.authMethod, client.createdAt]
-  );
+  withWriteTransaction(() => {
+    run(
+      'INSERT OR REPLACE INTO oauth_clients (client_id, client_secret, redirect_uris, client_name, auth_method, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [client.clientId, client.clientSecret, JSON.stringify(client.redirectUris), client.clientName, client.authMethod, client.createdAt]
+    );
+  });
 }
 
-/** 加载未过期令牌,顺带清理过期行 */
+/** 加载未过期令牌,顺带清理过期行(清理也落盘) */
 export function loadTokens(): StoredOAuthToken[] {
   ensureTables();
   const nowMs = Date.now();
-  run('DELETE FROM oauth_tokens WHERE expires_at < ?', [nowMs]);
+  withWriteTransaction(() => {
+    run('DELETE FROM oauth_tokens WHERE expires_at < ?', [nowMs]);
+  });
   return query<{ token: string; kind: string; client_id: string; expires_at: number }>(
     'SELECT * FROM oauth_tokens WHERE expires_at >= ?',
     [nowMs]
@@ -84,17 +90,36 @@ export function loadTokens(): StoredOAuthToken[] {
   }));
 }
 
-/** 写入令牌 */
+/** 写入令牌(事务提交后落盘) */
 export function saveToken(token: StoredOAuthToken): void {
   ensureTables();
-  run(
-    'INSERT OR REPLACE INTO oauth_tokens (token, kind, client_id, expires_at) VALUES (?, ?, ?, ?)',
-    [token.token, token.kind, token.clientId, token.expiresAt]
-  );
+  withWriteTransaction(() => {
+    run(
+      'INSERT OR REPLACE INTO oauth_tokens (token, kind, client_id, expires_at) VALUES (?, ?, ?, ?)',
+      [token.token, token.kind, token.clientId, token.expiresAt]
+    );
+  });
 }
 
-/** 删除令牌(轮换/吊销) */
+/** 原子写入一对 access/refresh 令牌(同一事务,避免只落一半) */
+export function saveTokenPair(access: StoredOAuthToken, refresh: StoredOAuthToken): void {
+  ensureTables();
+  withWriteTransaction(() => {
+    run(
+      'INSERT OR REPLACE INTO oauth_tokens (token, kind, client_id, expires_at) VALUES (?, ?, ?, ?)',
+      [access.token, access.kind, access.clientId, access.expiresAt]
+    );
+    run(
+      'INSERT OR REPLACE INTO oauth_tokens (token, kind, client_id, expires_at) VALUES (?, ?, ?, ?)',
+      [refresh.token, refresh.kind, refresh.clientId, refresh.expiresAt]
+    );
+  });
+}
+
+/** 删除令牌(轮换/吊销,事务提交后落盘) */
 export function deleteToken(token: string): void {
   ensureTables();
-  run('DELETE FROM oauth_tokens WHERE token = ?', [token]);
+  withWriteTransaction(() => {
+    run('DELETE FROM oauth_tokens WHERE token = ?', [token]);
+  });
 }

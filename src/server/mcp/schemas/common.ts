@@ -9,7 +9,7 @@ export const idSchema = z.string().uuid().describe('Entity UUID');
 
 /** 乐观并发检查：上次读取时的 updated_at（Unix 秒） */
 export const expectedUpdatedAtSchema = z.number().int().positive().optional().describe(
-  'The updated_at value you saw when reading this entity. If the server has a newer value the update is rejected with CONFLICT and you must re-read.'
+  "The entity's updatedAt value (camelCase field on entities) from your last read. If the server has a newer value the update is rejected with CONFLICT and you must re-read."
 );
 
 /** 列表数量上限 */
