@@ -49,7 +49,12 @@ export function getCreateTablesSQL(): string[] {
     'CREATE TABLE IF NOT EXISTS illustrations (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, chapter_id TEXT DEFAULT NULL, prompt TEXT NOT NULL, file_path TEXT NOT NULL, width INTEGER NOT NULL DEFAULT 0, height INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL)',
 
     'CREATE INDEX IF NOT EXISTS idx_illustrations_project_id ON illustrations(project_id)',
-    'CREATE INDEX IF NOT EXISTS idx_illustrations_chapter_id ON illustrations(chapter_id)'
+    'CREATE INDEX IF NOT EXISTS idx_illustrations_chapter_id ON illustrations(chapter_id)',
+
+    // ===== 章节版本表 =====
+    'CREATE TABLE IF NOT EXISTS chapter_versions (id TEXT PRIMARY KEY, chapter_id TEXT NOT NULL, chapter_number INTEGER NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, version INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE)',
+
+    'CREATE INDEX IF NOT EXISTS idx_chapter_versions_chapter_id ON chapter_versions(chapter_id)'
   ];
 }
 

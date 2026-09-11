@@ -12,10 +12,15 @@
 
 ### 代码质量
 - `pnpm typecheck` - 运行 TypeScript 类型检查（noEmit）
+- `pnpm typecheck:server` - 仅服务端类型检查（tsconfig.server.json）
 - `pnpm lint` - 在 src/ 目录运行 ESLint（.ts, .vue 文件）
 
 ### 测试
-当前未配置测试框架。添加测试时，请先查看 README 或询问合适的测试命令。
+- `pnpm test` - 运行全部 vitest 测试（领域服务 / REST 回归 / MCP 协议）
+- `pnpm test:server` - 仅服务层与 REST 回归测试
+- `pnpm test:mcp` - 仅 MCP 协议集成测试
+- `pnpm mcp:inspect` - 启动 MCP Inspector（URL 填 http://127.0.0.1:3002/mcp）
+- 测试使用 vitest@^2（与 vite 5 兼容，勿升 vitest 5）+ supertest；每个测试文件自动创建独立临时数据库（tests/setup.ts 设置 DB_DIR），严禁触碰真实 `~/.novel-ai-writer/database.db`
 
 ### 模型真实调用测试限制
 - 未经用户明确确认，禁止对 OpenRouter 付费模型发起真实 LLM 调用；只允许测试免费模型（价格标记为免费，或 prompt/completion 单价均为 0）

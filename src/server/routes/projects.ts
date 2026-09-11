@@ -1,62 +1,39 @@
-// Projects API 路由
+// Projects API 路由（业务逻辑在 projectService）
 import express, { Router, Request, Response } from 'express';
-import { query, run, saveDB } from '../db';
-import { generateId, now } from '../utils/helpers';
-import { formatProject } from '../utils/formatters';
+import { run, saveDB } from '../db';
+import * as projectService from '../services/domain/projectService';
 import { asyncHandler } from '../middleware/errorHandler';
-import type { DbProject, Project } from '@shared/types';
+import type { Project } from '@shared/types';
 
 const router: Router = express.Router();
 
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
 // 获取所有项目
 router.get('/', asyncHandler(async (_req: Request, res: Response) => {
-  const projects = query<DbProject>('SELECT * FROM projects ORDER BY updated_at DESC');
-  const formattedProjects: Project[] = projects.map(formatProject);
-  res.json(formattedProjects);
+  const projects: Project[] = projectService.listProjects();
+  res.json(projects);
 }));
 
 // 获取单个项目（使用正则表达式限制 :id 只能是 UUID 格式）
-router.get('/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', asyncHandler(async (req: Request, res: Response) => {
-  const projects = query<DbProject>('SELECT * FROM projects WHERE id = ?', [req.params.id]);
-  if (projects.length === 0) {
-    res.status(404).json({ error: '项目未找到' });
-    return;
-  }
-  res.json(formatProject(projects[0]));
+router.get(`/:id(${UUID_PATTERN})`, asyncHandler(async (req: Request, res: Response) => {
+  res.json(projectService.getProject(req.params.id));
 }));
 
 // 创建项目
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { title, description } = req.body;
-  const id = generateId();
-  const createdAt = now();
-  const updatedAt = now();
-
-  run('INSERT INTO projects (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-    [id, title, description || null, createdAt, updatedAt]);
-
-  saveDB();
-
-  const projects = query<DbProject>('SELECT * FROM projects WHERE id = ?', [id]);
-  res.status(201).json(formatProject(projects[0]));
+  res.status(201).json(projectService.createProject({ title, description }));
 }));
 
 // 更新项目（使用正则表达式限制 :id 只能是 UUID 格式）
-router.put('/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', asyncHandler(async (req: Request, res: Response) => {
+router.put(`/:id(${UUID_PATTERN})`, asyncHandler(async (req: Request, res: Response) => {
   const { title, description } = req.body;
-  const updatedAt = now();
-
-  run('UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ?',
-    [title, description || null, updatedAt, req.params.id]);
-
-  saveDB();
-
-  const projects = query<DbProject>('SELECT * FROM projects WHERE id = ?', [req.params.id]);
-  res.json(formatProject(projects[0]));
+  res.json(projectService.updateProject(req.params.id, { title, description }));
 }));
 
 // 删除项目（使用正则表达式限制 :id 只能是 UUID 格式）
-router.delete('/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', asyncHandler(async (req: Request, res: Response) => {
+router.delete(`/:id(${UUID_PATTERN})`, asyncHandler(async (req: Request, res: Response) => {
   run('DELETE FROM projects WHERE id = ?', [req.params.id]);
   saveDB();
   res.status(204).send();

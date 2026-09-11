@@ -23,7 +23,7 @@ export const useCharacterStore = defineStore('character', () => {
     }
   };
 
-  const createCharacter = async (character: Omit<Character, 'id' | 'projectId' | 'createdAt'>) => {
+  const createCharacter = async (character: Omit<Character, 'id' | 'projectId' | 'createdAt' | 'updatedAt' | 'deleted' | 'deletedAt'>) => {
     const projectStore = useProjectStore();
     if (!projectStore.currentProject) throw new Error('No project selected');
 

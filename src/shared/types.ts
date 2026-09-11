@@ -130,6 +130,9 @@ export interface TimelineNode {
   /** 节点创建时间戳（秒） */
   createdAt: number;
 
+  /** 节点最后更新时间戳（秒） */
+  updatedAt: number;
+
   /** 是否已删除（软删除标记） */
   deleted?: boolean;
 
@@ -189,6 +192,9 @@ export interface Character {
   
   /** 人物创建时间戳（秒） */
   createdAt: number;
+
+  /** 人物最后更新时间戳（秒） */
+  updatedAt: number;
 
   /** 是否已删除（软删除标记） */
   deleted?: boolean;
@@ -574,6 +580,46 @@ export interface UpdateChapterOrderRequest {
 }
 
 /**
+ * 章节版本接口（前端格式）
+ * 章节历史版本快照，用于版本回溯与恢复
+ */
+export interface ChapterVersion {
+  /** 版本记录唯一标识符（UUID） */
+  id: string;
+
+  /** 所属章节的 ID */
+  chapterId: string;
+
+  /** 快照时的章节编号 */
+  chapterNumber: number;
+
+  /** 快照时的章节标题 */
+  title: string;
+
+  /** 快照时的章节内容 */
+  content: string;
+
+  /** 版本号（递增） */
+  version: number;
+
+  /** 快照创建时间戳（秒） */
+  createdAt: number;
+}
+
+/**
+ * 数据库章节版本接口（数据库格式）
+ */
+export interface DbChapterVersion {
+  id: string;
+  chapter_id: string;
+  chapter_number: number;
+  title: string;
+  content: string;
+  version: number;
+  created_at: number;
+}
+
+/**
  * 导出章节响应接口
  */
 export interface ExportChaptersResponse {
@@ -715,6 +761,7 @@ export interface MiscRecord {
   content: string;
   orderIndex: number;
   createdAt: number;
+  updatedAt: number;
   deleted?: boolean;
   deletedAt?: number;
 }

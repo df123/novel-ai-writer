@@ -196,6 +196,26 @@ Responses 请求遇到 `408/425/429/500/502/503/504` 瞬时错误会重试两次
 
 > 详细路由和请求参数说明见 [docs/implementation/LLM_PROVIDER_EXPANSION.md](docs/implementation/LLM_PROVIDER_EXPANSION.md)。
 
+## ChatGPT Web MCP
+
+本项目在原 Web 系统之外,内置一个符合 MCP(Model Context Protocol)标准的服务端,供 **ChatGPT 普通聊天(Developer Mode + 自定义 MCP/App)** 调用,把 ChatGPT 变成你的小说写作前台:
+
+- **Endpoint**:`POST /mcp`(Streamable HTTP,官方 TS SDK,无状态)
+- **职责边界**:ChatGPT 负责对话与创作;MCP 只管理小说的结构化长期记忆——项目、主旨、人物、时间线、世界观、章节、版本、导出。MCP 不调用任何 LLM。
+- **数据安全**:所有写操作自动保存版本快照;支持 `expected_updated_at` 乐观并发;只允许软删除(archive),不提供项目删除/SQL/永久删除等危险工具;章节正文不进故事上下文,防 token 失控。
+- **认证**:开发环境 `MCP_AUTH_MODE=none` 放行;生产提供静态 Bearer Token 与 OAuth 2.1(PKCE + 动态客户端注册)两种模式,经 Apache HTTPS 反向代理暴露公网。
+- **原功能全部保留**:原 Web Chat、语音输入、AI 插画(ComfyUI)、Research Tools、LLM 设置、DatabasePanel 均不受影响,两套入口共享同一 Domain Service 与数据库。
+
+```bash
+# 本地测试(MCP Inspector)
+pnpm mcp:inspect        # URL 填 http://127.0.0.1:3002/mcp
+
+# 自动化测试(临时数据库,不碰真实数据)
+pnpm test
+```
+
+详细文档:[架构说明](docs/implementation/CHATGPT_MCP_ARCHITECTURE.md) · [工具清单](docs/implementation/CHATGPT_MCP_TOOLS.md) · [Apache 部署指南](docs/guides/CHATGPT_MCP_DEPLOYMENT.md)
+
 ## 资料研究工具
 
 内置 Z.AI Web Search / Web Reader、Wikipedia、Open-Meteo 历史天气和 Open Library 书籍搜索。模型可在写作时按需联网查证事实、历史背景、地理文化、天气细节和参考书；每个工具均可在「LLM设置 → 资料研究」中独立开关，并配有结果数量、正文长度和缓存限制，避免外部资料挤占小说上下文。

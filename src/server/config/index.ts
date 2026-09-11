@@ -52,7 +52,8 @@ export const ALLOWED_TABLES: readonly string[] = [
   'themes',
   'theme_history',
   'misc_records',
-  'misc_record_versions'
+  'misc_record_versions',
+  'chapter_versions'
 ] as const;
 
 /** LLM 提供商配置 */

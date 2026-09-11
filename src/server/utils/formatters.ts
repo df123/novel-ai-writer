@@ -135,6 +135,7 @@ export function formatTimelineNode(node: DbTimelineNode): TimelineNode {
     content: node.content ?? undefined,
     orderIndex: node.order_index,
     createdAt: node.created_at,
+    updatedAt: node.updated_at,
     deleted: node.deleted === 1,
     deletedAt: node.deleted_at ?? undefined
   };
@@ -150,6 +151,7 @@ export function formatCharacter(character: DbCharacter): Character {
     ...character,
     projectId: character.project_id,
     createdAt: character.created_at,
+    updatedAt: character.updated_at,
     personality: character.personality ?? undefined,
     background: character.background ?? undefined,
     relationships: character.relationships ?? undefined,
@@ -261,6 +263,7 @@ export function formatMiscRecord(record: DbMiscRecord): MiscRecord {
     content: record.content || '',
     orderIndex: record.order_index,
     createdAt: record.created_at,
+    updatedAt: record.updated_at,
     deleted: record.deleted === 1,
     deletedAt: record.deleted_at ?? undefined,
   };

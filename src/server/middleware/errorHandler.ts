@@ -6,9 +6,11 @@ import {
   AsyncMiddlewareFunction,
   RouteHandler
 } from '../types/express.types';
+import { DomainError } from '../services/domain/errors';
 
 /**
  * 错误处理中间件
+ * DomainError 按其错误码映射 HTTP 状态码，其余按 statusCode 或 500 处理
  */
 export const errorHandler: ErrorMiddlewareFunction = (
   err: Error,
@@ -16,6 +18,15 @@ export const errorHandler: ErrorMiddlewareFunction = (
   res: AppResponse,
   _next: NextFunction
 ): void => {
+  if (err instanceof DomainError) {
+    res.status(err.httpStatus).json({
+      error: err.message,
+      code: err.code,
+      ...(err.recoveryHint ? { recovery_hint: err.recoveryHint } : {})
+    });
+    return;
+  }
+
   console.error('Error:', err);
 
   const statusCode = (err as any).statusCode || 500;
