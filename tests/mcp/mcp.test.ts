@@ -78,6 +78,12 @@ describe('MCP initialize / tools/list', () => {
     expect(byName.get('get_story_context')).toContain('World entries contain a short summary only — use get_story_item for full content');
     expect(byName.get('create_timeline_event')).toContain('content — it is the only content field');
     expect(byName.get('update_timeline_event')).toContain('content — it is the only content field');
+
+    // get_story_item:实体契约字段为 updatedAt,并明确指引其作为 expected_updated_at 使用
+    const gsi = byName.get('get_story_item') || '';
+    expect(gsi).toContain('including updatedAt');
+    expect(gsi).toContain('Use the returned updatedAt value as expected_updated_at when updating the entity');
+    expect(gsi).not.toContain('including updated_at');
   });
 });
 

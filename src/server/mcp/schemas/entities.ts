@@ -58,7 +58,7 @@ export const createTimelineEventInput = {
   project_id: projectIdSchema,
   title: titleSchema.describe('Event title, e.g. "林浩进入青云宗"'),
   date: z.string().max(100).optional().describe('In-story date or time label, e.g. "第三年春"'),
-  content: z.string().max(100_000).optional().describe('Event body text (canonical field; output description is just its legacy alias)'),
+  content: z.string().max(100_000).optional().describe('Event body text. This is the canonical Timeline content field.'),
   order_index: z.number().int().min(0).max(1_000_000).optional().describe('Sort order (default 0)')
 };
 

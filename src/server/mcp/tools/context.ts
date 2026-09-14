@@ -36,7 +36,7 @@ export function registerContextTools(server: McpServer): void {
 
   server.registerTool('get_story_item', {
     title: 'Get story item',
-    description: 'Read one full entity (theme/character/timeline/world_entry/chapter) by UUID. The item must belong to the given project. Returns the complete record including updated_at for concurrency-safe updates.',
+    description: 'Read one full entity (theme/character/timeline/world_entry/chapter) by UUID. The item must belong to the given project. Returns the complete record including updatedAt. Use the returned updatedAt value as expected_updated_at when updating the entity.',
     inputSchema: getStoryItemInput,
     outputSchema: storyItemOutput,
     annotations: READ_ANNOTATIONS
