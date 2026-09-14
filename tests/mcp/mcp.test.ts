@@ -293,3 +293,59 @@ describe('输出字段命名卫生(MCP 边界去除 db 行展开重复)', () => 
     expect(dupes).toEqual([]);
   });
 });
+
+describe('Timeline MCP 输出仅含 canonical content(裁决§三/§六:移除 legacy description)', () => {
+  it('create/update_timeline_event 输出无 description,content 恒存在', async () => {
+    const created = await rpc('tools/call', {
+      name: 'create_timeline_event',
+      arguments: { project_id: projectId, title: '裁决清理事件', date: '第一年夏', content: '事件正文甲' }
+    });
+    expect(created.result.isError).toBeFalsy();
+    const event = (created.result.structuredContent as { timeline_event: Record<string, unknown> }).timeline_event;
+    expect(event).not.toHaveProperty('description');
+    expect(event.content).toBe('事件正文甲');
+
+    const updated = await rpc('tools/call', {
+      name: 'update_timeline_event',
+      arguments: { project_id: projectId, event_id: event.id, content: '事件正文乙' }
+    });
+    expect(updated.result.isError).toBeFalsy();
+    const updatedEvent = (updated.result.structuredContent as { timeline_event: Record<string, unknown> }).timeline_event;
+    expect(updatedEvent).not.toHaveProperty('description');
+    expect(updatedEvent.content).toBe('事件正文乙');
+
+    // get_story_item 全量读取同样无 description
+    const item = await rpc('tools/call', {
+      name: 'get_story_item',
+      arguments: { project_id: projectId, type: 'timeline', id: event.id as string }
+    });
+    expect(item.result.isError).toBeFalsy();
+    const full = (item.result.structuredContent as { timeline_event: Record<string, unknown> }).timeline_event;
+    expect(full).not.toHaveProperty('description');
+    expect(full.content).toBe('事件正文乙');
+
+    // 回收站与恢复输出同样剥离
+    await rpc('tools/call', {
+      name: 'archive_timeline_event',
+      arguments: { project_id: projectId, event_id: event.id as string }
+    });
+    const trash = await rpc('tools/call', {
+      name: 'list_trash',
+      arguments: { project_id: projectId, type: 'timeline' }
+    });
+    const trashed = (trash.result.structuredContent as { items: Array<Record<string, unknown>> }).items
+      .find(i => i.id === event.id);
+    expect(trashed).toBeDefined();
+    expect(trashed).not.toHaveProperty('description');
+    expect(trashed!.content).toBe('事件正文乙');
+
+    const restored = await rpc('tools/call', {
+      name: 'restore_item',
+      arguments: { project_id: projectId, type: 'timeline', id: event.id as string }
+    });
+    expect(restored.result.isError).toBeFalsy();
+    const restoredItem = (restored.result.structuredContent as { restored_item: Record<string, unknown> }).restored_item;
+    expect(restoredItem).not.toHaveProperty('description');
+    expect(restoredItem.content).toBe('事件正文乙');
+  });
+});

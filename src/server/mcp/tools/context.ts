@@ -1,7 +1,7 @@
 // MCP 工具：故事上下文/搜索/条目读取——整个 MCP 最重要的一组只读工具
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runTool } from '../server';
-import { toolOk, summarizeList } from '../result';
+import { toolOk, summarizeList, toMcpTimelineEvent } from '../result';
 import { getStoryContext } from '../../services/domain/storyContextService';
 import { searchStory, type StoryItemType } from '../../services/domain/storySearchService';
 import { getStoryItem } from '../../services/domain/storyItemService';
@@ -42,8 +42,10 @@ export function registerContextTools(server: McpServer): void {
     annotations: READ_ANNOTATIONS
   }, async ({ project_id, type, id }) => runTool('get_story_item', project_id, () => {
     const item = getStoryItem(project_id, type, id);
+    // timeline 实体经 MCP 输出适配:仅暴露 canonical content,不带 legacy description 别名
+    const timelineEvent = item.timeline_event ? toMcpTimelineEvent(item.timeline_event) : undefined;
     const label = item.theme?.title || item.character?.name || item.timeline_event?.title || item.world_entry?.title ||
       (item.chapter ? `第${item.chapter.chapterNumber}章 ${item.chapter.title}` : 'item');
-    return toolOk({ ...item }, `Retrieved ${type} "${label}".`);
+    return toolOk({ ...item, ...(timelineEvent ? { timeline_event: timelineEvent } : {}) }, `Retrieved ${type} "${label}".`);
   }));
 }

@@ -1,6 +1,7 @@
 // MCP 结果构造：所有工具同时返回 structuredContent + 人类可读 content 摘要
 // 不暴露数据库内部字段、file_path、secret 等服务器内部信息
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { TimelineNode } from '@shared/types';
 
 /** snake_case 键转 camelCase(project_id → projectId) */
 function toCamelKey(key: string): string {
@@ -42,6 +43,25 @@ export function toolOk(structured: Record<string, unknown>, summary: string): Ca
   return {
     content: [{ type: 'text', text: summary }],
     structuredContent: stripDuplicatedDbFields(structured) as Record<string, unknown>
+  };
+}
+
+/**
+ * Timeline 实体的 MCP 输出适配:移除 legacy description 别名(共享 formatter 将其构造为 content 的恒等展示镜像)
+ * MCP 只暴露 canonical content;REST / Web / 共享 formatter / 数据库行为均保持不变
+ */
+export function toMcpTimelineEvent(event: TimelineNode): Omit<TimelineNode, 'description'> & { content: string } {
+  return {
+    id: event.id,
+    projectId: event.projectId,
+    title: event.title,
+    date: event.date,
+    content: event.content ?? '',
+    orderIndex: event.orderIndex,
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
+    ...(event.deleted !== undefined ? { deleted: event.deleted } : {}),
+    ...(event.deletedAt !== undefined ? { deletedAt: event.deletedAt } : {})
   };
 }
 

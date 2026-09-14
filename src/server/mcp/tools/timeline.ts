@@ -1,7 +1,7 @@
 // MCP 工具：时间线事件写操作（更新自动快照，归档为软删除）
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runTool } from '../server';
-import { toolOk } from '../result';
+import { toolOk, toMcpTimelineEvent } from '../result';
 import {
   createTimelineEvent,
   updateTimelineEvent,
@@ -19,20 +19,20 @@ const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWor
 export function registerTimelineTools(server: McpServer): void {
   server.registerTool('create_timeline_event', {
     title: 'Create timeline event',
-    description: 'Create a timeline event (plot point) in a project. Write the body text into content; the description field in outputs is only a legacy alias of content with identical value.',
+    description: 'Create a timeline event (plot point) in a project. Write the body text into content — it is the only content field.',
     inputSchema: createTimelineEventInput,
     outputSchema: timelineEventToolOutput,
     annotations: WRITE_ANNOTATIONS
   }, async ({ project_id, title, date, content, order_index }) =>
     runTool('create_timeline_event', project_id, () => {
       const event = createTimelineEvent(project_id, { title, date, content, orderIndex: order_index });
-      return toolOk({ timeline_event: event }, `Created timeline event "${event.title}".`);
+      return toolOk({ timeline_event: toMcpTimelineEvent(event) }, `Created timeline event "${event.title}".`);
     })
   );
 
   server.registerTool('update_timeline_event', {
     title: 'Update timeline event',
-    description: 'Update a timeline event by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read (the updatedAt field of the entity). Update the body via content.',
+    description: 'Update a timeline event by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read (the updatedAt field of the entity). Update the body via content — it is the only content field.',
     inputSchema: updateTimelineEventInput,
     outputSchema: timelineEventToolOutput,
     annotations: WRITE_ANNOTATIONS
@@ -44,7 +44,7 @@ export function registerTimelineTools(server: McpServer): void {
         { createVersion: true, expectedUpdatedAt: expected_updated_at },
         { projectId: project_id }
       );
-      return toolOk({ timeline_event: event }, `Updated timeline event "${event.title}".`);
+      return toolOk({ timeline_event: toMcpTimelineEvent(event) }, `Updated timeline event "${event.title}".`);
     })
   );
 
