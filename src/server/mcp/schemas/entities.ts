@@ -58,7 +58,7 @@ export const createTimelineEventInput = {
   project_id: projectIdSchema,
   title: titleSchema.describe('Event title, e.g. "林浩进入青云宗"'),
   date: z.string().max(100).optional().describe('In-story date or time label, e.g. "第三年春"'),
-  content: z.string().max(100_000).optional().describe('Event description'),
+  content: z.string().max(100_000).optional().describe('Event body text (canonical field; output description is just its legacy alias)'),
   order_index: z.number().int().min(0).max(1_000_000).optional().describe('Sort order (default 0)')
 };
 
@@ -67,7 +67,7 @@ export const updateTimelineEventInput = {
   event_id: idSchema.describe('Timeline event UUID'),
   title: titleSchema.optional(),
   date: z.string().max(100).optional(),
-  content: z.string().max(100_000).optional(),
+  content: z.string().max(100_000).optional().describe('Event body text (canonical field)'),
   order_index: z.number().int().min(0).max(1_000_000).optional(),
   expected_updated_at: expectedUpdatedAtSchema
 };

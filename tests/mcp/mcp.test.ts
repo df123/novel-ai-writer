@@ -105,13 +105,15 @@ describe('MCP 全链路：读取 → 写入 → 并发 → 版本 → 回收站 
     });
     const character = (item.result.structuredContent as { character: { updatedAt: number } }).character;
 
-    // 用过期 updated_at 更新 → CONFLICT（可恢复错误文本）
+    // 用过期 updated_at 更新 → CONFLICT（可恢复错误文本,指引用实体 updatedAt 值重试）
     const stale = await rpc('tools/call', {
       name: 'update_character',
       arguments: { project_id: projectId, character_id: characterId, personality: '沉稳', expected_updated_at: character.updatedAt - 50 }
     });
     expect(stale.result.isError).toBe(true);
-    expect((stale.result.content as Array<{ text: string }>)[0].text).toContain('CONFLICT');
+    const conflictText = (stale.result.content as Array<{ text: string }>)[0].text;
+    expect(conflictText).toContain('CONFLICT');
+    expect(conflictText).toContain('updatedAt value as expected_updated_at');
 
     // 用正确 updated_at 更新 → 成功且自动快照
     const ok = await rpc('tools/call', {

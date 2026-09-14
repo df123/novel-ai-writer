@@ -13,7 +13,7 @@ const READ_ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, openWorld
 export function registerContextTools(server: McpServer): void {
   server.registerTool('get_story_context', {
     title: 'Get story context',
-    description: 'Get the structured story context of a project: premise (theme), characters, timeline, world entries and a chapter index. Chapter full text is NOT included — use get_chapter for content. Use this before writing or editing.',
+    description: 'Get the structured story context of a project: premise (theme), characters, timeline, world entries and a chapter index. Chapter full text is NOT included — use get_chapter for content. World entries contain a short summary only — use get_story_item for full content. Use this before writing or editing.',
     inputSchema: getStoryContextInput,
     outputSchema: storyContextOutput,
     annotations: READ_ANNOTATIONS

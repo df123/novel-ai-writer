@@ -19,7 +19,7 @@ const WRITE_ANNOTATIONS = { readOnlyHint: false, destructiveHint: false, openWor
 export function registerTimelineTools(server: McpServer): void {
   server.registerTool('create_timeline_event', {
     title: 'Create timeline event',
-    description: 'Create a timeline event (plot point) in a project.',
+    description: 'Create a timeline event (plot point) in a project. Write the body text into content; the description field in outputs is only a legacy alias of content with identical value.',
     inputSchema: createTimelineEventInput,
     outputSchema: timelineEventToolOutput,
     annotations: WRITE_ANNOTATIONS
@@ -32,7 +32,7 @@ export function registerTimelineTools(server: McpServer): void {
 
   server.registerTool('update_timeline_event', {
     title: 'Update timeline event',
-    description: 'Update a timeline event by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read.',
+    description: 'Update a timeline event by UUID. A snapshot of the old state is saved automatically. Pass expected_updated_at from your last read (the updatedAt field of the entity). Update the body via content.',
     inputSchema: updateTimelineEventInput,
     outputSchema: timelineEventToolOutput,
     annotations: WRITE_ANNOTATIONS

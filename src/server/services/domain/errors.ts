@@ -69,7 +69,7 @@ export function assertUpdatedAtMatch(
   if (expected !== undefined && expected !== actual) {
     throw conflict(
       `${entityLabel} was modified after it was read.`,
-      `Fetch the latest ${entityLabel.toLowerCase()} (get_story_item) and retry with the new updated_at.`
+      `Fetch the latest ${entityLabel.toLowerCase()} (get_story_item) and retry using its updatedAt value as expected_updated_at.`
     );
   }
 }
