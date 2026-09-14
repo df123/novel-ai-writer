@@ -71,7 +71,7 @@ import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { Plus, Edit, Delete, Clock, CopyDocument } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { marked } from 'marked';
+import { renderSafeMarkdown } from '../utils/safeMarkdown';
 import { useThemeStore } from '../stores/themeStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useChangeFlagStore } from '../stores/changeFlagStore';
@@ -80,11 +80,6 @@ import ThemeHistoryDialog from './ThemeHistoryDialog.vue';
 import ChangeDiffDialog from './ChangeDiffDialog.vue';
 import type { DiffSection } from '../utils/diff';
 import type { Theme } from '@shared/types';
-
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-});
 
 const themeStore = useThemeStore();
 const projectStore = useProjectStore();
@@ -124,7 +119,7 @@ const handleViewThemeDiff = async () => {
 const renderedContent = computed(() => {
   if (!theme.value) return '';
   try {
-    return marked(theme.value.content);
+    return renderSafeMarkdown(theme.value.content);
   } catch (error) {
     console.error('Markdown渲染失败:', error);
     return theme.value.content;

@@ -68,7 +68,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Edit } from '@element-plus/icons-vue';
-import { marked } from 'marked';
+import { renderSafeMarkdown } from '../utils/safeMarkdown';
 
 interface ContentViewerSection {
   label: string;
@@ -100,11 +100,6 @@ const emit = defineEmits<{
   (e: 'edit'): void;
 }>();
 
-marked.setOptions({
-  breaks: true,
-  gfm: true
-});
-
 const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value)
@@ -117,7 +112,7 @@ const renderedSections = computed(() => props.sections.map(section => ({
 
 function renderMarkdown(content: string): string {
   try {
-    return marked(content);
+    return renderSafeMarkdown(content);
   } catch (error) {
     console.error('Markdown渲染失败:', error);
     return content;

@@ -340,6 +340,7 @@
 import { ref, watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useAuthStore } from '../stores/authStore';
 import { ElMessage } from 'element-plus';
 
 interface Props {
@@ -353,6 +354,7 @@ const emit = defineEmits<{
 }>();
 
 const settingsStore = useSettingsStore();
+const authStore = useAuthStore();
 const {
   deepseekApiKey,
   openrouterApiKey,
@@ -476,6 +478,7 @@ watch(visible, async (val) => {
 const handleSaveDeepSeek = async () => {
   try {
     await updateSettings({ deepseekApiKey: deepseekKey.value });
+    clearSecretInputsIfPublic();
     ElMessage.success('DeepSeek API密钥已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
@@ -485,6 +488,7 @@ const handleSaveDeepSeek = async () => {
 const handleSaveOpenRouter = async () => {
   try {
     await updateSettings({ openrouterApiKey: openrouterKey.value });
+    clearSecretInputsIfPublic();
     ElMessage.success('OpenRouter API密钥已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
@@ -498,6 +502,7 @@ const handleSaveZai = async () => {
       zaiReasoningEnabled: zaiReasoningValue.value,
       zaiReasoningEffort: zaiEffortValue.value,
     });
+    clearSecretInputsIfPublic();
     ElMessage.success('Z.AI设置已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
@@ -511,6 +516,7 @@ const handleSaveOpencode = async () => {
       opencodeReasoningEnabled: opencodeReasoningValue.value,
       opencodeReasoningEffort: opencodeEffortValue.value,
     });
+    clearSecretInputsIfPublic();
     ElMessage.success('OpenCode设置已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
@@ -525,10 +531,21 @@ const handleSaveCliproxy = async () => {
       cliproxyReasoningEnabled: cliproxyReasoningValue.value,
       cliproxyReasoningEffort: cliproxyEffortValue.value,
     });
+    clearSecretInputsIfPublic();
     ElMessage.success('CLI Proxy API设置已保存，模型列表需手动刷新');
   } catch (error) {
     ElMessage.error('保存失败: ' + (error as Error).message);
   }
+};
+
+// 公网模式：密钥不回显，保存成功后立即清空输入框（设计书 §20）
+const clearSecretInputsIfPublic = () => {
+  if (authStore.appMode !== 'public') return;
+  deepseekKey.value = '';
+  openrouterKey.value = '';
+  zaiKey.value = '';
+  opencodeKey.value = '';
+  cliproxyKey.value = '';
 };
 
 const handleSaveResearch = async () => {

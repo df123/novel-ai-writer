@@ -1,7 +1,10 @@
 // 语音输入 API 路由:接收前端录音,转发本地 FunASR 服务转写为文本
+// public 模式（设计书 §28）:8MB 上限、并发=2、地址来自环境变量、status 不回显内部地址
 import express, { Router, Request, Response } from 'express';
 import { query } from '../db';
 import { asyncHandler } from '../middleware/errorHandler';
+import { isPublicMode, getServiceBaseUrl } from '../config';
+import { withResourceSlot, ResourceBusyError } from '../web/resourceLimits';
 import type { DbSetting } from '@shared/types';
 
 const router: Router = express.Router();
@@ -10,6 +13,10 @@ const router: Router = express.Router();
 const DEFAULT_FUNASR_BASE_URL = 'http://127.0.0.1:3010';
 
 function getFunasrBaseUrl(): string {
+  // 公网模式地址由服务器环境变量固定，浏览器无法控制（SSRF 收敛）
+  if (isPublicMode()) {
+    return getServiceBaseUrl('funasr');
+  }
   const setting = query<DbSetting>('SELECT value FROM settings WHERE key = ?', ['speech_base_url'])[0];
   return setting?.value || DEFAULT_FUNASR_BASE_URL;
 }
@@ -25,16 +32,22 @@ router.get('/status', asyncHandler(async (_req: Request, res: Response) => {
   try {
     const response = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(3000) });
     const data = await response.json() as { model?: string; device?: string };
-    res.json({ available: response.ok, baseUrl, model: data.model ?? null, device: data.device ?? null });
+    // 公网模式不回显内部服务地址
+    const body: Record<string, unknown> = { available: response.ok, model: data.model ?? null, device: data.device ?? null };
+    if (!isPublicMode()) body.baseUrl = baseUrl;
+    res.json(body);
   } catch {
-    res.json({ available: false, baseUrl, model: null, device: null });
+    const body: Record<string, unknown> = { available: false, model: null, device: null };
+    if (!isPublicMode()) body.baseUrl = baseUrl;
+    res.json(body);
   }
 }));
 
 // 接收原始 WAV 音频字节,以 multipart 转发 FunASR 的 OpenAI 兼容接口
 router.post(
   '/transcribe',
-  express.raw({ type: ['audio/wav', 'audio/webm', 'audio/ogg', 'audio/mpeg', 'application/octet-stream'], limit: '50mb' }),
+  // 前端录音最长 120 秒、16kHz 单声道 WAV,约数 MB;公网收紧到 8MB（设计书 §28）
+  express.raw({ type: ['audio/wav', 'audio/webm', 'audio/ogg', 'audio/mpeg', 'application/octet-stream'], limit: isPublicMode() ? '8mb' : '50mb' }),
   asyncHandler(async (req: Request, res: Response) => {
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       res.status(400).json({ error: '未收到有效的音频数据' });
@@ -48,13 +61,19 @@ router.post(
 
     let response: globalThis.Response;
     try {
-      response = await fetch(`${baseUrl}/v1/audio/transcriptions`, {
-        method: 'POST',
-        body: form,
-        signal: AbortSignal.timeout(120000),
-      });
-    } catch {
-      res.status(502).json({ error: `无法连接语音识别服务(${baseUrl}),请确认 FunASR 已启动` });
+      response = await withResourceSlot('speech', () =>
+        fetch(`${baseUrl}/v1/audio/transcriptions`, {
+          method: 'POST',
+          body: form,
+          signal: AbortSignal.timeout(120000),
+        })
+      );
+    } catch (error) {
+      if (error instanceof ResourceBusyError) {
+        res.status(429).header('Retry-After', String(error.retryAfterSeconds)).json({ error: error.message });
+        return;
+      }
+      res.status(502).json({ error: `无法连接语音识别服务,请确认 FunASR 已启动` });
       return;
     }
 

@@ -17,12 +17,13 @@ fi
 
 mkdir -p "${MODEL_CACHE_DIR}"
 
+# 只绑定回环地址:公网无法直连语音服务(与提示文字一致)
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --gpus all \
   --restart unless-stopped \
   --shm-size 2gb \
-  -p ${HOST_PORT}:8000 \
+  -p 127.0.0.1:${HOST_PORT}:8000 \
   -e FUNASR_DEVICE=cuda \
   -e FUNASR_MODEL=sensevoice \
   -v "${MODEL_CACHE_DIR}:/root/.cache" \

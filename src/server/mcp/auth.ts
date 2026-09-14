@@ -6,6 +6,7 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { loadClients, saveClient, loadTokens, saveTokenPair, deleteToken, rotateRefreshToken } from './oauthStore';
+import { oauthRateLimit, recordOauthAuthorizeFailure } from '../web/webRateLimit';
 
 /** 认证模式 */
 export type McpAuthMode = 'none' | 'token' | 'oauth';
@@ -199,8 +200,7 @@ function requireRegisteredRedirect(client: OAuthClient, redirectUri: string | un
 }
 
 /** 简单授权页：用户输入访问口令批准 ChatGPT 的授权请求 */
-oauthRouter.get('/authorize', (req: Request, res: Response) => {
-  ensurePersisted();
+oauthRouter.get('/authorize', (req: Request, res: Response) => {  ensurePersisted();
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method } = req.query as Record<string, string>;
   const client = client_id ? clients.get(client_id) : undefined;
   if (!client) {
@@ -242,6 +242,11 @@ oauthRouter.get('/authorize', (req: Request, res: Response) => {
 
 oauthRouter.post('/authorize', (req: Request, res: Response) => {
   ensurePersisted();
+  // 口令爆破限流：同 IP 失败次数过多直接拒绝（P1 hardening）
+  if (!oauthRateLimit('oauthAuthorizeFail', req.ip || 'unknown')) {
+    res.status(429).send('Too many authorize attempts, try again later');
+    return;
+  }
   const { client_id, redirect_uri, state, code_challenge, code_challenge_method, password } = req.body as Record<string, string>;
   const expectedPassword = process.env.MCP_OAUTH_PASSWORD || '';
   if (!expectedPassword) {
@@ -262,6 +267,7 @@ oauthRouter.post('/authorize', (req: Request, res: Response) => {
   }
   if (!password || !safeEqual(password, expectedPassword)) {
     console.warn('[oauth] authorize 拒绝:访问口令错误');
+    recordOauthAuthorizeFailure(req.ip || 'unknown');
     res.status(401).setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send('<p>口令错误。<a href="javascript:history.back()">返回重试</a></p>');
     return;
@@ -346,6 +352,11 @@ function authenticateClient(req: Request, body: Record<string, string>): OAuthCl
 
 /** OAuth 令牌端点（authorization_code + refresh_token，PKCE 校验） */
 oauthRouter.post('/token', (req: Request, res: Response) => {
+  // 端点级限流（P1 hardening，不改变协议）
+  if (!oauthRateLimit('oauthToken', req.ip || 'unknown')) {
+    res.status(429).json({ error: 'slow_down', error_description: 'Too many token requests' });
+    return;
+  }
   const body = req.body as Record<string, string>;
   const grantType = body.grant_type;
 
@@ -431,7 +442,12 @@ function tokenResponse(pair: { access: TokenRecord; refresh: TokenRecord; expire
 }
 
 /** 动态客户端注册（RFC 7591 / MCP 规范要求） */
-oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
+oauthRouter.post('/register', express.json({ limit: '16kb' }), (req: Request, res: Response) => {
+  // 注册端点限流 + 注册体字段限制（P1 hardening，防注册表被灌爆）
+  if (!oauthRateLimit('oauthRegister', req.ip || 'unknown')) {
+    res.status(429).json({ error: 'slow_down', error_description: 'Too many registration requests' });
+    return;
+  }
   const body = req.body as {
     client_name?: string;
     redirect_uris?: string[];
@@ -439,6 +455,18 @@ oauthRouter.post('/register', express.json(), (req: Request, res: Response) => {
   };
   if (!body.redirect_uris || !Array.isArray(body.redirect_uris) || body.redirect_uris.length === 0) {
     res.status(400).json({ error: 'invalid_redirect_uri' });
+    return;
+  }
+  if (body.redirect_uris.length > 5) {
+    res.status(400).json({ error: 'invalid_client_metadata', error_description: 'too many redirect_uris (max 5)' });
+    return;
+  }
+  if (body.redirect_uris.some(uri => typeof uri !== 'string' || uri.length > 512)) {
+    res.status(400).json({ error: 'invalid_redirect_uri', error_description: 'redirect_uri too long (max 512 chars)' });
+    return;
+  }
+  if (typeof body.client_name === 'string' && body.client_name.length > 128) {
+    res.status(400).json({ error: 'invalid_client_metadata', error_description: 'client_name too long (max 128 chars)' });
     return;
   }
 

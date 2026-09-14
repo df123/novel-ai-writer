@@ -1,14 +1,18 @@
 // Express 应用工厂：注册全部中间件与路由，供 index.ts 启动与测试复用
+// public 模式（设计书 §16/§17/§19/§29）：Web 门卫只挂 /api/*，MCP/OAuth/well-known 保持原认证模型
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 
 import * as fs from 'fs';
-import { dbDir } from './config';
+import { dbDir, isPublicMode } from './config';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { webApiGuard, securityHeaders, apiNoStore } from './web/webSecurity';
+import { rateLimitMiddleware } from './web/webRateLimit';
 import type { App } from './types/express.types';
 
 // 导入路由
+import webAuthRouter from './routes/webAuth';
 import projectsRouter from './routes/projects';
 import chatsRouter from './routes/chats';
 import messagesRouter from './routes/messages';
@@ -27,37 +31,65 @@ import speechRouter from './routes/speech';
 import illustrationsRouter from './routes/illustrations';
 import mcpRouter from './routes/mcp';
 
+/** 请求日志：路径脱敏（下载令牌不落日志）且不记录 query string（设计书 §37/§39） */
+function logRequestMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const start = Date.now();
+  res.on('finish', () => {
+    const timestamp = new Date().toISOString();
+    const safePath = req.path.startsWith('/mcp/download/')
+      ? '/mcp/download/[REDACTED]'
+      : req.path;
+    console.log(`[${timestamp}] ${req.method} ${safePath} ${res.statusCode} ${Date.now() - start}ms`);
+  });
+  next();
+}
+
 /**
  * 创建 Express 应用（需在 initDB 完成后调用）
  */
 export function createApp(): App {
   const app: App = express();
 
-  // 中间件
-  app.use(cors());
-  app.use(express.json({ limit: '50mb' }));
+  if (isPublicMode()) {
+    // 公网部署在 Apache 反代之后，取真实客户端 IP 供限流使用
+    app.set('trust proxy', true);
+    // 同源 SPA，公网完全不需要 CORS（设计书 §19）
+  } else {
+    app.use(cors());
+  }
 
-  // 请求日志中间件（含状态码与耗时，便于排查 MCP/OAuth 连接问题）
-  app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] ${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - start}ms`);
-    });
-    next();
-  });
+  // 请求体上限：公网收紧到 4MB（章节正文远低于此），内网保持 50MB（设计书 §29）
+  app.use(express.json({ limit: isPublicMode() ? '4mb' : '50mb' }));
+  app.use(logRequestMiddleware);
+
+  if (isPublicMode()) {
+    app.use(securityHeaders);
+  }
 
   // 确保数据库目录存在
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  // 注册路由（具体路径优先于通用路径）
+  // ===== Web API（/api/*）：public 模式统一过会话+CSRF 门卫与常规限流 =====
   console.log('=== 开始注册路由 ===');
+  app.use('/api', apiNoStore);
+  if (isPublicMode()) {
+    app.use('/api', webApiGuard);
+    app.use('/api', rateLimitMiddleware('api'));
+  }
+
+  app.use('/api/auth', webAuthRouter);
   app.use('/api/settings', settingsRouter);
-  app.use('/api/llm', llmRouter);
+  // 高成本接口限流仅在 public 模式启用（设计书 §30；local 保持现状）
+  const withLimit = (name: 'llm' | 'research' | 'speech' | 'illustration' | 'export') =>
+    isPublicMode() ? rateLimitMiddleware(name) : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
+  app.use('/api/llm', withLimit('llm'), llmRouter);
   app.use('/api/prompts', promptsRouter);
-  app.use('/api/db', databaseRouter);
+  // 数据库管理台仅内网注册；public 模式整个 /api/db 不存在（设计书 §6/P0-3）
+  if (!isPublicMode()) {
+    app.use('/api/db', databaseRouter);
+  }
   app.use('/api/projects', projectsRouter);
   app.use('/api/projects/:projectId/chapters', chaptersRouter);
   app.use('/api/themes', themesRouter);
@@ -68,19 +100,29 @@ export function createApp(): App {
   app.use('/api', charactersRouter);
   app.use('/api', exportRouter);
   app.use('/api', miscRecordsRouter);
-  app.use('/api/research', researchRouter);
-  app.use('/api/speech', speechRouter);
-  app.use('/api/illustrations', illustrationsRouter);
-  console.log('=== 路由注册完成 ===');
+  app.use('/api/research', withLimit('research'), researchRouter);
+  app.use('/api/speech', withLimit('speech'), speechRouter);
+  app.use('/api/illustrations', withLimit('illustration'), illustrationsRouter);
+  console.log(`=== 路由注册完成（APP_MODE=${isPublicMode() ? 'public' : 'local'}） ===`);
 
   // MCP 及其配套端点（/mcp、/health、well-known、导出下载）
-  // 必须在 SPA fallback 与 404 之前注册，避免被 index.html 吞掉
+  // 必须在 SPA fallback 与 404 之前注册，避免被 index.html 吞掉；
+  // Web 会话/CSRF 门卫只挂 /api/*，此处刻意不套用（设计书 §16）
   app.use(mcpRouter);
 
   // 托管前端静态文件（生产模式）
   if (process.env.NODE_ENV !== 'development') {
     const rendererPath = path.resolve(process.cwd(), 'dist/renderer');
-    app.use(express.static(rendererPath));
+    // 带哈希的构建产物可长期缓存，index.html 必须每次校验（设计书 §38）
+    app.use(express.static(rendererPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }
+    }));
 
     // SPA fallback：非 API/MCP 请求返回 index.html
     app.get('*', (req, res, next) => {

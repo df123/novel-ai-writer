@@ -3,12 +3,64 @@ import type { TableInfo, TableDataResponse, QueryResponse, CreateThemeRequest, U
 
 const API_BASE_URL = '/api';
 
+/**
+ * Web 安全上下文（public 模式）：由 authStore 在会话加载/登录/注销时更新。
+ * 放在本模块避免 axios 实例与 Pinia store 循环依赖。
+ */
+const webSecurityContext = {
+  appMode: 'local' as 'local' | 'public',
+  csrfToken: null as string | null,
+  onUnauthorized: null as (() => void) | null
+};
+
+export const webSecurity = {
+  configure(update: Partial<typeof webSecurityContext>): void {
+    Object.assign(webSecurityContext, update);
+  },
+  getCsrfToken(): string | null {
+    return webSecurityContext.csrfToken;
+  },
+  isPublicMode(): boolean {
+    return webSecurityContext.appMode === 'public';
+  }
+};
+
+const UNSAFE_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// 公网模式：非安全方法统一携带 CSRF 令牌（设计书 §15）
+api.interceptors.request.use((config) => {
+  if (
+    webSecurityContext.appMode === 'public' &&
+    webSecurityContext.csrfToken &&
+    UNSAFE_METHODS.has((config.method || 'get').toLowerCase())
+  ) {
+    config.headers = config.headers ?? {};
+    (config.headers as Record<string, string>)['X-CSRF-Token'] = webSecurityContext.csrfToken;
+  }
+  return config;
+});
+
+// 公网模式：会话过期/失效统一交回 authStore 处理（回登录页）
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      webSecurityContext.appMode === 'public' &&
+      error?.response?.status === 401 &&
+      !String(error?.config?.url || '').includes('/auth/')
+    ) {
+      webSecurityContext.onUnauthorized?.();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Projects
 export const projectApi = {
@@ -122,11 +174,14 @@ export const llmApi = {
     },
     signal?: AbortSignal
   ) => {
+    // 流式请求绕过 axios，公网模式需手动补 CSRF 头（设计书 §15）
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (webSecurity.isPublicMode() && webSecurity.getCsrfToken()) {
+      headers['X-CSRF-Token'] = webSecurity.getCsrfToken()!;
+    }
     return fetch(`${API_BASE_URL}/llm/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({ provider, messages, options }),
       signal,
     });
@@ -140,9 +195,16 @@ export const settingsApi = {
 };
 
 // Models
+// 公网模式：不传 apiKey/baseUrl（服务端从加密设置解析）；local 模式保留原有行为
 export const modelsApi = {
-  list: (provider: string, apiKey: string, baseUrl?: string) =>
-    api.post(`/llm/models/${provider}`, { apiKey, baseUrl }),
+  list: (provider: string, apiKey?: string, baseUrl?: string) => {
+    const body: Record<string, string> = {};
+    if (!webSecurity.isPublicMode()) {
+      if (apiKey) body.apiKey = apiKey;
+      if (baseUrl) body.baseUrl = baseUrl;
+    }
+    return api.post(`/llm/models/${provider}`, body);
+  }
 };
 
 // 资料研究 API

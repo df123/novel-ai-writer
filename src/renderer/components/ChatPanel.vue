@@ -353,15 +353,10 @@ import { speechApi } from '../utils/api';
 import { startRecording, toWav16kMono, isRecordingSupported, type VoiceRecorder } from '../utils/audio';
 import ResearchResultCard from './ResearchResultCard.vue';
 import { formatTimestamp } from '../../shared/utils';
-import { marked } from 'marked';
+import { renderSafeMarkdown } from '../utils/safeMarkdown';
 import { COMMANDS, COMMAND_GROUP_LABELS, CommandGroup, type Command } from '../utils/commands';
 import { createResearchResultView, type ResearchResultView } from '../utils/researchResults';
 import type { InputInstance } from 'element-plus';
-
-marked.setOptions({
-  breaks: true,
-  gfm: true
-});
 
 const chatStore = useChatStore();
 const projectStore = useProjectStore();
@@ -929,7 +924,7 @@ const displayReasoning = (message: Message): string => {
 
 const renderMarkdown = (content: string) => {
   try {
-    return marked(content);
+    return renderSafeMarkdown(content);
   } catch (error) {
     console.error('Markdown render error:', error);
     return content;

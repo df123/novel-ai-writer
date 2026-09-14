@@ -53,6 +53,9 @@ interface ChatStreamOptions {
 
   /** CLI Proxy API 推理强度 */
   cliproxyReasoningEffort?: string;
+
+  /** 客户端断开时中止上游请求的信号（公网资源保护） */
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -868,11 +871,14 @@ async function readErrorMessage(response: FetchResponse): Promise<string> {
 async function postLLMStream(
   url: string,
   headers: Record<string, string>,
-  body: string
+  body: string,
+  signal?: AbortSignal
 ): Promise<FetchResponse> {
   try {
-    return await fetch(url, { method: 'POST', headers, body });
+    return await fetch(url, { method: 'POST', headers, body, signal });
   } catch (error) {
+    // 客户端断开导致的中止不是错误，原样抛出让上层静默收尾
+    if ((error as Error).name === 'AbortError') throw error;
     const cause = (error as { cause?: unknown }).cause;
     const causeMessage = cause instanceof Error
       ? `${cause.name}: ${cause.message}`
@@ -894,10 +900,11 @@ function wait(ms: number): Promise<void> {
 async function postChatLLMStreamWithRetry(
   url: string,
   headers: Record<string, string>,
-  body: string
+  body: string,
+  signal?: AbortSignal
 ): Promise<FetchResponse> {
   for (let attempt = 0; attempt <= CHAT_RETRY_DELAYS_MS.length; attempt += 1) {
-    const response = await postLLMStream(url, headers, body);
+    const response = await postLLMStream(url, headers, body, signal);
     const delay = CHAT_RETRY_DELAYS_MS[attempt];
     if (response.ok || delay === undefined || !CHAT_TRANSIENT_RETRY_STATUSES.has(response.status)) {
       return response;
@@ -917,10 +924,11 @@ async function postChatLLMStreamWithRetry(
 async function postResponsesLLMStreamWithRetry(
   url: string,
   headers: Record<string, string>,
-  body: string
+  body: string,
+  signal?: AbortSignal
 ): Promise<FetchResponse> {
   for (let attempt = 0; attempt <= RESPONSES_RETRY_DELAYS_MS.length; attempt += 1) {
-    const response = await postLLMStream(url, headers, body);
+    const response = await postLLMStream(url, headers, body, signal);
     const delay = RESPONSES_RETRY_DELAYS_MS[attempt];
     if (
       response.ok ||
@@ -1075,7 +1083,8 @@ async function fetchLLMStream(
         endpoint.modelName,
         cleanedMessages,
         options
-      ))
+      )),
+      options.abortSignal
     );
 
     if (!chatResponse.ok) {
@@ -1099,7 +1108,8 @@ async function fetchLLMStream(
       endpoint.modelName,
       messages,
       options
-    ))
+    )),
+    options.abortSignal
   );
 
   if (responsesResponse.ok) {
@@ -1155,13 +1165,20 @@ export async function chatStream(
   const cleanedMessages = cleanMessages(messages);
 
   for (let attempt = 0; attempt <= RESPONSES_STREAM_RETRY_DELAYS_MS.length; attempt += 1) {
-    const streamResult = await fetchLLMStream(
-      provider,
-      endpoint,
-      cleanedMessages,
-      messages,
-      options
-    );
+    let streamResult: LLMStreamResult;
+    try {
+      streamResult = await fetchLLMStream(
+        provider,
+        endpoint,
+        cleanedMessages,
+        messages,
+        options
+      );
+    } catch (error) {
+      // 客户端已断开：静默结束，不再向上游重试
+      if ((error as Error).name === 'AbortError' || options.abortSignal?.aborted) return;
+      throw error;
+    }
     const canRetry = streamResult.usesResponsesApi && attempt < RESPONSES_STREAM_RETRY_DELAYS_MS.length;
     const shouldRetry = await pipeLLMStreamToClient(streamResult, res, canRetry);
     if (!shouldRetry) return;

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { settingsApi, modelsApi } from '../utils/api';
+import { settingsApi, modelsApi, webSecurity } from '../utils/api';
 import { ElMessage } from 'element-plus';
+import { useAuthStore } from './authStore';
 import type { Model } from '../../shared/types';
 
 interface ModelCacheEntry {
@@ -11,19 +12,6 @@ interface ModelCacheEntry {
 }
 
 const MODEL_CACHE_STORAGE_KEY = 'novel-ai:model-caches:v1';
-
-function createProviderSignature(input: string): string {
-  let first = 0x811c9dc5;
-  let second = 0x01000193;
-
-  for (let i = 0; i < input.length; i += 1) {
-    const code = input.charCodeAt(i);
-    first = (first ^ code) * 0x01000193 >>> 0;
-    second = (second + code * (i + 1)) >>> 0;
-  }
-
-  return `${first.toString(36)}-${second.toString(36)}`;
-}
 
 function readModelCaches(): Record<string, ModelCacheEntry> {
   try {
@@ -53,12 +41,17 @@ function writeModelCaches(caches: Record<string, ModelCacheEntry>): void {
 }
 
 export const useSettingsStore = defineStore('settings', () => {
+  const authStore = useAuthStore();
   const deepseekApiKey = ref('');
   const openrouterApiKey = ref('');
   const zaiApiKey = ref('');
   const opencodeApiKey = ref('');
   const cliproxyApiKey = ref('');
   const cliproxyBaseUrl = ref('http://127.0.0.1:8317/v1');
+  // public 模式下密钥不下发浏览器，仅保留"是否已配置"标记（设计书 §20/§22）
+  const providerConfigured = ref<Record<string, boolean>>({});
+  // 模型缓存签名改用服务端配置版本号，不再由密钥派生任何本地数据（设计书 §22）
+  const providerConfigVersion = ref(1);
   const temperature = ref(0.7);
   const selectedProvider = ref('deepseek');
   const selectedModel = ref('deepseek-v4-flash');
@@ -122,51 +115,65 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   };
 
-  const clearModelCache = (provider: string) => {
-    if (!modelCaches.value[provider]) return;
+  // public 模式：密钥值为空、只更新 configured 标记；local 模式：完整回显（现状）
+  const applySettingsResponse = (settings: Record<string, unknown>) => {
+    const decryptFailed = settings._decryptFailed as string[] | undefined;
+    if (decryptFailed) {
+      checkDecryptFailed(decryptFailed);
+      delete settings._decryptFailed;
+    }
 
-    const nextCaches = { ...modelCaches.value };
-    delete nextCaches[provider];
-    modelCaches.value = nextCaches;
-    writeModelCaches(nextCaches);
+    const isPublic = authStore.appMode === 'public' || webSecurity.isPublicMode();
+    providerConfigVersion.value = Number(settings.providerConfigVersion) || 1;
+
+    if (isPublic) {
+      deepseekApiKey.value = '';
+      openrouterApiKey.value = '';
+      zaiApiKey.value = '';
+      opencodeApiKey.value = '';
+      cliproxyApiKey.value = '';
+      cliproxyBaseUrl.value = '';
+      providerConfigured.value = {
+        deepseek: settings.deepseek_api_key_configured === true,
+        openrouter: settings.openrouter_api_key_configured === true,
+        zai: settings.zai_api_key_configured === true,
+        opencode: settings.opencode_api_key_configured === true,
+        cliproxy: settings.cliproxy_api_key_configured === true
+      };
+    } else {
+      deepseekApiKey.value = (settings.deepseek_api_key as string) || '';
+      openrouterApiKey.value = (settings.openrouter_api_key as string) || '';
+      zaiApiKey.value = (settings.zai_api_key as string) || '';
+      opencodeApiKey.value = (settings.opencode_api_key as string) || '';
+      cliproxyApiKey.value = (settings.cliproxy_api_key as string) || '';
+      cliproxyBaseUrl.value = (settings.cliproxy_base_url as string) || 'http://127.0.0.1:8317/v1';
+      providerConfigured.value = {};
+    }
+
+    temperature.value = settings.temperature ? parseFloat(String(settings.temperature)) : 0.7;
+    selectedProvider.value = (settings.selected_provider as string) || 'deepseek';
+    selectedModel.value = (settings.selected_model as string) || 'deepseek-v4-flash';
+    reasoningEffort.value = (settings.reasoning_effort as string) || 'high';
+    zaiReasoningEnabled.value = settings.zai_reasoning_enabled !== 'false';
+    zaiReasoningEffort.value = (settings.zai_reasoning_effort as string) || 'max';
+    opencodeReasoningEnabled.value = settings.opencode_reasoning_enabled === 'true';
+    opencodeReasoningEffort.value = (settings.opencode_reasoning_effort as string) || 'none';
+    cliproxyReasoningEnabled.value = settings.cliproxy_reasoning_enabled === 'true';
+    cliproxyReasoningEffort.value = (settings.cliproxy_reasoning_effort as string) || 'auto';
+    researchWebSearchEnabled.value = settings.research_web_search_enabled !== 'false';
+    researchWebReaderEnabled.value = settings.research_web_reader_enabled !== 'false';
+    researchWikipediaEnabled.value = settings.research_wikipedia_enabled !== 'false';
+    researchWeatherEnabled.value = settings.research_weather_enabled !== 'false';
+    researchBooksEnabled.value = settings.research_books_enabled !== 'false';
+    showThinkingContent.value = settings.show_thinking_content === 'true' || settings.show_thinking_content === true;
+    showToolCalls.value = settings.show_tool_calls === 'true' || settings.show_tool_calls === true;
   };
 
   const loadSettings = async () => {
     isLoading.value = true;
     try {
       const response = await settingsApi.get();
-      const settings = response.data;
-
-      // 检查是否有解密失败的 API 密钥
-      const decryptFailed = settings._decryptFailed as string[] | undefined;
-      if (decryptFailed) {
-        checkDecryptFailed(decryptFailed);
-        delete settings._decryptFailed;
-      }
-
-      deepseekApiKey.value = settings.deepseek_api_key || '';
-      openrouterApiKey.value = settings.openrouter_api_key || '';
-      zaiApiKey.value = settings.zai_api_key || '';
-      opencodeApiKey.value = settings.opencode_api_key || '';
-      cliproxyApiKey.value = settings.cliproxy_api_key || '';
-      cliproxyBaseUrl.value = settings.cliproxy_base_url || 'http://127.0.0.1:8317/v1';
-      temperature.value = settings.temperature ? parseFloat(settings.temperature) : 0.7;
-      selectedProvider.value = settings.selected_provider || 'deepseek';
-      selectedModel.value = settings.selected_model || 'deepseek-v4-flash';
-      reasoningEffort.value = settings.reasoning_effort || 'high';
-      zaiReasoningEnabled.value = settings.zai_reasoning_enabled !== 'false';
-      zaiReasoningEffort.value = settings.zai_reasoning_effort || 'max';
-      opencodeReasoningEnabled.value = settings.opencode_reasoning_enabled === 'true';
-      opencodeReasoningEffort.value = settings.opencode_reasoning_effort || 'none';
-      cliproxyReasoningEnabled.value = settings.cliproxy_reasoning_enabled === 'true';
-      cliproxyReasoningEffort.value = settings.cliproxy_reasoning_effort || 'auto';
-      researchWebSearchEnabled.value = settings.research_web_search_enabled !== 'false';
-      researchWebReaderEnabled.value = settings.research_web_reader_enabled !== 'false';
-      researchWikipediaEnabled.value = settings.research_wikipedia_enabled !== 'false';
-      researchWeatherEnabled.value = settings.research_weather_enabled !== 'false';
-      researchBooksEnabled.value = settings.research_books_enabled !== 'false';
-      showThinkingContent.value = settings.show_thinking_content === 'true' || settings.show_thinking_content === true;
-      showToolCalls.value = settings.show_tool_calls === 'true' || settings.show_tool_calls === true;
+      applySettingsResponse(response.data as Record<string, unknown>);
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
@@ -295,51 +302,20 @@ export const useSettingsStore = defineStore('settings', () => {
         currentSettings.show_tool_calls = settings.showToolCalls ? 'true' : 'false';
       }
 
+      // 公网模式：内部服务地址由服务器环境变量管理，不随请求提交（会被白名单 400 拒绝）
+      if (authStore.appMode === 'public' || webSecurity.isPublicMode()) {
+        delete currentSettings.cliproxy_base_url;
+      }
+
       const response = await settingsApi.update(currentSettings);
-      const updated = response.data;
+      const previousVersion = providerConfigVersion.value;
+      applySettingsResponse(response.data as Record<string, unknown>);
 
-      if (settings.deepseekApiKey !== undefined) clearModelCache('deepseek');
-      if (settings.openrouterApiKey !== undefined) clearModelCache('openrouter');
-      if (settings.zaiApiKey !== undefined) clearModelCache('zai');
-      if (settings.opencodeApiKey !== undefined) clearModelCache('opencode');
-      if (settings.cliproxyApiKey !== undefined || settings.cliproxyBaseUrl !== undefined) {
-        clearModelCache('cliproxy');
+      // 配置版本变化（含密钥更新）即失效全部模型缓存
+      if (providerConfigVersion.value !== previousVersion) {
+        modelCaches.value = {};
+        writeModelCaches({});
       }
-
-      // 检查是否有解密失败的 API 密钥
-      const decryptFailed = updated._decryptFailed as string[] | undefined;
-      if (decryptFailed) {
-        checkDecryptFailed(decryptFailed);
-        delete updated._decryptFailed;
-      }
-
-      deepseekApiKey.value = updated.deepseek_api_key || '';
-      openrouterApiKey.value = updated.openrouter_api_key || '';
-      zaiApiKey.value = updated.zai_api_key || '';
-      opencodeApiKey.value = updated.opencode_api_key || '';
-      cliproxyApiKey.value = updated.cliproxy_api_key || '';
-      cliproxyBaseUrl.value = updated.cliproxy_base_url || 'http://127.0.0.1:8317/v1';
-      temperature.value = updated.temperature ? parseFloat(updated.temperature) : 0.7;
-      if (settings.selectedProvider !== undefined) {
-        selectedProvider.value = updated.selected_provider || 'deepseek';
-      }
-      if (settings.selectedModel !== undefined) {
-        selectedModel.value = updated.selected_model || 'deepseek-v4-flash';
-      }
-      reasoningEffort.value = updated.reasoning_effort || 'high';
-      zaiReasoningEnabled.value = updated.zai_reasoning_enabled !== 'false';
-      zaiReasoningEffort.value = updated.zai_reasoning_effort || 'max';
-      opencodeReasoningEnabled.value = updated.opencode_reasoning_enabled === 'true';
-      opencodeReasoningEffort.value = updated.opencode_reasoning_effort || 'none';
-      cliproxyReasoningEnabled.value = updated.cliproxy_reasoning_enabled === 'true';
-      cliproxyReasoningEffort.value = updated.cliproxy_reasoning_effort || 'auto';
-      researchWebSearchEnabled.value = updated.research_web_search_enabled !== 'false';
-      researchWebReaderEnabled.value = updated.research_web_reader_enabled !== 'false';
-      researchWikipediaEnabled.value = updated.research_wikipedia_enabled !== 'false';
-      researchWeatherEnabled.value = updated.research_weather_enabled !== 'false';
-      researchBooksEnabled.value = updated.research_books_enabled !== 'false';
-      showThinkingContent.value = updated.show_thinking_content === 'true' || updated.show_thinking_content === true;
-      showToolCalls.value = updated.show_tool_calls === 'true' || updated.show_tool_calls === true;
     } catch (error) {
       console.error('Failed to update settings:', error);
       throw error;
@@ -356,9 +332,8 @@ export const useSettingsStore = defineStore('settings', () => {
     cliproxy: cliproxyApiKey.value
   })[provider] || '';
 
-  const getProviderSignature = (provider: string): string => createProviderSignature(
-    `${provider}:${getProviderApiKey(provider)}:${provider === 'cliproxy' ? cliproxyBaseUrl.value : ''}`
-  );
+  // 缓存签名只依赖服务端配置版本（密钥变更时版本自增），本地不保存任何密钥派生值
+  const getProviderSignature = (provider: string): string => `v${providerConfigVersion.value}:${provider}`;
 
   const applyModels = (provider: string, nextModels: Model[]) => {
     if (selectedProvider.value !== provider) return;
@@ -391,7 +366,15 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     const apiKey = getProviderApiKey(provider);
-    if (['deepseek', 'openrouter', 'zai', 'opencode', 'cliproxy'].includes(provider) && !apiKey) {
+    const isPublic = authStore.appMode === 'public' || webSecurity.isPublicMode();
+    // 公网模式：凭据在服务端解析，本地只看 configured 标记
+    if (isPublic) {
+      if (!providerConfigured.value[provider]) {
+        lastModelError.value = `请先在设置中配置 ${providerLabels[provider]} API 密钥`;
+        showModelsMessage(provider, lastModelError.value);
+        return false;
+      }
+    } else if (['deepseek', 'openrouter', 'zai', 'opencode', 'cliproxy'].includes(provider) && !apiKey) {
       lastModelError.value = `请先配置 ${providerLabels[provider]} API 密钥`;
       showModelsMessage(provider, lastModelError.value);
       return false;
@@ -401,8 +384,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const response = await modelsApi.list(
         provider,
-        apiKey || 'dummy',
-        provider === 'cliproxy' ? cliproxyBaseUrl.value : undefined
+        isPublic ? undefined : (apiKey || 'dummy'),
+        provider === 'cliproxy' && !isPublic ? cliproxyBaseUrl.value : undefined
       );
       const nextModels = response.data.models || [];
       if (requestId !== modelRequestSequence.value) return false;
@@ -451,6 +434,8 @@ export const useSettingsStore = defineStore('settings', () => {
     opencodeApiKey,
     cliproxyApiKey,
     cliproxyBaseUrl,
+    providerConfigured,
+    providerConfigVersion,
     temperature,
     selectedProvider,
     selectedModel,

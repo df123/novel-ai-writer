@@ -2,7 +2,7 @@
  * 调用当前 LLM 从小说内容提取插画场景提示词
  * 复用 /api/llm/chat 流式接口,在面板侧累积文本后解析 JSON
  */
-import { llmApi } from './api';
+import { llmApi, webSecurity } from './api';
 import { useSettingsStore } from '../stores/settingsStore';
 
 async function readStreamText(response: Response): Promise<string> {
@@ -70,8 +70,9 @@ export async function extractScenePrompts(content: string, count: number, styleH
   const response = await llmApi.chat(provider, messages, {
     model: settings.selectedModel,
     temperature: 0.7,
-    apiKey: apiKeyMap[provider] ?? '',
-    cliproxyBaseUrl: provider === 'cliproxy' ? settings.cliproxyBaseUrl : undefined,
+    // 公网模式不携带 apiKey/cliproxyBaseUrl（服务端解析，提交会被 400 拒绝）
+    ...(webSecurity.isPublicMode() ? {} : { apiKey: apiKeyMap[provider] ?? '' }),
+    ...(provider === 'cliproxy' && !webSecurity.isPublicMode() ? { cliproxyBaseUrl: settings.cliproxyBaseUrl } : {}),
   });
   const text = await readStreamText(response);
   const prompts = parsePromptList(text);

@@ -1,11 +1,15 @@
 // AI 插画路由:本地 ComfyUI(Z-Image-Turbo)生成插画
+// 加固（设计书 §25/§26/§27）:metadata 写入走事务真落盘、尺寸白名单、并发=1、
+// 文件访问限制在 illustrations 目录内、public 模式地址来自环境变量且不回显
 import express, { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { query, run } from '../db';
+import { withWriteTransaction } from '../db/transaction';
 import { generateId, now } from '../utils/helpers';
 import { asyncHandler } from '../middleware/errorHandler';
-import { dbDir } from '../config';
+import { dbDir, isPublicMode, getServiceBaseUrl } from '../config';
+import { withResourceSlot, ResourceBusyError } from '../web/resourceLimits';
 import type { DbIllustration, DbSetting, Illustration } from '@shared/types';
 
 const router: Router = express.Router();
@@ -13,8 +17,18 @@ const router: Router = express.Router();
 const ILLUSTRATIONS_DIR = path.join(dbDir, 'illustrations');
 const DEFAULT_COMFY_BASE_URL = 'http://127.0.0.1:3011';
 const GENERATE_TIMEOUT_MS = 10 * 60 * 1000;
+// UI 仅提供三种固定尺寸，后端同名单拒绝任意 width/height（防资源滥用）
+const ALLOWED_SIZES: ReadonlyArray<readonly [number, number]> = [
+  [1024, 1024],
+  [1024, 1536],
+  [1536, 1024]
+];
 
 function getComfyBaseUrl(): string {
+  // 公网模式地址由服务器环境变量固定，浏览器无法控制（SSRF 收敛）
+  if (isPublicMode()) {
+    return getServiceBaseUrl('comfyui');
+  }
   const setting = query<DbSetting>('SELECT value FROM settings WHERE key = ?', ['illustration_base_url'])[0];
   return setting?.value || DEFAULT_COMFY_BASE_URL;
 }
@@ -145,9 +159,10 @@ router.get('/status', asyncHandler(async (_req: Request, res: Response) => {
   const baseUrl = getComfyBaseUrl();
   try {
     const response = await fetch(`${baseUrl}/system_stats`, { signal: AbortSignal.timeout(3000) });
-    res.json({ available: response.ok, baseUrl });
+    // 公网模式不回显内部服务地址
+    res.json(isPublicMode() ? { available: response.ok } : { available: response.ok, baseUrl });
   } catch {
-    res.json({ available: false, baseUrl });
+    res.json(isPublicMode() ? { available: false } : { available: false, baseUrl });
   }
 }));
 
@@ -168,8 +183,26 @@ router.post('/generate', asyncHandler(async (req: Request, res: Response) => {
     res.status(400).json({ error: '缺少画面描述' });
     return;
   }
+  const effectiveWidth = width || 1024;
+  const effectiveHeight = height || 1024;
+  if (!ALLOWED_SIZES.some(([w, h]) => w === effectiveWidth && h === effectiveHeight)) {
+    res.status(400).json({ error: `不支持的尺寸 ${effectiveWidth}x${effectiveHeight}，仅允许 ${ALLOWED_SIZES.map(([w, h]) => `${w}x${h}`).join(' / ')}` });
+    return;
+  }
 
-  const imageBuffer = await generateWithComfy(prompt.trim(), width || 1024, height || 1024);
+  let imageBuffer: Buffer;
+  try {
+    // ComfyUI 全局并发=1，忙时 429（设计书 §25）
+    imageBuffer = await withResourceSlot('comfy', () =>
+      generateWithComfy(prompt.trim(), effectiveWidth, effectiveHeight)
+    );
+  } catch (error) {
+    if (error instanceof ResourceBusyError) {
+      res.status(429).header('Retry-After', String(error.retryAfterSeconds)).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
 
   if (!fs.existsSync(ILLUSTRATIONS_DIR)) {
     fs.mkdirSync(ILLUSTRATIONS_DIR, { recursive: true });
@@ -178,10 +211,13 @@ router.post('/generate', asyncHandler(async (req: Request, res: Response) => {
   const filePath = path.join(ILLUSTRATIONS_DIR, `${id}.png`);
   fs.writeFileSync(filePath, imageBuffer);
 
-  run(
-    'INSERT INTO illustrations (id, project_id, chapter_id, prompt, file_path, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, projectId, chapterId ?? null, prompt.trim(), filePath, width || 1024, height || 1024, now()]
-  );
+  // 元数据写入走写事务（run 只改内存，必须经 saveDB 落盘，否则重启丢失——设计书 §26）
+  withWriteTransaction(() => {
+    run(
+      'INSERT INTO illustrations (id, project_id, chapter_id, prompt, file_path, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, projectId, chapterId ?? null, prompt.trim(), filePath, effectiveWidth, effectiveHeight, now()]
+    );
+  });
 
   const row = query<DbIllustration>('SELECT * FROM illustrations WHERE id = ?', [id])[0];
   res.json(formatIllustration(row));
@@ -200,14 +236,24 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   res.json(rows.map(formatIllustration));
 }));
 
-// 插画图片文件
+// 插画图片文件：路径限制在 illustrations 目录内（防数据库被篡改后任意文件读取，设计书 §27）
 router.get('/image/:id', asyncHandler(async (req: Request, res: Response) => {
   const row = query<DbIllustration>('SELECT * FROM illustrations WHERE id = ?', [req.params.id])[0];
   if (!row || !fs.existsSync(row.file_path)) {
     res.status(404).json({ error: '插画不存在' });
     return;
   }
-  res.sendFile(row.file_path);
+  try {
+    const illustrationsRoot = fs.realpathSync(ILLUSTRATIONS_DIR);
+    const target = fs.realpathSync(row.file_path);
+    if (target !== illustrationsRoot && !target.startsWith(illustrationsRoot + path.sep)) {
+      res.status(403).json({ error: '非法的文件路径' });
+      return;
+    }
+    res.sendFile(target);
+  } catch {
+    res.status(404).json({ error: '插画不存在' });
+  }
 }));
 
 // 删除插画
@@ -217,7 +263,10 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
     res.status(404).json({ error: '插画不存在' });
     return;
   }
-  run('DELETE FROM illustrations WHERE id = ?', [row.id]);
+  // 删除同样走写事务真落盘（设计书 §26）
+  withWriteTransaction(() => {
+    run('DELETE FROM illustrations WHERE id = ?', [row.id]);
+  });
   try {
     if (fs.existsSync(row.file_path)) fs.unlinkSync(row.file_path);
   } catch (error) {

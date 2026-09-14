@@ -201,6 +201,9 @@ systemctl reload apache2
 
 **重要**:该专用域名只代理 MCP 必要路径(`/mcp`、`/mcp/download`、`/health`、`/oauth`、`/.well-known/*`)。**不要**把 `/api/db`、`/api/settings`、`/api/llm` 等管理面接口开放到公网域名;原 Web UI 继续留在内网访问。
 
+> 2026-09-14 起支持将 Web UI 经 `APP_MODE=public` 安全暴露到公网(Web 登录+CSRF+密钥脱敏+限流),MCP 与 Web 各用独立域名/独立认证。
+> 详见 `docs/guides/PUBLIC_WEB_DEPLOYMENT.md`。本文件的 MCP 域名配置不变。
+
 Apache 注意事项(Streamable HTTP):
 
 - 不得把 `/mcp` 重定向成 HTML、不得缓存响应、不得改写 JSON body、不得强制 gzip 打断流式输出、不得提前截断长连接(以上配置已用 `timeout=600` 规避)。

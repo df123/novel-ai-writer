@@ -56,7 +56,8 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="settings">LLM设置</el-dropdown-item>
-              <el-dropdown-item command="database">数据库管理</el-dropdown-item>
+              <!-- 公网模式不提供数据库管理入口（/api/db 服务端不注册，设计书 §6） -->
+              <el-dropdown-item v-if="!isPublicMode" command="database">数据库管理</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -129,6 +130,7 @@ import { useChapterStore } from '../stores/chapterStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
 import { useChangeFlagStore } from '../stores/changeFlagStore';
+import { useAuthStore } from '../stores/authStore';
 import ChapterPanel from './ChapterPanel.vue';
 import TimelinePanel from './TimelinePanel.vue';
 import ChatPanel from './ChatPanel.vue';
@@ -149,6 +151,9 @@ const chapterStore = useChapterStore();
 const themeStore = useThemeStore();
 const miscRecordStore = useMiscRecordStore();
 const changeFlagStore = useChangeFlagStore();
+const authStore = useAuthStore();
+
+const isPublicMode = authStore.appMode === 'public';
 
 const showSettings = ref(false);
 const showCreateProject = ref(false);

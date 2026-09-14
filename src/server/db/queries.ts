@@ -55,6 +55,8 @@ export function run(sql: string, params: unknown[] = []): void {
 
 /**
  * 持久化数据库到文件
+ * 原子写入（设计书 §41）：先写临时文件并 fsync，再 rename 覆盖，
+ * 进程/主机在写入中途崩溃时不会留下半个数据库文件
  */
 export function saveDB(): void {
   if (!db) {
@@ -62,7 +64,15 @@ export function saveDB(): void {
   }
   const data = db.export();
   const buffer = Buffer.from(data);
-  fs.writeFileSync(dbPath, buffer);
+  const tmpPath = `${dbPath}.tmp`;
+  fs.writeFileSync(tmpPath, buffer);
+  const fd = fs.openSync(tmpPath, 'r+');
+  try {
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmpPath, dbPath);
   // sql.js 的 export() 会重置连接级 PRAGMA，保存后必须重新开启外键
   db.run('PRAGMA foreign_keys = ON');
 }

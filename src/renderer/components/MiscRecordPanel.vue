@@ -262,7 +262,7 @@
 import { ref, reactive, watch, computed } from 'vue';
 import { Close, FullScreen, Loading } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { marked } from 'marked';
+import { renderSafeMarkdown } from '../utils/safeMarkdown';
 import { useMiscRecordStore } from '../stores/miscRecordStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useChangeFlagStore } from '../stores/changeFlagStore';
@@ -369,7 +369,7 @@ const currentVersions = computed<MiscRecordVersion[]>(() => {
 const renderedRecordContent = computed(() => {
   if (!store.selectedRecord?.content) return '';
   try {
-    return marked(store.selectedRecord.content);
+    return renderSafeMarkdown(store.selectedRecord.content);
   } catch (error) {
     console.error('Markdown渲染失败:', error);
     return store.selectedRecord.content;

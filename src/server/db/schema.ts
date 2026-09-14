@@ -54,7 +54,12 @@ export function getCreateTablesSQL(): string[] {
     // ===== 章节版本表 =====
     'CREATE TABLE IF NOT EXISTS chapter_versions (id TEXT PRIMARY KEY, chapter_id TEXT NOT NULL, chapter_number INTEGER NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, version INTEGER NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE)',
 
-    'CREATE INDEX IF NOT EXISTS idx_chapter_versions_chapter_id ON chapter_versions(chapter_id)'
+    'CREATE INDEX IF NOT EXISTS idx_chapter_versions_chapter_id ON chapter_versions(chapter_id)',
+
+    // ===== Web 会话表（public 模式登录；只存 SHA-256 令牌哈希，永不加入 ALLOWED_TABLES） =====
+    'CREATE TABLE IF NOT EXISTS web_sessions (id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, csrf_token TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)',
+
+    'CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at)'
   ];
 }
 

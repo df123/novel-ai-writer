@@ -10,6 +10,7 @@ import { useProjectStore } from './projectStore';
 import { useTimelineStore } from './timelineStore';
 import { useCharacterStore } from './characterStore';
 import { useSettingsStore } from './settingsStore';
+import { useAuthStore } from './authStore';
 import { useThemeStore } from './themeStore';
 import { useMiscRecordStore } from './miscRecordStore';
 import { useChangeFlagStore } from './changeFlagStore';
@@ -138,6 +139,7 @@ export const useChatStore = defineStore('chat', () => {
     const timelineStore = useTimelineStore();
     const characterStore = useCharacterStore();
     const settingsStore = useSettingsStore();
+    const authStore = useAuthStore();
   const themeStore = useThemeStore();
   const miscRecordStore = useMiscRecordStore();
   const changeFlagStore = useChangeFlagStore();
@@ -155,6 +157,8 @@ export const useChatStore = defineStore('chat', () => {
       opencode: 'OpenCode',
       cliproxy: 'CLI Proxy API',
     };
+    // 公网模式：密钥不下发浏览器，由服务端解析；本地凭 configured 标记判断
+    const isPublicMode = authStore.appMode === 'public';
     const apiKeyMap: Record<LLMProviderName, string> = {
       deepseek: settingsStore.deepseekApiKey,
       openrouter: settingsStore.openrouterApiKey,
@@ -162,18 +166,22 @@ export const useChatStore = defineStore('chat', () => {
       opencode: settingsStore.opencodeApiKey,
       cliproxy: settingsStore.cliproxyApiKey,
     };
-    const apiKey = apiKeyMap[providerName];
+    const apiKey = isPublicMode ? '' : apiKeyMap[providerName];
+    const providerReady = isPublicMode ? settingsStore.providerConfigured[providerName] : Boolean(apiKey);
 
-    if (!apiKey) {
+    if (!providerReady) {
       throw new Error(`请先配置 ${providerLabels[providerName]} API 密钥`);
     }
+
+    // 公网模式下研究工具可用性同样依据 configured 标记
+    const zaiReady = isPublicMode ? Boolean(settingsStore.providerConfigured.zai) : Boolean(settingsStore.zaiApiKey);
 
     const activeTools = ALL_TOOLS.filter(tool => {
       switch (tool.function.name) {
         case 'web_search':
-          return settingsStore.researchWebSearchEnabled && Boolean(settingsStore.zaiApiKey);
+          return settingsStore.researchWebSearchEnabled && zaiReady;
         case 'read_web_page':
-          return settingsStore.researchWebReaderEnabled && Boolean(settingsStore.zaiApiKey);
+          return settingsStore.researchWebReaderEnabled && zaiReady;
         case 'search_wikipedia':
         case 'read_wikipedia':
           return settingsStore.researchWikipediaEnabled;
@@ -980,11 +988,12 @@ export const useChatStore = defineStore('chat', () => {
         {
           model: options.modelName,
           temperature: settingsStore.temperature,
-          apiKey,
+          // 公网模式不携带 apiKey/cliproxyBaseUrl（服务端解析，提交会被 400 拒绝）
+          ...(isPublicMode ? {} : { apiKey }),
           tools: activeTools,
           thinking: providerName === 'deepseek' ? { type: 'enabled' } : undefined,
           reasoning_effort: providerName === 'deepseek' ? settingsStore.reasoningEffort : undefined,
-          cliproxyBaseUrl: providerName === 'cliproxy' ? settingsStore.cliproxyBaseUrl : undefined,
+          ...(providerName === 'cliproxy' && !isPublicMode ? { cliproxyBaseUrl: settingsStore.cliproxyBaseUrl } : {}),
           zaiReasoningEnabled: providerName === 'zai' ? settingsStore.zaiReasoningEnabled : undefined,
           zaiReasoningEffort: providerName === 'zai' ? settingsStore.zaiReasoningEffort : undefined,
           opencodeReasoningEnabled: providerName === 'opencode' ? settingsStore.opencodeReasoningEnabled : undefined,
