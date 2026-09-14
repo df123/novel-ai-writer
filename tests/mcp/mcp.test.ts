@@ -68,6 +68,17 @@ describe('MCP initialize / tools/list', () => {
     // 全部工具都带 outputSchema(与 structuredContent 实际形状对应)
     expect(tools.every(t => t.outputSchema && Object.keys(t.outputSchema).length > 0)).toBe(true);
   });
+
+  it('tools/list 暴露的 description 与代码一致(防 Host 侧元数据回归)', async () => {
+    const res = await rpc('tools/list');
+    const tools = res.result.tools as Array<{ name: string; description?: string }>;
+    const byName = new Map(tools.map(t => [t.name, t.description || '']));
+
+    expect(byName.get('get_story_context')).toContain('Chapter full text is NOT included — use get_chapter for content');
+    expect(byName.get('get_story_context')).toContain('World entries contain a short summary only — use get_story_item for full content');
+    expect(byName.get('create_timeline_event')).toContain('content — it is the only content field');
+    expect(byName.get('update_timeline_event')).toContain('content — it is the only content field');
+  });
 });
 
 describe('MCP 全链路：读取 → 写入 → 并发 → 版本 → 回收站 → 导出', () => {
