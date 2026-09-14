@@ -16,20 +16,22 @@
 | 测试项目 | `MCP验收临时项目`(为本验收专门创建) |
 | 数据安全 | 未修改任何真实小说项目;未执行任何永久删除(仅 archive 软删除 + restore 恢复验证) |
 
-## 原定测试集(任务书 §5 / 原任务书 §54)— 全部 PASS
+## 原定能力验收(任务书 §5 / 原任务书 §54)— PASS(部分场景使用隔离测试项目的等效数据)
+
+> 测试开始时部署库中**无任何已有真实项目**(list_projects 返回 0 个),原始记录中"真实项目只读 Context"一项为 **N/A**。因此全部读写均在专门新建的隔离项目内完成;涉及具体实体名称/章节号的场景(5.3–5.7)使用等效数据(验收角色、验收城市、第 1 章等),而非 prompt 字面上的"林浩 / 黑岩城 / 第12章 / 第13章"。下表 **Equivalent PASS** 即表示:精确 prompt 场景未按字面执行,对应工具能力已在隔离项目以等效数据真机验证。
 
 | # | Prompt | 预期工具序列 | 结果 | 备注 |
 |---|---|---|---|---|
-| 5.1 | 列出我的小说项目。 | list_projects | **PASS** | |
-| 5.2 | 继续写《XXX》,先看看现在的设定。 | list_projects → get_story_context | **PASS** | 含 create_project(新建 `MCP验收临时项目`)与 get_story_context |
-| 5.3 | 林浩现在是什么性格? | search_story / get_story_item | **PASS** | 含 create_character + get_story_item |
-| 5.4 | 把林浩改得更谨慎。 | get_story_item → update_character | **PASS** | write 放行;携带 expected_updated_at;自动产生旧版本快照 |
-| 5.5 | 之前是不是有个叫黑岩城的城市? | search_story | **PASS** | 含 create_world_entry 前置数据构造 |
-| 5.6 | 把第12章给我看看。 | list_chapters / get_chapter | **PASS** | |
-| 5.7 | (先生成正文)…刚才这版不错,保存成第13章。 | create_chapter | **PASS** | 草稿讨论阶段未自动写库(见扩展验证) |
+| 5.1 | 列出我的小说项目。 | list_projects | **PASS** | 按字面执行;当时返回 0 个已有项目(部署库为空),该结果直接触发了隔离验收项目的新建 |
+| 5.2 | 继续写《XXX》,先看看现在的设定。 | list_projects → get_story_context | **Equivalent PASS** | 测试开始时无已有真实项目,未执行"按已有项目标题解析"的精确场景;create_project(新建 `MCP验收临时项目`)与 get_story_context 已在隔离测试项目实际验证 |
+| 5.3 | 林浩现在是什么性格? | search_story / get_story_item | **Equivalent PASS** | 对隔离项目的验收角色执行(非字面"林浩");含 create_character + get_story_item |
+| 5.4 | 把林浩改得更谨慎。 | get_story_item → update_character | **PASS**(等效场景:对验收角色执行) | write 放行;携带 expected_updated_at;自动产生旧版本快照 |
+| 5.5 | 之前是不是有个叫黑岩城的城市? | search_story | **Equivalent PASS** | 对隔离项目的验收城市执行(非字面"黑岩城");含 create_world_entry 前置数据构造 |
+| 5.6 | 把第12章给我看看。 | list_chapters / get_chapter | **Equivalent PASS** | 验证于隔离项目实际章节(第 1 章),非字面第 12 章 |
+| 5.7 | (先生成正文)…刚才这版不错,保存成第13章。 | create_chapter | **Equivalent PASS** | 保存为隔离项目的验收章节;草稿讨论阶段未自动写库(见扩展验证) |
 | 5.8 | 给我解释什么是第一人称写作。 | 不调用任何 MCP 工具 | **PASS** | 普通知识问题未调用 novel MCP |
 | 5.9 | 给这一章生成一张图片。 | 不出现小说侧生图工具 | **PASS** | 未伪造/误调用小说 MCP 插画工具;图片由 ChatGPT 原生能力处理 |
-| 5.10 | (多结果搜索后)第一个详细说说。 | get_story_item(用上一步返回的稳定 ID) | **PASS** | stable-ID follow-up 验证通过 |
+| 5.10 | (多结果搜索后)第一个详细说说。 | get_story_item(用上一步返回的稳定 ID) | **PASS** | stable-ID follow-up 于隔离项目搜索结果验证通过 |
 
 ## 扩展验证集(真机追加)
 
