@@ -242,7 +242,9 @@ const handleGenerate = async () => {
         successCount++;
       } catch (error) {
         console.error('生成插画失败:', error);
-        ElMessage.error(error instanceof Error ? error.message : `第 ${i + 1} 张生成失败`);
+        // 优先显示服务端返回的友好文案(如"无法连接生图服务…"),退回 axios/通用错误
+        const serverMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        ElMessage.error(serverMessage || (error instanceof Error ? error.message : `第 ${i + 1} 张生成失败`));
       }
     }
     if (successCount > 0) {
