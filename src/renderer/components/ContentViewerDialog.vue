@@ -110,13 +110,9 @@ const renderedSections = computed(() => props.sections.map(section => ({
   html: renderMarkdown(section.content || '')
 })));
 
+// 安全渲染：异常时必须 fail-closed，绝不把原始内容放进 v-html
 function renderMarkdown(content: string): string {
-  try {
-    return renderSafeMarkdown(content);
-  } catch (error) {
-    console.error('Markdown渲染失败:', error);
-    return content;
-  }
+  return renderSafeMarkdown(content);
 }
 
 function handleEdit() {

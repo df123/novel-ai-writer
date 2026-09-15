@@ -922,14 +922,8 @@ const displayReasoning = (message: Message): string => {
   return message.reasoning_content || '';
 };
 
-const renderMarkdown = (content: string) => {
-  try {
-    return renderSafeMarkdown(content);
-  } catch (error) {
-    console.error('Markdown render error:', error);
-    return content;
-  }
-};
+// 安全渲染：异常时必须 fail-closed，绝不把原始内容放进 v-html
+const renderMarkdown = (content: string) => renderSafeMarkdown(content);
 
 /**
  * 高亮显示用户消息中的斜杠命令

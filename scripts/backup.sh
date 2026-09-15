@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 备份数据库与插画目录（设计书 §42）
-# 保留 14 天每日 + 8 周每周 + 12 月每月；备份文件含 OAuth 令牌表，属高敏感文件(600)
+# 保留策略：朴素轮转，保留最近 34 份备份（非 14日+8周+12月 的分层保留）
+# 备份文件含 OAuth 令牌表，属高敏感文件(600)
 # 用法: ./scripts/backup.sh [数据目录]  （默认 ~/.novel-ai-writer，Docker 部署时传 volume 宿主挂载路径）
 set -euo pipefail
 
@@ -28,7 +29,7 @@ chmod -R go-rwx "$TARGET"
 ( cd "$BACKUP_ROOT" && find "$STAMP" -type f -exec sha256sum {} \; > "$STAMP.SHA256SUMS" )
 echo "备份完成: $TARGET"
 
-# 轮转：单机场景采用朴素策略，保留最近 34 份（约覆盖 14 每日 + 8 每周 + 12 每月）
+# 轮转：朴素策略，保留最近 34 份（约等于 34 天每日一备；非 grandfather-father-son 分层保留）
 TOTAL_KEEP=$((14 + 8 + 12))
 COUNT=$(ls -1d "$BACKUP_ROOT"/20* 2>/dev/null | wc -l)
 if [ "$COUNT" -gt "$TOTAL_KEEP" ]; then

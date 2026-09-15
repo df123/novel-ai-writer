@@ -22,8 +22,21 @@ services:
       - MCP_STATIC_TOKEN=${MCP_STATIC_TOKEN:-}
       - MCP_PUBLIC_URL=${MCP_PUBLIC_URL:-http://localhost:3002}
       - MCP_OAUTH_PASSWORD=${MCP_OAUTH_PASSWORD:-}
-      # 注意:容器内不要设置 HOST(保持默认 0.0.0.0),否则端口映射失效;
-      # 公网隔离由上方 127.0.0.1 端口绑定实现
+      # ===== Public Web(APP_MODE=public 时启用网页登录/CSRF/密钥脱敏)=====
+      # 容器内必须监听 0.0.0.0 端口映射才能转发;宿主侧仍只发布 127.0.0.1(见上方 ports),
+      # 公网隔离由宿主回环绑定 + Apache 白名单反代实现,故显式放开容器内绑定
+      - HOST=0.0.0.0
+      - ALLOW_PUBLIC_CONTAINER_BIND=1
+      - APP_MODE=${APP_MODE:-local}
+      - WEB_PUBLIC_URL=${WEB_PUBLIC_URL:-}
+      - WEB_USERNAME=${WEB_USERNAME:-}
+      - WEB_PASSWORD_HASH=${WEB_PASSWORD_HASH:-}
+      - WEB_SESSION_TTL_HOURS=${WEB_SESSION_TTL_HOURS:-168}
+      # 内部服务固定地址(public 模式 SSRF 收敛)。
+      # 容器内 127.0.0.1 指容器自身,访问宿主机上的 FunASR/ComfyUI/CLI Proxy 需用 host.docker.internal
+      - FUNASR_BASE_URL=${FUNASR_BASE_URL:-http://host.docker.internal:3010}
+      - COMFYUI_BASE_URL=${COMFYUI_BASE_URL:-http://host.docker.internal:3011}
+      - CLIPROXY_BASE_URL=${CLIPROXY_BASE_URL:-http://host.docker.internal:8317/v1}
     volumes:
       - novel-ai-data:/app/data
       - novel-ai-logs:/app/logs

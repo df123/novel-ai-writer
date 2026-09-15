@@ -366,15 +366,8 @@ const currentVersions = computed<MiscRecordVersion[]>(() => {
   return store.getVersions(store.selectedRecord.id);
 });
 
-const renderedRecordContent = computed(() => {
-  if (!store.selectedRecord?.content) return '';
-  try {
-    return renderSafeMarkdown(store.selectedRecord.content);
-  } catch (error) {
-    console.error('Markdown渲染失败:', error);
-    return store.selectedRecord.content;
-  }
-});
+// 安全渲染：异常时必须 fail-closed，绝不把原始内容放进 v-html
+const renderedRecordContent = computed(() => renderSafeMarkdown(store.selectedRecord?.content || ''));
 
 // 弹窗打开时加载记录
 const handleDialogOpen = () => {

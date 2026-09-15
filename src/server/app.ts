@@ -51,16 +51,25 @@ export function createApp(): App {
   const app: App = express();
 
   if (isPublicMode()) {
-    // 公网部署在 Apache 反代之后，取真实客户端 IP 供限流使用
-    app.set('trust proxy', true);
+    // 公网部署在 Apache 反代之后，取真实客户端 IP 供限流使用。
+    // 只信任回环来源的代理：Apache(127.0.0.1)可信、其左侧 XFF 为伪造不可信，
+    // 避免攻击者伪造 X-Forwarded-For 绕过按 IP 的登录/OAuth 限流
+    app.set('trust proxy', 'loopback');
     // 同源 SPA，公网完全不需要 CORS（设计书 §19）
   } else {
     app.use(cors());
   }
 
-  // 请求体上限：公网收紧到 4MB（章节正文远低于此），内网保持 50MB（设计书 §29）
-  app.use(express.json({ limit: isPublicMode() ? '4mb' : '50mb' }));
   app.use(logRequestMiddleware);
+
+  // 路径级 body 解析（取代原全局 parser，设计书 §29 各边界独立真实生效）：
+  // 先挂的具体路径先生效（body-parser 首个解析后其余跳过）
+  app.use('/api/auth', express.json({ limit: '8kb' }));
+  app.use('/api', express.json({ limit: isPublicMode() ? '4mb' : '50mb' }));
+  // MCP 冻结：/mcp 始终保持原 50MB 上限，public 收紧不得影响 MCP 行为
+  app.use('/mcp', express.json({ limit: '50mb' }));
+  // OAuth JSON 请求统一收紧（authorize/token 走 urlencoded 不受影响；register 另有路由级 16KB）
+  app.use('/oauth', express.json({ limit: '16kb' }));
 
   if (isPublicMode()) {
     app.use(securityHeaders);

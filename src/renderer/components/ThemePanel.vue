@@ -116,15 +116,8 @@ const handleViewThemeDiff = async () => {
   changeFlagStore.clearFlag('theme', current.id);
 };
 
-const renderedContent = computed(() => {
-  if (!theme.value) return '';
-  try {
-    return renderSafeMarkdown(theme.value.content);
-  } catch (error) {
-    console.error('Markdown渲染失败:', error);
-    return theme.value.content;
-  }
-});
+// 安全渲染：异常时必须 fail-closed，绝不把原始内容放进 v-html
+const renderedContent = computed(() => renderSafeMarkdown(theme.value?.content || ''));
 
 const handleOpenCreateDialog = () => {
   editingTheme.value = null;

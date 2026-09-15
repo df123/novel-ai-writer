@@ -168,10 +168,20 @@
             show-password
             class="stack-input"
           />
+          <!-- 公网模式：服务地址由服务器管理员通过环境变量配置，浏览器不可修改（设计书 §20） -->
           <el-input
+            v-if="!isPublicMode"
             v-model="cliproxyBaseUrlValue"
             placeholder="http://127.0.0.1:8317/v1"
             class="stack-input"
+          />
+          <el-alert
+            v-else
+            title="CLI Proxy 服务地址由服务器管理员配置"
+            type="info"
+            :closable="false"
+            show-icon
+            class="decrypt-warning"
           />
           <el-alert
             v-if="decryptFailedKeys.includes('cliproxy_api_key')"
@@ -207,7 +217,7 @@
             研究工具会按需联网查资料。Z.AI 工具使用已保存的 Z.AI API 密钥；其余工具免费、无需密钥。
           </p>
           <el-alert
-            v-if="!zaiApiKey"
+            v-if="!zaiReady"
             title="未配置 Z.AI API 密钥时，网络搜索和网页阅读不会暴露给模型；维基百科、历史天气和书籍搜索仍可使用。"
             type="info"
             :closable="false"
@@ -355,6 +365,10 @@ const emit = defineEmits<{
 
 const settingsStore = useSettingsStore();
 const authStore = useAuthStore();
+
+const isPublicMode = authStore.appMode === 'public';
+// 公网模式密钥不下发，以 configured 标记判断 Z.AI 是否可用
+const zaiReady = isPublicMode ? computed(() => Boolean(settingsStore.providerConfigured.zai)) : computed(() => Boolean(settingsStore.zaiApiKey));
 const {
   deepseekApiKey,
   openrouterApiKey,

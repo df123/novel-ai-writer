@@ -2,7 +2,7 @@
 
 > 实现依据:《Novel Writer Public Web V1 架构与安全设计书》(2026-09-14,基线 master@e965a99)。
 > 代码分支:`feat/public-web-v1`。
-> MCP V1(28 工具/OAuth 2.1/Domain Services)**完全冻结不动**,Web 登录与 MCP OAuth 相互独立。
+> **MCP 兼容性说明**:MCP 工具/接口契约(28 工具、schema、OAuth 2.1 授权码/刷新轮换、Domain Services、乐观并发)完全未动;MCP HTTP/OAuth **外围**有有限硬化(端点限流、注册体限制、`/mcp` body 解析独立但上限保持 50MB)。Web 登录与 MCP OAuth 相互独立。
 
 ## 1. 运行模式
 
@@ -14,7 +14,7 @@
 | `/api/db` | 注册(数据库管理台可用) | **整个不注册**(404) |
 | Provider 密钥 | GET 回显明文(现状) | **write-only**(GET 只返回 `*_configured`) |
 | 内部服务地址 | 设置页可改 | 环境变量固定,浏览器不可控 |
-| 请求体上限 | JSON 50MB | JSON 4MB / 语音 8MB / 登录 8KB / OAuth 注册 16KB |
+| 请求体上限 | JSON 50MB | 登录 8KB / API JSON 4MB / OAuth 注册 16KB；**`/mcp` 保持原 50MB 不变**(路径级独立解析,public 收紧不影响 MCP) |
 | 限流 | 无 | 登录 5 失败/15分/IP;普通 API 300/5分;LLM 20/5分;Research 30/5分;Speech 10/5分;插画 5/10分;导出 10/10分 |
 | 监听 | 0.0.0.0(现状) | 默认 127.0.0.1;显式 `HOST=0.0.0.0` **拒绝启动** |
 | MCP 认证 | 允许 none(警告) | **none 为致命启动错误** |
@@ -85,6 +85,15 @@ NO_PROXY=127.0.0.1,localhost
 
 ### 3.3 systemd 单元
 
+进程持有 API 密钥/OAuth 令牌/会话,**绝不用 root 运行**;密钥文件放 /etc 并收紧权限,不与应用代码同目录。
+
+```bash
+# 专用系统用户
+useradd --system --home /opt/novel-ai-writer --shell /usr/sbin/nologin novelwriter
+chown -R novelwriter:novelwriter /opt/novel-ai-writer
+chmod 600 /etc/novel-ai-writer.env && chown root:novelwriter /etc/novel-ai-writer.env
+```
+
 ```ini
 # /etc/systemd/system/novel-ai-writer.service
 [Unit]
@@ -92,15 +101,20 @@ Description=Novel AI Writer (Express, sql.js single process)
 After=network.target
 
 [Service]
+User=novelwriter
+Group=novelwriter
+UMask=0077
 WorkingDirectory=/opt/novel-ai-writer
 ExecStart=/usr/bin/node dist/server/index.js
-EnvironmentFile=/opt/novel-ai-writer/.env
+EnvironmentFile=/etc/novel-ai-writer.env
 Restart=on-failure
 # 日志走 journald;应用日志已脱敏(不记录 query string,/mcp/download 令牌打码)
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+对应地,3.2 节的环境变量写入 `/etc/novel-ai-writer.env`(权限 600)。
 
 ### 3.4 本地服务回环绑定
 
@@ -175,8 +189,20 @@ BACKUP_ROOT=/opt/backups ./scripts/backup.sh ...  # 自定义备份根
 ```
 
 - 备份含 `oauth_clients`/`oauth_tokens`/加密 API 密钥 → **高敏感**:目录 700、文件 600,离机备份必须加密
-- 保留策略:最近 34 份(≈14 日 + 8 周 + 12 月)
+- 保留策略:**朴素轮转,保留最近 34 份**(非 14日+8周+12月分层保留;个人项目按天备份即约 34 天)
 - **必须实测 restore**:`sha256sum -c` 校验 → 拷回 data 目录 → 启动 → 验证项目/插画存在
+
+### 2.1 Docker 部署 Public 模式(支持)
+
+`docker-compose.yml` 已透传全部 Public Web 环境变量。容器内绑定规则与裸机不同:
+
+```text
+容器内: HOST=0.0.0.0 + ALLOW_PUBLIC_CONTAINER_BIND=1(compose 已内置)
+宿主侧: ports 仅发布 127.0.0.1:3002(compose 已内置,公网隔离由这一层保证)
+内部服务: 容器内 127.0.0.1 指容器自身,FunASR/ComfyUI/CLI Proxy 需用 host.docker.internal
+```
+
+`.env` 中设置 `APP_MODE=public` 等变量后 `docker compose up -d --build` 即可;启动 fail-fast 校验在容器内同样生效(缺配置容器会退出,`docker logs` 可见具体缺项)。**注意:public 模式下宿主必须仍有 Apache 白名单反代,绝不可把 ports 改为发布到 0.0.0.0。**
 
 ## 6. 安全机制速查(已实现)
 

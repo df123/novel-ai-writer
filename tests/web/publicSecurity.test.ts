@@ -360,12 +360,17 @@ describe('公网启动 fail-fast 校验（设计书 §18）', () => {
     expect(errors.some(e => e.includes('MCP_AUTH_MODE'))).toBe(true);
   });
 
-  it('HOST=0.0.0.0 为致命错误', () => {
+  it('HOST=0.0.0.0 为致命错误，Docker 容器绑定白名单可豁免', () => {
     const saved = process.env.HOST;
+    const savedContainer = process.env.ALLOW_PUBLIC_CONTAINER_BIND;
     process.env.HOST = '0.0.0.0';
     const errors = validatePublicStartup();
-    process.env.HOST = saved;
     expect(errors.some(e => e.includes('0.0.0.0'))).toBe(true);
+    process.env.ALLOW_PUBLIC_CONTAINER_BIND = '1';
+    const waived = validatePublicStartup();
+    process.env.HOST = saved;
+    process.env.ALLOW_PUBLIC_CONTAINER_BIND = savedContainer;
+    expect(waived.some(e => e.includes('0.0.0.0'))).toBe(false);
   });
 
   it('配置齐全时校验通过（token 模式）', () => {
@@ -380,5 +385,68 @@ describe('公网启动 fail-fast 校验（设计书 §18）', () => {
     process.env.MCP_PUBLIC_URL = savedUrl;
     process.env.MCP_STATIC_TOKEN = savedToken;
     expect(errors).toEqual([]);
+  });
+});
+
+describe('路径级 body 限制真实生效（评审 Blocker 2）', () => {
+  it('trust proxy 仅信任回环代理（防伪造 XFF 绕过限流）', () => {
+    expect(app.get('trust proxy')).toBe('loopback');
+  });
+
+  it('登录请求体 > 8KB → 413', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .set('Origin', WEB_PUBLIC_URL)
+      .send({ username: WEB_USERNAME, password: 'x'.repeat(9 * 1024) });
+    expect(response.status).toBe(413);
+  });
+
+  it('普通 API JSON > 4MB → 413', async () => {
+    const { cookie, csrfToken } = await login('10.11.0.2');
+    const response = await request(app)
+      .post('/api/projects')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrfToken)
+      .set('Origin', WEB_PUBLIC_URL)
+      .send({ title: 'y'.repeat(4 * 1024 * 1024) });
+    expect(response.status).toBe(413);
+  });
+
+  it('/mcp 保持 50MB 上限：5MB JSON 不被 public 收紧拒绝（非 413）', async () => {
+    const response = await request(app)
+      .post('/mcp')
+      .set('Content-Type', 'application/json')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { padding: 'z'.repeat(5 * 1024 * 1024) } });
+    // MCP 冻结：public 模式不得把 /mcp 从 50MB 收紧到 4MB；协议层错误可以，413 不可以
+    expect(response.status).not.toBe(413);
+  });
+});
+
+describe('插画删除路径囚禁（评审 §6）', () => {
+  it('目录外 file_path 的行：删除记录但不碰文件系统', async () => {
+    const outsideFile = `${process.env.DB_DIR}/outside-sensitive.txt`;
+    require('fs').writeFileSync(outsideFile, 'do-not-delete-me');
+    const id = 'ill-outside-test';
+    const { run } = await import('../../src/server/db');
+    run('INSERT INTO projects (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', ['proj-x', '囚禁测试', '', 0, 0]);
+    run(
+      'INSERT INTO illustrations (id, project_id, chapter_id, prompt, file_path, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, 'proj-x', null, 'p', outsideFile, 1024, 1024, 0]
+    );
+
+    const { cookie, csrfToken } = await login('10.12.0.1');
+    const response = await request(app)
+      .delete(`/api/illustrations/${id}`)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrfToken)
+      .set('Origin', WEB_PUBLIC_URL);
+    expect(response.status).toBe(200);
+
+    // 数据库行已删,但目录外文件完好
+    const { query } = await import('../../src/server/db');
+    expect(query('SELECT * FROM illustrations WHERE id = ?', [id])).toHaveLength(0);
+    expect(require('fs').existsSync(outsideFile)).toBe(true);
+    require('fs').rmSync(outsideFile);
   });
 });

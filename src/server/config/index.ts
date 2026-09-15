@@ -190,8 +190,8 @@ export function validatePublicStartup(): string[] {
     }
   }
   const host = process.env.HOST;
-  if (host === '0.0.0.0' || host === '::') {
-    errors.push('APP_MODE=public 禁止监听 0.0.0.0（默认 127.0.0.1，由反向代理转发）');
+  if ((host === '0.0.0.0' || host === '::') && process.env.ALLOW_PUBLIC_CONTAINER_BIND !== '1') {
+    errors.push('APP_MODE=public 禁止监听 0.0.0.0（默认 127.0.0.1，由反向代理转发）；Docker 容器内确需 0.0.0.0 时设置 ALLOW_PUBLIC_CONTAINER_BIND=1（宿主侧端口映射仍必须只绑 127.0.0.1）');
   }
   return errors;
 }

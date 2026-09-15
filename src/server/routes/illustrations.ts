@@ -5,7 +5,7 @@ import express, { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { query, run } from '../db';
-import { withWriteTransaction } from '../db/transaction';
+import { withWriteTransaction, projectExists } from '../db/transaction';
 import { generateId, now } from '../utils/helpers';
 import { asyncHandler } from '../middleware/errorHandler';
 import { dbDir, isPublicMode, getServiceBaseUrl } from '../config';
@@ -189,6 +189,20 @@ router.post('/generate', asyncHandler(async (req: Request, res: Response) => {
     res.status(400).json({ error: `不支持的尺寸 ${effectiveWidth}x${effectiveHeight}，仅允许 ${ALLOWED_SIZES.map(([w, h]) => `${w}x${h}`).join(' / ')}` });
     return;
   }
+  // 触发 GPU 任务前先校验归属，无效项目/章节直接拒绝（评审§6）
+  if (!projectExists(projectId)) {
+    res.status(404).json({ error: '项目不存在' });
+    return;
+  }
+  if (chapterId) {
+    const chapter = query<{ project_id: string }>(
+      'SELECT project_id FROM chapters WHERE id = ? AND deleted = 0', [chapterId]
+    )[0];
+    if (!chapter || chapter.project_id !== projectId) {
+      res.status(400).json({ error: '章节不存在或不属于该项目' });
+      return;
+    }
+  }
 
   let imageBuffer: Buffer;
   try {
@@ -236,24 +250,34 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   res.json(rows.map(formatIllustration));
 }));
 
-// 插画图片文件：路径限制在 illustrations 目录内（防数据库被篡改后任意文件读取，设计书 §27）
-router.get('/image/:id', asyncHandler(async (req: Request, res: Response) => {
-  const row = query<DbIllustration>('SELECT * FROM illustrations WHERE id = ?', [req.params.id])[0];
-  if (!row || !fs.existsSync(row.file_path)) {
-    res.status(404).json({ error: '插画不存在' });
-    return;
-  }
+/**
+ * 把数据库中的 file_path 限制在 illustrations 目录内（realpath 围禁）。
+ * GET 与 DELETE 共用：防止旧库/手工改库/受损行携带任意路径导致越权读取或删除。
+ * @returns 合法的真实路径；不在目录内或文件不存在返回 null
+ */
+function resolveIllustrationPathSafely(filePath: string): string | null {
+  if (!fs.existsSync(filePath)) return null;
   try {
     const illustrationsRoot = fs.realpathSync(ILLUSTRATIONS_DIR);
-    const target = fs.realpathSync(row.file_path);
-    if (target !== illustrationsRoot && !target.startsWith(illustrationsRoot + path.sep)) {
-      res.status(403).json({ error: '非法的文件路径' });
-      return;
+    const target = fs.realpathSync(filePath);
+    if (target === illustrationsRoot || !target.startsWith(illustrationsRoot + path.sep)) {
+      return null;
     }
-    res.sendFile(target);
+    return target;
   } catch {
-    res.status(404).json({ error: '插画不存在' });
+    return null;
   }
+}
+
+// 插画图片文件：路径限制在 illustrations 目录内（设计书 §27）
+router.get('/image/:id', asyncHandler(async (req: Request, res: Response) => {
+  const row = query<DbIllustration>('SELECT * FROM illustrations WHERE id = ?', [req.params.id])[0];
+  const safePath = row ? resolveIllustrationPathSafely(row.file_path) : null;
+  if (!safePath) {
+    res.status(row ? 403 : 404).json({ error: row ? '非法的文件路径' : '插画不存在' });
+    return;
+  }
+  res.sendFile(safePath);
 }));
 
 // 删除插画
@@ -267,10 +291,16 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   withWriteTransaction(() => {
     run('DELETE FROM illustrations WHERE id = ?', [row.id]);
   });
-  try {
-    if (fs.existsSync(row.file_path)) fs.unlinkSync(row.file_path);
-  } catch (error) {
-    console.error('Failed to delete illustration file:', error);
+  // 文件删除与读取同等的路径围禁：目录外的路径只清数据库行，不碰文件系统
+  const safePath = resolveIllustrationPathSafely(row.file_path);
+  if (safePath) {
+    try {
+      fs.unlinkSync(safePath);
+    } catch (error) {
+      console.error('Failed to delete illustration file:', error);
+    }
+  } else if (row.file_path) {
+    console.warn(`[illustrations] 跳过目录外文件路径的删除: ${path.basename(row.file_path)}`);
   }
   res.json({ success: true });
 }));
