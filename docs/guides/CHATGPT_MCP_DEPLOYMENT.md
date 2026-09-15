@@ -188,7 +188,10 @@ a2enmod proxy proxy_http headers ssl
     ProxyPassReverse /.well-known/oauth-authorization-server http://127.0.0.1:3002/.well-known/oauth-authorization-server
 
     ErrorLog ${APACHE_LOG_DIR}/novel-mcp-error.log
-    CustomLog ${APACHE_LOG_DIR}/novel-mcp-access.log combined
+    # /mcp/download/:token 的单次下载令牌在 URL path 中,combined 日志会记录完整 URI;
+    # 对该路径不记录访问日志(应用侧已打印 [REDACTED] 版本)
+    SetEnvIf Request_URI "^/mcp/download/" dontlog
+    CustomLog ${APACHE_LOG_DIR}/novel-mcp-access.log combined env=!dontlog
 </VirtualHost>
 ```
 

@@ -352,6 +352,9 @@ function authenticateClient(req: Request, body: Record<string, string>): OAuthCl
 
 /** OAuth 令牌端点（authorization_code + refresh_token，PKCE 校验） */
 oauthRouter.post('/token', (req: Request, res: Response) => {
+  // 令牌响应绝不允许被任何层缓存（设计书 §38 / RFC 6749 §5.1）
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Pragma', 'no-cache');
   // 端点级限流（P1 hardening，不改变协议）
   if (!oauthRateLimit('oauthToken', req.ip || 'unknown')) {
     res.status(429).json({ error: 'slow_down', error_description: 'Too many token requests' });

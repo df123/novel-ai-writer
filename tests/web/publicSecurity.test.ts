@@ -530,4 +530,22 @@ describe('限流桶过期清扫（评审 P1）', () => {
     vi.useRealTimers();
     resetRateLimiter();
   });
+
+  it('失败计数路径(record* 函数)同样触发清扫,不经 take 的 bucket 不会永久积累', async () => {
+    const { recordOauthAuthorizeFailure } = await import('../../src/server/web/webRateLimit');
+    resetRateLimiter();
+    recordLoginFailure('5.6.7.8');
+    expect(getBucketCount()).toBe(1);
+
+    // /oauth/authorize 不经过 /api 通用 limiter,recordOauthAuthorizeFailure 自身必须维护清扫
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 16 * 60_000);
+    for (let i = 0; i < 80; i += 1) {
+      recordOauthAuthorizeFailure('9.9.9.9');
+    }
+    // 过期的 loginFail 桶被清掉,只剩 oauthAuthorizeFail 一个桶
+    expect(getBucketCount()).toBe(1);
+    vi.useRealTimers();
+    resetRateLimiter();
+  });
 });

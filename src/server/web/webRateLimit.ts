@@ -33,17 +33,7 @@ function take(name: string, key: string): boolean {
   const nowMs = Date.now();
   const mapKey = `${name}:${key}`;
 
-  // 惰性清扫：定期清过期 bucket；仍超容量则按最旧窗口丢弃，保证 Map 有界
-  operationsSinceSweep += 1;
-  if (operationsSinceSweep >= SWEEP_EVERY || buckets.size > MAX_BUCKETS) {
-    operationsSinceSweep = 0;
-    if (sweepExpired() > MAX_BUCKETS) {
-      const byAge = [...buckets.entries()].sort((a, b) => a[1].windowStart - b[1].windowStart);
-      for (const [staleKey] of byAge.slice(0, byAge.length - MAX_BUCKETS)) {
-        buckets.delete(staleKey);
-      }
-    }
-  }
+  maybeSweep();
 
   const bucket = buckets.get(mapKey);
   if (!bucket || nowMs - bucket.windowStart >= spec.windowMs) {
@@ -52,6 +42,38 @@ function take(name: string, key: string): boolean {
   }
   bucket.count += 1;
   return bucket.count <= spec.max;
+}
+
+/**
+ * 所有 bucket 写入共用的维护入口（评审 P1 收口）：
+ * 定期清过期 bucket + 容量保护，防止只写不扫的路径（如失败计数）造成 Map 永久增长
+ */
+function maybeSweep(): void {
+  operationsSinceSweep += 1;
+  if (operationsSinceSweep < SWEEP_EVERY && buckets.size <= MAX_BUCKETS) return;
+  operationsSinceSweep = 0;
+  if (sweepExpired() > MAX_BUCKETS) {
+    const byAge = [...buckets.entries()].sort((a, b) => a[1].windowStart - b[1].windowStart);
+    for (const [staleKey] of byAge.slice(0, byAge.length - MAX_BUCKETS)) {
+      buckets.delete(staleKey);
+    }
+  }
+}
+
+/** 计入一次失败计数（窗口内累加，窗口过期重开），走统一维护入口 */
+function recordFailure(name: 'loginFail' | 'oauthAuthorizeFail', key: string): void {
+  const spec = SPECS[name];
+  const mapKey = `${name}:fails:${key}`;
+  const nowMs = Date.now();
+
+  maybeSweep();
+
+  const bucket = buckets.get(mapKey);
+  if (!bucket || nowMs - bucket.windowStart >= spec.windowMs) {
+    buckets.set(mapKey, { windowStart: nowMs, count: 1 });
+    return;
+  }
+  bucket.count += 1;
 }
 
 interface LimiterSpec {
@@ -83,14 +105,7 @@ export function isLoginBlocked(ip: string): boolean {
 
 /** 记录一次登录失败 */
 export function recordLoginFailure(ip: string): void {
-  const spec = SPECS.loginFail;
-  const key = `loginFail:fails:${ip}`;
-  const bucket = buckets.get(key);
-  if (!bucket || Date.now() - bucket.windowStart >= spec.windowMs) {
-    buckets.set(key, { windowStart: Date.now(), count: 1 });
-    return;
-  }
-  bucket.count += 1;
+  recordFailure('loginFail', ip);
 }
 
 /** 通用 API 限流中间件工厂：按会话（回退 IP）计数 */
@@ -126,14 +141,7 @@ export function oauthRateLimit(name: 'oauthAuthorizeFail' | 'oauthToken' | 'oaut
 
 /** 记录一次 authorize 密码错误 */
 export function recordOauthAuthorizeFailure(ip: string): void {
-  const spec = SPECS.oauthAuthorizeFail;
-  const key = `oauthAuthorizeFail:fails:${ip}`;
-  const bucket = buckets.get(key);
-  if (!bucket || Date.now() - bucket.windowStart >= spec.windowMs) {
-    buckets.set(key, { windowStart: Date.now(), count: 1 });
-    return;
-  }
-  bucket.count += 1;
+  recordFailure('oauthAuthorizeFail', ip);
 }
 
 /** 测试辅助：清空全部限流桶 */

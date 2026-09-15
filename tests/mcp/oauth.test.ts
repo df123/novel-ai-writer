@@ -114,6 +114,41 @@ describe('well-known 元数据按模式发布', () => {
   });
 });
 
+describe('token 端点响应禁止缓存（设计书 §38 / RFC 6749 §5.1）', () => {
+  it('成功与失败的 token 响应均携带 Cache-Control: no-store + Pragma: no-cache', async () => {
+    // 失败响应(无效请求)
+    const failed = await request(app).post('/oauth/token').type('form').send({ grant_type: 'authorization_code', code: 'nope' });
+    expect(failed.status).toBe(401);
+    expect(failed.headers['cache-control']).toBe('no-store');
+    expect(failed.headers['pragma']).toBe('no-cache');
+
+    // 成功响应(完整 PKCE 流程)
+    const reg = await request(app).post('/oauth/register').send({
+      client_name: 'no-store-check',
+      redirect_uris: [REDIRECT_A],
+      token_endpoint_auth_method: 'none'
+    });
+    const flow = await authorizationCodeFlow({
+      clientId: reg.body.client_id,
+      redirectUri: REDIRECT_A,
+      verifier: 'n'.repeat(43),
+      password: TEST_PASSWORD
+    });
+    expect(flow.status).toBe(200);
+    const success = await request(app)
+      .post('/oauth/token')
+      .type('form')
+      .send({
+        grant_type: 'refresh_token',
+        refresh_token: flow.body.refresh_token,
+        client_id: reg.body.client_id
+      });
+    expect(success.status).toBe(200);
+    expect(success.headers['cache-control']).toBe('no-store');
+    expect(success.headers['pragma']).toBe('no-cache');
+  });
+});
+
 describe('P0-2: redirect_uri 严格校验', () => {
   it('注册 redirect A,authorize 用 A 成功,用 B 被拒', async () => {
     const reg = await registerClient({ client_name: 'redirect-test', redirect_uris: [REDIRECT_A] });

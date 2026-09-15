@@ -6,8 +6,10 @@
 #   - Apache → 应用这一跳来源仍是 127.0.0.1,与 trust proxy=loopback 拓扑精确匹配
 # host 模式没有端口映射,请勿添加 ports;公网隔离完全由 Apache + 防火墙(仅 80/443)保证
 #
-# 用法:cp .env.example .env 并填好 APP_MODE=public 与 WEB_* 后
+# 用法:cp .env.example .env 并填好 WEB_* 等变量后
 #   docker compose -f docker-compose.public.yml up -d --build
+# 注意:APP_MODE 在本文件中硬编码为 public(不接受 .env 覆盖)——
+# 复制 .env.example 后即使漏改其中的 APP_MODE=local 也不会让本文件以无认证 local 启动
 services:
   app:
     build:
@@ -30,8 +32,8 @@ services:
       - MCP_STATIC_TOKEN=${MCP_STATIC_TOKEN:-}
       - MCP_PUBLIC_URL=${MCP_PUBLIC_URL:-}
       - MCP_OAUTH_PASSWORD=${MCP_OAUTH_PASSWORD:-}
-      # Public Web
-      - APP_MODE=${APP_MODE:-public}
+      # Public Web。APP_MODE 硬编码 public:.env 漏改 APP_MODE=local 不得使本文件静默降级(评审 Blocker)
+      - APP_MODE=public
       - WEB_PUBLIC_URL=${WEB_PUBLIC_URL:-}
       - WEB_USERNAME=${WEB_USERNAME:-}
       - WEB_PASSWORD_HASH=${WEB_PASSWORD_HASH:-}

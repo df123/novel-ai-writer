@@ -1,0 +1,46 @@
+# CI:类型检查 / Lint / 全量测试 / 构建
+# 目的:让每次 push 与 PR 都产生可公开复核的 check 结果,
+# 评审方无需本地环境即可在 GitHub 上独立验证测试是否通过
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (renderer + shared)
+        run: pnpm typecheck
+
+      - name: Typecheck (server)
+        run: pnpm typecheck:server
+
+      - name: Lint (0 errors required, warnings allowed)
+        run: pnpm lint
+
+      # 测试自建临时数据库(tests/setup.ts 设置 DB_DIR),不触碰任何真实数据,无需 secrets
+      - name: Test (domain + REST + MCP + public web security)
+        run: pnpm test
+
+      - name: Build (server + renderer)
+        run: pnpm build
