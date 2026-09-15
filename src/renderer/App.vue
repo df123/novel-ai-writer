@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useProjectStore } from './stores/projectStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useAuthStore } from './stores/authStore';
@@ -26,17 +26,27 @@ const isReady = ref(false);
 
 const needLogin = computed(() => authStore.isReady && authStore.appMode === 'public' && !authStore.authenticated);
 
-onMounted(async () => {
+async function loadAppData(): Promise<void> {
   try {
-    // 启动门禁：先探测会话，未认证不加载任何业务数据
-    await authStore.initSession();
-    if (needLogin.value) return;
-
     await Promise.all([projectStore.loadProjects(), settingsStore.loadSettings()]);
-    isReady.value = true;
   } catch (error) {
     console.error('Failed to initialize app:', error);
+  } finally {
     isReady.value = true;
+  }
+}
+
+onMounted(async () => {
+  // 启动门禁：先探测会话，未认证不加载任何业务数据
+  await authStore.initSession();
+  if (needLogin.value) return;
+  await loadAppData();
+});
+
+// 登录页完成登录后(未登录时跳过了启动加载)，在此补触发应用数据加载
+watch(needLogin, (blocked, wasBlocked) => {
+  if (wasBlocked && !blocked && !isReady.value) {
+    void loadAppData();
   }
 });
 </script>

@@ -194,6 +194,13 @@ export const settingsApi = {
   update: (settings: Record<string, string | number>) => api.put('/settings', settings),
 };
 
+// Web 认证（必须走上面带 CSRF/401 拦截器的实例；裸 axios 会导致 logout 缺 CSRF 头被 403）
+export const authApi = {
+  login: (username: string, password: string) => api.post('/auth/login', { username, password }),
+  session: () => api.get('/auth/session'),
+  logout: () => api.post('/auth/logout'),
+};
+
 // Models
 // 公网模式：不传 apiKey/baseUrl（服务端从加密设置解析）；local 模式保留原有行为
 export const modelsApi = {

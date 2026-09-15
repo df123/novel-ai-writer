@@ -58,6 +58,7 @@
               <el-dropdown-item command="settings">LLM设置</el-dropdown-item>
               <!-- 公网模式不提供数据库管理入口（/api/db 服务端不注册，设计书 §6） -->
               <el-dropdown-item v-if="!isPublicMode" command="database">数据库管理</el-dropdown-item>
+              <el-dropdown-item v-if="isPublicMode" command="logout" divided>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -192,6 +193,9 @@ const handleMenuCommand = (command: string) => {
     showSettings.value = true;
   } else if (command === 'database') {
     showDatabase.value = true;
+  } else if (command === 'logout') {
+    // public 模式退出登录：会话删除后 App.vue 响应式切回登录页
+    void authStore.logout();
   }
 };
 </script>

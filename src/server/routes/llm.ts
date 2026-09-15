@@ -84,7 +84,9 @@ router.post('/models/:provider', asyncHandler(async (req: Request, res: Response
       busyResponse(res, error);
       return;
     }
-    throw error;
+    // 上游 Provider 拒绝(密钥无效/配额/网络)映射为 502,携带原始错误文本供前端提示;
+    // 不再作为 500 抛出(无效密钥是可预期状态,而非服务器故障)
+    res.status(502).json({ error: (error as Error).message || '获取模型列表失败' });
   }
 }));
 

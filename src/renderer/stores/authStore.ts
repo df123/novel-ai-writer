@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import axios from 'axios';
-import { webSecurity } from '../utils/api';
+import { authApi, webSecurity } from '../utils/api';
 
 interface SessionResponse {
   authenticated: boolean;
@@ -46,8 +45,8 @@ export const useAuthStore = defineStore('auth', () => {
   // SPA 启动第一步：先探测会话，再决定加载应用还是登录页（设计书 §14）
   async function initSession(): Promise<void> {
     try {
-      const response = await axios.get<SessionResponse>('/api/auth/session');
-      applySession(response.data);
+      const response = await authApi.session();
+      applySession(response.data as SessionResponse);
     } catch (error) {
       console.error('Failed to probe auth session:', error);
       // 探测失败按未认证处理，公网模式下展示登录页
@@ -61,8 +60,8 @@ export const useAuthStore = defineStore('auth', () => {
     loginError.value = '';
     isLoggingIn.value = true;
     try {
-      const response = await axios.post<LoginResponse>('/api/auth/login', { username, password });
-      applySession({ ...response.data, authenticated: true });
+      const response = await authApi.login(username, password);
+      applySession({ ...(response.data as LoginResponse), authenticated: true });
       return true;
     } catch (error) {
       const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -75,7 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout(): Promise<void> {
     try {
-      await axios.post('/api/auth/logout');
+      await authApi.logout();
     } catch (error) {
       console.error('Failed to logout:', error);
     }
