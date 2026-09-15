@@ -116,8 +116,14 @@ async function generateWithComfy(promptText: string, width: number, height: numb
       body: JSON.stringify({ prompt: buildWorkflow(promptText, width, height, seed), client_id: 'novel-ai-writer' }),
       signal: AbortSignal.timeout(30000),
     });
-  } catch {
-    throw new Error(`无法连接生图服务(${baseUrl}),请确认 ComfyUI 已启动`);
+  } catch (error) {
+    // 公网模式错误信息不携带内部服务地址（server-only，评审 P1）；完整上下文进服务端日志
+    console.error('[illustrations] ComfyUI connection failed:', error);
+    throw new Error(
+      isPublicMode()
+        ? '无法连接生图服务,请确认 ComfyUI 已启动'
+        : `无法连接生图服务(${baseUrl}),请确认 ComfyUI 已启动`
+    );
   }
 
   const queueData = await queueResponse.json().catch(() => null) as { prompt_id?: string; error?: unknown } | null;

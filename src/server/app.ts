@@ -63,12 +63,12 @@ export function createApp(): App {
   app.use(logRequestMiddleware);
 
   // 路径级 body 解析（取代原全局 parser，设计书 §29 各边界独立真实生效）：
-  // 先挂的具体路径先生效（body-parser 首个解析后其余跳过）
+  // 先挂的具体路径先生效（body-parser 首个解析后其余跳过）。
+  // 登录 8KB 体量极小、且是门卫豁免路径，解析放前无 DoS 面；
+  // 业务 /api 的 4MB 解析刻意放在会话门卫与限流之后（未认证请求先 401，不接收大 body）；
+  // /mcp 的 50MB 解析放在 MCP Bearer 认证之后（见 routes/mcp.ts，评审 P1）。
+  // OAuth JSON 统一收紧到 16KB（authorize/token 走 urlencoded 不受影响）
   app.use('/api/auth', express.json({ limit: '8kb' }));
-  app.use('/api', express.json({ limit: isPublicMode() ? '4mb' : '50mb' }));
-  // MCP 冻结：/mcp 始终保持原 50MB 上限，public 收紧不得影响 MCP 行为
-  app.use('/mcp', express.json({ limit: '50mb' }));
-  // OAuth JSON 请求统一收紧（authorize/token 走 urlencoded 不受影响；register 另有路由级 16KB）
   app.use('/oauth', express.json({ limit: '16kb' }));
 
   if (isPublicMode()) {
@@ -87,6 +87,8 @@ export function createApp(): App {
     app.use('/api', webApiGuard);
     app.use('/api', rateLimitMiddleware('api'));
   }
+  // 业务 API 的 JSON 解析在门卫/限流之后（未登录先 401；local 无门卫行为不变）
+  app.use('/api', express.json({ limit: isPublicMode() ? '4mb' : '50mb' }));
 
   app.use('/api/auth', webAuthRouter);
   app.use('/api/settings', settingsRouter);

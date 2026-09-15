@@ -1,0 +1,56 @@
+# Public Web 生产部署专用（APP_MODE=public 必须使用本文件,不要用 docker-compose.yml）
+#
+# 网络模型（评审整改）:host 网络 —— 容器直接共享宿主网络栈:
+#   - 应用监听宿主 127.0.0.1:3002,由宿主上的 Apache 白名单反代对外
+#   - FunASR/ComfyUI/CLI Proxy 仅监听宿主 127.0.0.1,容器内可达(无需 host.docker.internal)
+#   - Apache → 应用这一跳来源仍是 127.0.0.1,与 trust proxy=loopback 拓扑精确匹配
+# host 模式没有端口映射,请勿添加 ports;公网隔离完全由 Apache + 防火墙(仅 80/443)保证
+#
+# 用法:cp .env.example .env 并填好 APP_MODE=public 与 WEB_* 后
+#   docker compose -f docker-compose.public.yml up -d --build
+services:
+  app:
+    build:
+      context: .
+      network: host
+      args:
+        - HTTP_PROXY=${HTTP_PROXY:-}
+        - HTTPS_PROXY=${HTTPS_PROXY:-}
+    container_name: novel-ai-writer-public
+    network_mode: host
+    environment:
+      - NODE_ENV=production
+      # host 网络:监听宿主回环,公网访问只能经 Apache 反代
+      - HOST=127.0.0.1
+      - PORT=${APP_PORT:-3002}
+      - DB_DIR=/app/data
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      # MCP 认证:public 必须 token 或 oauth
+      - MCP_AUTH_MODE=${MCP_AUTH_MODE:-token}
+      - MCP_STATIC_TOKEN=${MCP_STATIC_TOKEN:-}
+      - MCP_PUBLIC_URL=${MCP_PUBLIC_URL:-}
+      - MCP_OAUTH_PASSWORD=${MCP_OAUTH_PASSWORD:-}
+      # Public Web
+      - APP_MODE=${APP_MODE:-public}
+      - WEB_PUBLIC_URL=${WEB_PUBLIC_URL:-}
+      - WEB_USERNAME=${WEB_USERNAME:-}
+      - WEB_PASSWORD_HASH=${WEB_PASSWORD_HASH:-}
+      - WEB_SESSION_TTL_HOURS=${WEB_SESSION_TTL_HOURS:-168}
+      # 内部服务:host 网络下即宿主回环地址
+      - FUNASR_BASE_URL=${FUNASR_BASE_URL:-http://127.0.0.1:3010}
+      - COMFYUI_BASE_URL=${COMFYUI_BASE_URL:-http://127.0.0.1:3011}
+      - CLIPROXY_BASE_URL=${CLIPROXY_BASE_URL:-http://127.0.0.1:8317/v1}
+    volumes:
+      - novel-ai-data:/app/data
+      - novel-ai-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  novel-ai-data:
+  novel-ai-logs:

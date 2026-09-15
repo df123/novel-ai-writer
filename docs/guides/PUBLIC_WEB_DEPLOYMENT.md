@@ -53,11 +53,13 @@
 ### 3.1 生成登录密码哈希
 
 ```bash
-node scripts/hash-password.mjs '你的强密码'
+node scripts/hash-password.mjs
+# 交互式输入密码(不回显,不进 shell history)
+# 或脚本化: node scripts/hash-password.mjs '你的强密码'
 # 输出: scrypt:16384:8:1:...:...
 ```
 
-### 3.2 环境变量(/opt/novel-ai-writer/.env)
+### 3.2 环境变量(/etc/novel-ai-writer.env,权限 600;见 3.3)
 
 ```bash
 APP_MODE=public
@@ -172,9 +174,13 @@ ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
 ### 4.4 Apache 日志脱敏
 
 ```apache
-# 用 %U(不含 query string)而非 %r,避免下载令牌/搜索词进日志
-LogFormat "%h %l %u %t \"%m %U protocol\" %>s %b"脱敏
-CustomLog ${APACHE_LOG_DIR}/writer-access.log 脱敏
+# 用 %U(不含 query string)而非 %r,避免搜索词等 query 进日志
+LogFormat "%h %l %u %t \"%m %U protocol\" %>s %b" 脱敏
+
+# /mcp/download/:token 的下载令牌在 URL path 里(不在 query),仅 %U 无法隐藏:
+# 对该路径直接不记录访问日志(应用侧已记录 [REDACTED] 版本)
+SetEnvIf Request_URI "^/mcp/download/" dontlog
+CustomLog ${APACHE_LOG_DIR}/writer-access.log 脱敏 env=!dontlog
 ```
 
 ## 5. 备份(设计书 §42)
@@ -192,17 +198,22 @@ BACKUP_ROOT=/opt/backups ./scripts/backup.sh ...  # 自定义备份根
 - 保留策略:**朴素轮转,保留最近 34 份**(非 14日+8周+12月分层保留;个人项目按天备份即约 34 天)
 - **必须实测 restore**:`sha256sum -c` 校验 → 拷回 data 目录 → 启动 → 验证项目/插画存在
 
-### 2.1 Docker 部署 Public 模式(支持)
+### 2.1 Docker 部署 Public 模式(支持,须用专用 compose 文件)
 
-`docker-compose.yml` 已透传全部 Public Web 环境变量。容器内绑定规则与裸机不同:
+**`APP_MODE=public` 的 Docker 部署必须使用 `docker-compose.public.yml`**(host 网络),不要用默认 `docker-compose.yml`(那是 local/内网用途):
 
-```text
-容器内: HOST=0.0.0.0 + ALLOW_PUBLIC_CONTAINER_BIND=1(compose 已内置)
-宿主侧: ports 仅发布 127.0.0.1:3002(compose 已内置,公网隔离由这一层保证)
-内部服务: 容器内 127.0.0.1 指容器自身,FunASR/ComfyUI/CLI Proxy 需用 host.docker.internal
+```bash
+cp .env.example .env   # 填好 APP_MODE=public 与 WEB_* 等
+docker compose -f docker-compose.public.yml up -d --build
 ```
 
-`.env` 中设置 `APP_MODE=public` 等变量后 `docker compose up -d --build` 即可;启动 fail-fast 校验在容器内同样生效(缺配置容器会退出,`docker logs` 可见具体缺项)。**注意:public 模式下宿主必须仍有 Apache 白名单反代,绝不可把 ports 改为发布到 0.0.0.0。**
+为什么用 host 网络而不是默认 bridge + `host.docker.internal`(评审整改):
+
+- **内部服务连通性**:FunASR/ComfyUI/CLI Proxy 只监听宿主 `127.0.0.1`(安全要求);bridge 容器经 `host.docker.internal`(bridge 网关 IP)访问的是宿主网关接口,连不上只听 loopback 的服务。host 网络下容器直接共享宿主网络栈,`127.0.0.1:3010/3011/8317` 全部可达,`.env` 里的内部地址保持 `127.0.0.1` 写法。
+- **trust proxy 拓扑匹配**:host 网络下 Apache → 应用这一跳来源仍是 `127.0.0.1`,与 `trust proxy=loopback` 精确匹配,按真实客户端 IP 限流;bridge+NAT 下该跳会变成 Docker 网关 IP,全站共享一个限流桶。
+- **无需 ports/ALLOW_PUBLIC_CONTAINER_BIND**:host 模式没有端口映射,应用监听宿主 `127.0.0.1:3002`,公网只可能经 Apache 白名单反代进入。
+
+若误在 `docker-compose.yml` 里设 `APP_MODE=public`:应用会监听容器内回环,端口映射不通、Apache 502(显性故障,非静默降级);`APP_MODE` 拼写错误则直接拒绝启动(fail-closed)。
 
 ## 6. 安全机制速查(已实现)
 
@@ -222,12 +233,15 @@ BACKUP_ROOT=/opt/backups ./scripts/backup.sh ...  # 自定义备份根
 | 安全头(CSP/nosniff/no-referrer/DENY/HSTS/Permissions-Policy)+API no-store + 静态资源缓存策略 | `src/server/web/webSecurity.ts`、`app.ts` |
 | 前端:启动会话门禁+LoginView+axios/fetch CSRF 拦截器+401 回登录+模型缓存版本化签名 | `src/renderer/stores/authStore.ts`、`utils/api.ts`、`App.vue` |
 
-## 7. 自动化测试(104/104 全绿,新增 25 项)
+## 7. 自动化测试(以最新提交的本地真实执行输出为准)
 
 `tests/web/publicSecurity.test.ts` 覆盖设计书 §48 验收矩阵的可自动化部分:
 未登录 401/错误密码 401/登录 5 失败 429/Cookie 属性/注销即失效/CSRF 缺失·伪造·外来 Origin 全 403/正确组合写入成功/
 `/api/db` 404(oauth_tokens 不可查询)/密钥不回显+configured+版本号/未知 key 400/server-only 地址 400/
-chat·models 携 apiKey 400/status 不回显 baseUrl/插画尺寸 4096→400/安全头/no-store/启动校验三种场景。
+chat·models 携 apiKey 400/status 不回显 baseUrl/插画尺寸 4096→400/安全头/no-store/启动校验/
+body 限制真实生效(登录 8KB·API 4MB→413,/mcp 50MB 不受影响)/未认证大 body 先 401 不解析/
+空 secret 不清除已配置密钥/APP_MODE 非法值拒绝启动/插画删除路径囚禁。
+测试数量随整改轮递增,以交付报告中本地 `pnpm test` 的真实输出为准(评审方无法独立复跑,依赖提交附带的执行记录)。
 
 ## 8. 最终验收清单(设计书 §48,部署后人工执行)
 

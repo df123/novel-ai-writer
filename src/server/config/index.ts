@@ -105,9 +105,16 @@ export const CLIPROXY_DEFAULT_BASE_URL = 'http://127.0.0.1:8317/v1';
 /** 应用运行模式：local=内网信任模型（现状），public=公网暴露（启用 Web 登录/CSRF/限流等安全边界） */
 export type AppMode = 'local' | 'public';
 
-/** 读取应用运行模式（默认 local，保持内网行为不变） */
+/**
+ * 读取应用运行模式（默认 local，保持内网行为不变）。
+ * fail-closed：非法值（拼写错误/多余空白/大小写不符）直接抛错拒绝启动，
+ * 而不是静默降级到无认证的 local（评审 Blocker：`APP_MODE=publci` 曾会静默变 local）。
+ */
 export function getAppMode(): AppMode {
-  return process.env.APP_MODE === 'public' ? 'public' : 'local';
+  const raw = process.env.APP_MODE;
+  if (!raw || raw === 'local') return 'local';
+  if (raw === 'public') return 'public';
+  throw new Error(`Invalid APP_MODE: ${JSON.stringify(raw)}（仅允许 local / public，未设置时默认 local）`);
 }
 
 /** 是否处于公网模式（惰性读取环境变量，便于测试在导入后切换模式） */

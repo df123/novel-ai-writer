@@ -1,7 +1,7 @@
 // Public Web V1 安全边界测试（设计书 §48 验收矩阵的可自动化部分）
 // 本文件在 APP_MODE=public 下启动独立应用实例，验证：
 // 认证/会话/CSRF/Origin/密钥脱敏/SSRF 收敛/db 端点不注册/尺寸白名单/安全头/登录限流
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import request from 'supertest';
 import { randomBytes, scryptSync } from 'crypto';
 
@@ -23,11 +23,14 @@ process.env.WEB_PUBLIC_URL = WEB_PUBLIC_URL;
 process.env.WEB_USERNAME = WEB_USERNAME;
 process.env.WEB_PASSWORD_HASH = makeScryptHash(WEB_PASSWORD);
 process.env.ENCRYPTION_KEY = 'test-encryption-key-32-bytes!!';
+// /mcp 用 token 认证,便于验证"认证先于 50MB 解析"
+process.env.MCP_AUTH_MODE = 'token';
+process.env.MCP_STATIC_TOKEN = 'e2e-mcp-token';
 
 const { initDB } = await import('../../src/server/db');
 const { createApp } = await import('../../src/server/app');
-const { resetRateLimiter } = await import('../../src/server/web/webRateLimit');
-const { validatePublicStartup } = await import('../../src/server/config');
+const { resetRateLimiter, recordLoginFailure, oauthRateLimit, getBucketCount } = await import('../../src/server/web/webRateLimit');
+const { validatePublicStartup, getAppMode } = await import('../../src/server/config');
 
 import type { Express } from 'express';
 
@@ -388,7 +391,7 @@ describe('公网启动 fail-fast 校验（设计书 §18）', () => {
   });
 });
 
-describe('路径级 body 限制真实生效（评审 Blocker 2）', () => {
+describe('路径级 body 限制真实生效（评审 Blocker 2/P1）', () => {
   it('trust proxy 仅信任回环代理（防伪造 XFF 绕过限流）', () => {
     expect(app.get('trust proxy')).toBe('loopback');
   });
@@ -412,13 +415,31 @@ describe('路径级 body 限制真实生效（评审 Blocker 2）', () => {
     expect(response.status).toBe(413);
   });
 
-  it('/mcp 保持 50MB 上限：5MB JSON 不被 public 收紧拒绝（非 413）', async () => {
+  it('未认证的 5MB 业务请求先 401,不进入解析（认证先于 body parsing）', async () => {
+    const response = await request(app)
+      .post('/api/projects')
+      .send({ title: 'y'.repeat(5 * 1024 * 1024) });
+    // 门卫在 JSON 解析之前:未登录直接 401,服务端不接收/解析大 body
+    expect(response.status).toBe(401);
+  });
+
+  it('/mcp 认证先于 50MB 解析:无 Bearer 的大请求 → 401 非 413', async () => {
     const response = await request(app)
       .post('/mcp')
       .set('Content-Type', 'application/json')
       .set('Accept', 'application/json, text/event-stream')
       .send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { padding: 'z'.repeat(5 * 1024 * 1024) } });
-    // MCP 冻结：public 模式不得把 /mcp 从 50MB 收紧到 4MB；协议层错误可以，413 不可以
+    expect(response.status).toBe(401);
+  });
+
+  it('/mcp 带 token 的 5MB JSON 不被 public 收紧拒绝（50MB 冻结,非 413）', async () => {
+    const response = await request(app)
+      .post('/mcp')
+      .set('Authorization', 'Bearer e2e-mcp-token')
+      .set('Content-Type', 'application/json')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '1' }, padding: 'z'.repeat(5 * 1024 * 1024) } });
+    // 认证通过后进入 50MB 解析与协议层;413 才代表 public 违规收紧
     expect(response.status).not.toBe(413);
   });
 });
@@ -448,5 +469,65 @@ describe('插画删除路径囚禁（评审 §6）', () => {
     expect(query('SELECT * FROM illustrations WHERE id = ?', [id])).toHaveLength(0);
     expect(require('fs').existsSync(outsideFile)).toBe(true);
     require('fs').rmSync(outsideFile);
+  });
+});
+
+describe('Public 空 secret 语义（评审新 Blocker）', () => {
+  it('空 write-only 输入不清除已配置密钥：只改推理设置后 configured 仍为 true', async () => {
+    const { cookie, csrfToken } = await login('10.13.0.1');
+    const put = (body: Record<string, string>) => request(app)
+      .put('/api/settings')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrfToken)
+      .set('Origin', WEB_PUBLIC_URL)
+      .send(body);
+
+    // 保存密钥
+    await put({ zai_api_key: 'sk-zai-keep-me' });
+    // 用户只改推理强度,密钥输入框为空一起提交(前端防线失效时服务端兜底)
+    const res = await put({ zai_api_key: '', zai_reasoning_effort: 'max' });
+    expect(res.status).toBe(200);
+
+    const get = await request(app).get('/api/settings').set('Cookie', cookie);
+    expect(get.body.zai_api_key_configured).toBe(true);
+    expect(get.body.zai_reasoning_effort).toBe('max');
+  });
+});
+
+describe('APP_MODE 严格解析（评审新 Blocker）', () => {
+  it('拼写错误的 APP_MODE 拒绝启动(fail-closed),不会静默降级 local', () => {
+    const saved = process.env.APP_MODE;
+    process.env.APP_MODE = 'publci';
+    expect(() => getAppMode()).toThrow(/Invalid APP_MODE/);
+    expect(() => createApp()).toThrow(/Invalid APP_MODE/);
+    process.env.APP_MODE = saved;
+    expect(getAppMode()).toBe('public');
+  });
+
+  it('合法值:未设置 → local;精确 local/public 直通', () => {
+    const saved = process.env.APP_MODE;
+    delete process.env.APP_MODE;
+    expect(getAppMode()).toBe('local');
+    process.env.APP_MODE = 'local';
+    expect(getAppMode()).toBe('local');
+    process.env.APP_MODE = saved;
+  });
+});
+
+describe('限流桶过期清扫（评审 P1）', () => {
+  it('窗口过期的 bucket 会被惰性清理,Map 不永久增长', () => {
+    resetRateLimiter();
+    recordLoginFailure('1.2.3.4');
+    expect(getBucketCount()).toBe(1);
+
+    // 时间前进 16 分钟(loginFail 窗口 15 分钟),再触发若干次计数操作引起清扫
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 16 * 60_000);
+    for (let i = 0; i < 80; i += 1) {
+      oauthRateLimit('oauthToken', 'sweep-trigger');
+    }
+    expect(getBucketCount()).toBe(1); // 只剩本次新建的 oauthToken 桶
+    vi.useRealTimers();
+    resetRateLimiter();
   });
 });

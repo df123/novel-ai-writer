@@ -5,7 +5,6 @@ import { handleMcpRequest } from '../mcp/httpTransport';
 import { mcpAuthMiddleware, oauthRouter, getAuthMode, getPublicBaseUrl } from '../mcp/auth';
 import { consumeDownload } from '../mcp/downloads';
 import { getDatabase } from '../db';
-
 const router: Router = express.Router();
 
 /**
@@ -22,9 +21,10 @@ router.get('/health', (_req: Request, res: Response) => {
 
 /**
  * MCP 端点（Streamable HTTP，无状态）
- * GET/DELETE 由 SDK 返回 405，POST 承载全部 JSON-RPC
+ * GET/DELETE 由 SDK 返回 405，POST 承载全部 JSON-RPC。
+ * 50MB 解析刻意放在 Bearer 认证之后：未认证请求先 401，不让服务端白白接收/解析超大 body（评审 P1）
  */
-router.all('/mcp', mcpAuthMiddleware, (req: Request, res: Response) => {
+router.all('/mcp', mcpAuthMiddleware, express.json({ limit: '50mb' }), (req: Request, res: Response) => {
   void handleMcpRequest(req, res);
 });
 

@@ -302,9 +302,15 @@ export const useSettingsStore = defineStore('settings', () => {
         currentSettings.show_tool_calls = settings.showToolCalls ? 'true' : 'false';
       }
 
-      // 公网模式：内部服务地址由服务器环境变量管理，不随请求提交（会被白名单 400 拒绝）
+      // 公网模式：内部服务地址由服务器环境变量管理，不随请求提交（会被白名单 400 拒绝）；
+      // 空 secret 也不提交（write-only 输入框不回显，空值表示"只改其他设置"，提交会被服务端忽略，这里直接省略）
       if (authStore.appMode === 'public' || webSecurity.isPublicMode()) {
         delete currentSettings.cliproxy_base_url;
+        for (const secretKey of Object.keys(currentSettings)) {
+          if (secretKey.endsWith('_api_key') && currentSettings[secretKey] === '') {
+            delete currentSettings[secretKey];
+          }
+        }
       }
 
       const response = await settingsApi.update(currentSettings);

@@ -886,10 +886,17 @@ async function postLLMStream(
         ? ''
         : String(cause);
     const requestError = error as Error;
-    throw new Error(
-      `LLM API 请求失败 (${url}): ${requestError.message}` +
-      (causeMessage ? `; ${causeMessage}` : '')
-    );
+    // 公网模式上游 URL 属 server-only，错误信息不回显（评审 P1）
+    const location = url.startsWith('http://127.0.0.1') || url.includes('host.docker.internal')
+      ? '本地代理服务'
+      : 'LLM 服务';
+    const publicSafeMessage = `LLM API 请求失败 (${location}): ${requestError.message}`;
+    const fullMessage = `LLM API 请求失败 (${url}): ${requestError.message}` + (causeMessage ? `; ${causeMessage}` : '');
+    if (process.env.APP_MODE === 'public') {
+      console.error('[llm]', fullMessage);
+      throw new Error(publicSafeMessage);
+    }
+    throw new Error(fullMessage);
   }
 }
 

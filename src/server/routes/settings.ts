@@ -94,6 +94,9 @@ router.put('/', asyncHandler(async (req: Request, res: Response) => {
 
     for (const [key, value] of Object.entries(settings)) {
       if (secretKeys.includes(key)) {
+        // 空输入 = 不修改现有密钥（write-only 输入框本就不回显，空值通常是"只改其他设置"）；
+        // 清除密钥须在 local 模式进行（评审 Blocker：空串曾会静默清除已配置密钥）
+        if (String(value) === '') continue;
         saveProviderSecret(key, String(value));
       } else {
         run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, String(value)]);
